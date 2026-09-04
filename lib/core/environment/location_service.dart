@@ -18,6 +18,12 @@ abstract interface class LocationService {
   /// Only ever called in response to a deliberate user action. Returns
   /// the resulting state; it does not throw for an ordinary refusal.
   Future<LocationState> requestAccess();
+
+  /// Opens the platform's own settings page for this app, which is the
+  /// only route back once the user has permanently denied permission.
+  ///
+  /// Returns whether the page could be opened.
+  Future<bool> openSystemSettings();
 }
 
 /// A location service that always reports "unavailable".
@@ -35,4 +41,7 @@ class UnavailableLocationService implements LocationService {
   @override
   Future<LocationState> requestAccess() async =>
       const LocationUnavailable('no location service configured');
+
+  @override
+  Future<bool> openSystemSettings() async => false;
 }

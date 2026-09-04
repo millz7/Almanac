@@ -65,6 +65,10 @@ class _EnvironmentRefresherState extends ConsumerState<_EnvironmentRefresher> {
   }
 
   void _refresh() {
+    // Cheap and always safe: no permission, no prompt. Picks up a zone
+    // change from travelling or from a daylight-saving switch.
+    ref.read(timeZoneProvider.notifier).refresh();
+    // Non-prompting, and skipped entirely while the current fix is fresh.
     ref.read(locationStateProvider.notifier).refresh();
     ref.invalidate(naturalEnvironmentProvider);
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'geo_location.dart';
@@ -64,6 +65,19 @@ class GeolocatorLocationService implements LocationService {
     }
   }
 
+  @override
+  Future<bool> openSystemSettings() async {
+    try {
+      // The platform's own app-settings page. Once permission is
+      // permanently denied this is the only way back, and Android gives
+      // no way to re-prompt from inside the app.
+      return await Geolocator.openAppSettings();
+    } on Object catch (error) {
+      debugPrint('Could not open app settings: $error');
+      return false;
+    }
+  }
+
   /// Maps a permission result to a refusal state, or null when the app is
   /// allowed to read a position.
   LocationState? _refusalFor(LocationPermission permission) =>
@@ -95,6 +109,10 @@ class GeolocatorLocationService implements LocationService {
     if (location == null) {
       return const LocationUnavailable('platform returned invalid coordinates');
     }
-    return LocationAvailable(location);
+    return LocationAvailable(
+      location,
+      accuracyMetres: position.accuracy,
+      obtainedAt: DateTime.now().toUtc(),
+    );
   }
 }

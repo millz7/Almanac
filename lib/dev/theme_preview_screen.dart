@@ -137,9 +137,10 @@ class _DetectedEnvironmentCard extends ConsumerWidget {
                 label: 'Hemisphere from',
                 value: _sourceLabel(data.hemisphereSource),
               ),
+              _Row(label: 'Time zone', value: data.timeZone.id),
               _Row(
                 label: 'UTC offset',
-                value: '${data.timeZone.utcOffset.inHours}h',
+                value: '${data.timeZone.offsetAt(DateTime.now()).inHours}h',
               ),
               _Row(
                 label: 'Precise location',

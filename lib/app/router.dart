@@ -9,6 +9,7 @@ import '../features/onboarding/domain/onboarding_stage.dart';
 import '../features/onboarding/presentation/hemisphere_screen.dart';
 import '../features/onboarding/presentation/location_intro_screen.dart';
 import '../features/rhythms/presentation/rhythms_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../features/today/presentation/today_screen.dart';
 import '../features/wellbeing/presentation/wellbeing_screen.dart';
 import 'app_shell.dart';
@@ -20,6 +21,9 @@ const kTodayRoute = '/today';
 /// not a place the user can navigate back to.
 const kHemisphereRoute = '/onboarding/hemisphere';
 const kLocationIntroRoute = '/onboarding/location';
+
+/// Settings, pushed over the app rather than being a sixth tab.
+const kSettingsRoute = '/settings';
 
 /// Route for the developer theme preview. Only registered in debug builds.
 const kThemePreviewRoute = '/dev/theme';
@@ -63,6 +67,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: kLocationIntroRoute,
         builder: (context, state) => const LocationIntroScreen(),
+      ),
+      // Outside the navigation shell: settings is somewhere you go and
+      // come back from, not a place in the app's main structure.
+      GoRoute(
+        path: kSettingsRoute,
+        builder: (context, state) => const SettingsScreen(),
       ),
       // Declared outside the navigation shell so it covers the whole
       // screen, and omitted entirely from release builds.

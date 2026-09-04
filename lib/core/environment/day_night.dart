@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'local_time_zone.dart';
 import 'solar_service.dart';
 
 /// Where the day currently is, relative to the sun.
@@ -14,10 +15,30 @@ enum DayPhase {
   final String label;
 }
 
+/// How much the app really knows about the state it is reporting.
+enum DayNightAccuracy {
+  /// Derived from real sunrise/sunset for the user's coordinates.
+  fromSolarEvents,
+
+  /// Estimated from the local clock because no position has been shared.
+  /// Good enough to theme by; never good enough to present as sunrise.
+  estimatedWithoutLocation,
+}
+
 /// How long the palette spends easing between night and day around each
 /// solar crossing. Centred on sunrise/sunset, so the halfway point of the
 /// blend is the moment the sun reaches the horizon.
 const kTwilightWindow = Duration(minutes: 45);
+
+/// The nominal daylight window used only when the app has no coordinates.
+///
+/// A rough global average, not a claim about anywhere in particular. It
+/// exists so that someone who declines location still sees a night theme
+/// at night; the resulting state is flagged
+/// [DayNightAccuracy.estimatedWithoutLocation] and no sunrise time is
+/// ever shown from it.
+const kNominalSunriseLocalTime = Duration(hours: 7);
+const kNominalSunsetLocalTime = Duration(hours: 19);
 
 /// The current day/night state.
 ///
@@ -29,6 +50,7 @@ class DayNightState {
   const DayNightState({
     required this.phase,
     required this.daylight,
+    this.accuracy = DayNightAccuracy.fromSolarEvents,
     this.nextChangeAt,
   });
 
@@ -37,8 +59,11 @@ class DayNightState {
   /// 0.0 at full night, 1.0 in full daylight, in between during twilight.
   final double daylight;
 
+  /// Whether this came from real solar events or from an estimate.
+  final DayNightAccuracy accuracy;
+
   /// When the phase next changes, if that is known from today's events.
-  /// Null after sunset, when the next change belongs to tomorrow.
+  /// Null after sunset, and on days when the sun neither rises nor sets.
   final DateTime? nextChangeAt;
 
   /// True from the midpoint of dawn to the midpoint of dusk.
@@ -50,32 +75,78 @@ class DayNightState {
   @override
   String toString() =>
       'DayNightState(${phase.label}, daylight: '
-      '${daylight.toStringAsFixed(2)})';
+      '${daylight.toStringAsFixed(2)}, ${accuracy.name})';
 }
 
-/// Works out the day/night state at [instant] from real solar events.
+/// Works out the day/night state at [instant].
 ///
-/// Deliberately a pure function of its inputs — no clock reads, no
-/// hard-coded hours — so it is trivially testable and works the same
-/// whether the events came from a placeholder or from real astronomical
-/// data later on.
+/// The single day/night calculation in the app. It covers three cases,
+/// all of which end up producing the same continuous [DayNightState.daylight]
+/// value so the theme has one thing to follow:
+///
+/// 1. An ordinary day — eased around the real sunrise and sunset.
+/// 2. A polar day or night — pinned to full daylight or full night.
+/// 3. No coordinates — estimated from the local clock and flagged as such.
+///
+/// Deliberately a pure function of its inputs, with no clock reads, so it
+/// is trivially testable.
 DayNightState resolveDayNight({
   required DateTime instant,
   required SolarEvents events,
+  LocalTimeZone? timeZone,
   Duration twilight = kTwilightWindow,
+}) {
+  // Inside the polar circles the sun may not cross the horizon at all.
+  switch (events.kind) {
+    case SolarDayKind.sunNeverSets:
+      return const DayNightState(phase: DayPhase.day, daylight: 1);
+    case SolarDayKind.sunNeverRises:
+      return const DayNightState(phase: DayPhase.night, daylight: 0);
+    case SolarDayKind.risesAndSets:
+      break;
+  }
+
+  final sunrise = events.sunrise;
+  final sunset = events.sunset;
+
+  if (sunrise == null || sunset == null) {
+    return _estimateFromClock(
+      instant: instant,
+      timeZone: timeZone,
+      twilight: twilight,
+    );
+  }
+
+  return _resolveAround(
+    instant: instant,
+    sunrise: sunrise,
+    sunset: sunset,
+    twilight: twilight,
+    accuracy: DayNightAccuracy.fromSolarEvents,
+  );
+}
+
+/// The shared easing logic, used for both real and estimated events.
+DayNightState _resolveAround({
+  required DateTime instant,
+  required DateTime sunrise,
+  required DateTime sunset,
+  required Duration twilight,
+  required DayNightAccuracy accuracy,
 }) {
   final now = instant.toUtc();
   final half = twilight ~/ 2;
 
-  final dawnStart = events.sunrise.subtract(half);
-  final dawnEnd = events.sunrise.add(half);
-  final duskStart = events.sunset.subtract(half);
-  final duskEnd = events.sunset.add(half);
+  final dawnStart = sunrise.subtract(half);
+  final dawnEnd = sunrise.add(half);
+  final duskStart = sunset.subtract(half);
+  final duskEnd = sunset.add(half);
 
   if (now.isBefore(dawnStart)) {
     return DayNightState(
       phase: DayPhase.night,
       daylight: 0,
+      accuracy: accuracy,
       nextChangeAt: dawnStart,
     );
   }
@@ -83,6 +154,7 @@ DayNightState resolveDayNight({
     return DayNightState(
       phase: DayPhase.dawn,
       daylight: _progress(now, dawnStart, dawnEnd),
+      accuracy: accuracy,
       nextChangeAt: dawnEnd,
     );
   }
@@ -90,6 +162,7 @@ DayNightState resolveDayNight({
     return DayNightState(
       phase: DayPhase.day,
       daylight: 1,
+      accuracy: accuracy,
       nextChangeAt: duskStart,
     );
   }
@@ -97,12 +170,40 @@ DayNightState resolveDayNight({
     return DayNightState(
       phase: DayPhase.dusk,
       daylight: 1 - _progress(now, duskStart, duskEnd),
+      accuracy: accuracy,
       nextChangeAt: duskEnd,
     );
   }
-  // After dusk. The next change is tomorrow's dawn, which needs tomorrow's
-  // solar events, so it is left for the caller to schedule.
-  return const DayNightState(phase: DayPhase.night, daylight: 0);
+  // After dusk. The next change is tomorrow's dawn, which needs
+  // tomorrow's solar events, so it is left for the caller to schedule.
+  return DayNightState(phase: DayPhase.night, daylight: 0, accuracy: accuracy);
+}
+
+/// Estimates day/night from the local clock, for when the app has no
+/// coordinates to calculate real solar events from.
+DayNightState _estimateFromClock({
+  required DateTime instant,
+  required LocalTimeZone? timeZone,
+  required Duration twilight,
+}) {
+  // With neither coordinates nor a time zone there is nothing to go on;
+  // daylight is the friendlier of the two guesses for a first frame.
+  if (timeZone == null) {
+    return const DayNightState(
+      phase: DayPhase.day,
+      daylight: 1,
+      accuracy: DayNightAccuracy.estimatedWithoutLocation,
+    );
+  }
+
+  final midnight = timeZone.midnightOf(instant);
+  return _resolveAround(
+    instant: instant,
+    sunrise: midnight.add(kNominalSunriseLocalTime),
+    sunset: midnight.add(kNominalSunsetLocalTime),
+    twilight: twilight,
+    accuracy: DayNightAccuracy.estimatedWithoutLocation,
+  );
 }
 
 /// How far [now] has travelled through the window [start]–[end], as 0–1.

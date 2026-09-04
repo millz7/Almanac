@@ -61,11 +61,32 @@ final class LocationUnavailable extends LocationState {
 
 /// The app knows where the user is.
 final class LocationAvailable extends LocationState {
-  const LocationAvailable(this.location);
+  const LocationAvailable(
+    this.location, {
+    this.accuracyMetres,
+    this.obtainedAt,
+  });
 
   @override
   final GeoLocation location;
 
+  /// The fix's reported accuracy in metres, when the platform supplied
+  /// one. Approximate location is expected here — a few hundred metres to
+  /// a few kilometres — which is ample for solar calculations.
+  final double? accuracyMetres;
+
+  /// When this fix was obtained, used to decide whether it is stale
+  /// enough to be worth asking the platform again. Not persisted: the app
+  /// keeps no history of where the user has been.
+  final DateTime? obtainedAt;
+
+  /// Whether this fix is older than [maxAge].
+  bool isStaleAt(DateTime now, Duration maxAge) {
+    final obtained = obtainedAt;
+    if (obtained == null) return true;
+    return now.toUtc().difference(obtained.toUtc()) > maxAge;
+  }
+
   @override
-  String toString() => 'LocationAvailable($location)';
+  String toString() => 'LocationAvailable($location, ±${accuracyMetres}m)';
 }

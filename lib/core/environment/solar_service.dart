@@ -2,29 +2,67 @@ import 'package:flutter/foundation.dart';
 
 import 'geo_location.dart';
 import 'local_time_zone.dart';
+import 'solar_calculator.dart';
+
+export 'solar_calculator.dart' show SolarDayKind;
 
 /// Sunrise and sunset for one local day, as absolute UTC instants.
+///
+/// Absolute instants, not local clock times: an instant is unambiguous
+/// across time zones and daylight-saving changes, and is converted to
+/// local time only for display.
 @immutable
 class SolarEvents {
-  const SolarEvents({required this.sunrise, required this.sunset});
+  const SolarEvents.risesAndSets({
+    required DateTime this.sunrise,
+    required DateTime this.sunset,
+  }) : kind = SolarDayKind.risesAndSets;
 
-  final DateTime sunrise;
-  final DateTime sunset;
+  /// Polar night: the sun stays below the horizon all day.
+  const SolarEvents.sunNeverRises()
+    : kind = SolarDayKind.sunNeverRises,
+      sunrise = null,
+      sunset = null;
+
+  /// Midnight sun: the sun stays above the horizon all day.
+  const SolarEvents.sunNeverSets()
+    : kind = SolarDayKind.sunNeverSets,
+      sunrise = null,
+      sunset = null;
+
+  /// The app cannot know: no position has been shared.
+  const SolarEvents.locationRequired()
+    : kind = SolarDayKind.risesAndSets,
+      sunrise = null,
+      sunset = null;
+
+  final SolarDayKind kind;
+
+  /// UTC instant of sunrise, or null when there is none to report.
+  final DateTime? sunrise;
+
+  /// UTC instant of sunset, or null when there is none to report.
+  final DateTime? sunset;
+
+  /// True when there are real times to work with.
+  bool get hasTimes => sunrise != null && sunset != null;
 
   @override
-  String toString() => 'SolarEvents(sunrise: $sunrise, sunset: $sunset)';
+  String toString() => hasTimes
+      ? 'SolarEvents($sunrise → $sunset)'
+      : 'SolarEvents(${kind.name}, no times)';
 }
 
 /// Supplies sunrise/sunset.
 ///
 /// [location] is nullable because the app must keep working when the user
-/// has not shared their position. A real astronomical implementation will
-/// need it and should report that it cannot answer without one; the
-/// current placeholder does not use it at all.
+/// has not shared their position. Sunrise genuinely cannot be computed
+/// without coordinates, so implementations return
+/// [SolarEvents.locationRequired] rather than a guess.
 ///
-/// Asynchronous because the real implementation — a platform plugin, an
-/// API call, or a cached calculation — will be. Keeping the signature
-/// async now means connecting it later requires no changes to callers.
+/// Asynchronous so an implementation may do work off the main isolate or
+/// consult a cache; the current one calculates locally and returns
+/// immediately.
 abstract interface class SolarService {
   /// Sunrise and sunset for the local day that contains [instant].
   Future<SolarEvents> eventsFor({
@@ -34,26 +72,13 @@ abstract interface class SolarService {
   });
 }
 
-/// PROVISIONAL — placeholder sunrise/sunset times.
+/// Calculates sunrise and sunset locally from the user's coordinates.
 ///
-/// This does **not** calculate anything astronomical: it returns the same
-/// two local clock times every day, everywhere, and ignores [location]
-/// entirely. It exists only so the day/night theme engine has something
-/// to run against until the real solar service is built in a later step.
-/// Nothing in the UI presents these values to the user as real data.
-///
-/// A useful side effect of needing only the time zone: day/night theming
-/// behaves identically whether or not the user shares their location.
-/// When the real service lands, that will no longer be true, and the
-/// "location required" degradation will apply to it.
-class PlaceholderSolarService implements SolarService {
-  const PlaceholderSolarService({
-    this.sunriseAfterLocalMidnight = const Duration(hours: 6, minutes: 30),
-    this.sunsetAfterLocalMidnight = const Duration(hours: 20, minutes: 30),
-  });
-
-  final Duration sunriseAfterLocalMidnight;
-  final Duration sunsetAfterLocalMidnight;
+/// Everything happens on the device: no network call, no third-party
+/// service, and nothing about where the user is leaves the phone. See
+/// [SolarCalculator] for the algorithm, its accuracy and its assumptions.
+class AstronomicalSolarService implements SolarService {
+  const AstronomicalSolarService();
 
   @override
   Future<SolarEvents> eventsFor({
@@ -61,10 +86,26 @@ class PlaceholderSolarService implements SolarService {
     required LocalTimeZone timeZone,
     GeoLocation? location,
   }) async {
-    final midnight = timeZone.midnightOf(instant);
-    return SolarEvents(
-      sunrise: midnight.add(sunriseAfterLocalMidnight),
-      sunset: midnight.add(sunsetAfterLocalMidnight),
+    if (location == null) return const SolarEvents.locationRequired();
+
+    // The local calendar date is what "today's sunrise" means, so the
+    // date comes from the user's zone rather than from UTC.
+    final date = timeZone.localDateOf(instant);
+    final times = SolarCalculator.forDate(
+      year: date.year,
+      month: date.month,
+      day: date.day,
+      latitude: location.latitude,
+      longitude: location.longitude,
     );
+
+    return switch (times.kind) {
+      SolarDayKind.risesAndSets => SolarEvents.risesAndSets(
+        sunrise: times.sunrise!,
+        sunset: times.sunset!,
+      ),
+      SolarDayKind.sunNeverRises => const SolarEvents.sunNeverRises(),
+      SolarDayKind.sunNeverSets => const SolarEvents.sunNeverSets(),
+    };
   }
 }

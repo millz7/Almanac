@@ -53,15 +53,24 @@ class TodayScreen extends StatelessWidget {
     return AppScaffold(
       title: 'Today',
       subtitle: today,
-      // Debug builds only: a way into the seasonal theme preview. Absent
-      // from release builds, where the route does not exist either.
-      trailing: kDebugMode
-          ? IconButton(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Debug builds only: a way into the seasonal theme preview.
+          // Absent from release builds, where the route does not exist.
+          if (kDebugMode)
+            IconButton(
               onPressed: () => context.push(kThemePreviewRoute),
               icon: const Icon(Icons.palette_outlined),
               tooltip: 'Theme preview (debug)',
-            )
-          : null,
+            ),
+          IconButton(
+            onPressed: () => context.push(kSettingsRoute),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
       body: [
         const EmptyState(
           icon: Icons.eco_outlined,

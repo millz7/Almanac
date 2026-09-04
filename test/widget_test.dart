@@ -98,9 +98,7 @@ void main() {
       ProviderScope(
         overrides: environmentOverrides(
           // Local noon in Wellington, which is the previous day in UTC.
-          now: TestTimeZones.wellington.instantOf(
-            DateTime.utc(2025, 7, 15, 12),
-          ),
+          now: TestTimeZones.wellington.instantAtLocal(2025, 7, 15, 12),
           timeZone: TestTimeZones.wellington,
           hemisphere: Hemisphere.southern,
         ),

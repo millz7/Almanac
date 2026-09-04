@@ -13,14 +13,49 @@ import 'natural_environment.dart';
 import 'season.dart';
 import 'season_service.dart';
 import 'solar_service.dart';
+import 'time_zone_service.dart';
 
 /// The app's clock, injected so tests can pin "now" to a fixed instant.
 final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-/// The device's time zone. Always available, no permission needed.
-final timeZoneProvider = Provider<LocalTimeZone>(
-  (ref) => LocalTimeZone.ofDevice(),
+/// The zone resolved during startup.
+///
+/// Overridden in `main()` with the device's actual IANA zone, resolved
+/// before the app is built so the first frame already has it. Defaults to
+/// UTC, which is honest about knowing nothing rather than guessing.
+final initialTimeZoneProvider = Provider<LocalTimeZone>(
+  (ref) => LocalTimeZone.utc,
 );
+
+/// Looks up the device's IANA time zone. Behind an interface so tests are
+/// not at the mercy of the machine's own zone setting.
+final timeZoneServiceProvider = Provider<TimeZoneService>(
+  (ref) => const PlatformTimeZoneService(),
+);
+
+/// The user's current time zone.
+///
+/// Seeded from startup and re-read when the app resumes, because someone
+/// who flies to another country changes zone without the app restarting.
+final timeZoneProvider = NotifierProvider<TimeZoneController, LocalTimeZone>(
+  TimeZoneController.new,
+);
+
+class TimeZoneController extends Notifier<LocalTimeZone> {
+  @override
+  LocalTimeZone build() => ref.watch(initialTimeZoneProvider);
+
+  /// Re-reads the device's zone. Cheap, and only on resume.
+  Future<void> refresh() async {
+    try {
+      final zone = await ref.read(timeZoneServiceProvider).currentTimeZone();
+      if (zone != state) state = zone;
+    } on Object {
+      // Keep whatever zone we already had; a failed lookup is not a
+      // reason to move the user to UTC.
+    }
+  }
+}
 
 /// The platform location service. Tests override it; nothing else in the
 /// app knows which implementation is behind it.
@@ -28,9 +63,9 @@ final locationServiceProvider = Provider<LocationService>(
   (ref) => const GeolocatorLocationService(),
 );
 
-/// Sunrise/sunset source. Currently a documented placeholder.
+/// Sunrise/sunset, calculated locally from the user's coordinates.
 final solarServiceProvider = Provider<SolarService>(
-  (ref) => const PlaceholderSolarService(),
+  (ref) => const AstronomicalSolarService(),
 );
 
 /// Season calculation. Real astronomy, no placeholder needed.
@@ -55,6 +90,13 @@ const kTechnicalFallbackHemisphere = Hemisphere.northern;
 final locationStateProvider =
     NotifierProvider<LocationController, LocationState>(LocationController.new);
 
+/// How long a position is considered good enough to reuse.
+///
+/// The app is not a tracker: sunrise moves by a couple of seconds over a
+/// kilometre, so re-reading the position on every resume would burn
+/// battery for no benefit. Within this window the existing fix is reused.
+const kPositionMaxAge = Duration(minutes: 15);
+
 class LocationController extends Notifier<LocationState> {
   @override
   LocationState build() => const LocationPermissionNotRequested();
@@ -62,7 +104,17 @@ class LocationController extends Notifier<LocationState> {
   /// Re-checks permission without prompting. Called at startup and on
   /// resume, so permission granted or revoked in system settings is
   /// picked up.
-  Future<void> refresh() async {
+  ///
+  /// Skips the platform call entirely while the current fix is still
+  /// fresh, unless [force] is set — which is what the user's own
+  /// "refresh" action in Settings does.
+  Future<void> refresh({bool force = false}) async {
+    final current = state;
+    if (!force &&
+        current is LocationAvailable &&
+        !current.isStaleAt(ref.read(clockProvider)(), kPositionMaxAge)) {
+      return;
+    }
     state = await _guard(
       () => ref.read(locationServiceProvider).currentState(),
     );
@@ -74,6 +126,19 @@ class LocationController extends Notifier<LocationState> {
     state = await _guard(
       () => ref.read(locationServiceProvider).requestAccess(),
     );
+  }
+
+  /// Opens the platform app-settings page, for when permission has been
+  /// permanently denied and only the system can change it.
+  ///
+  /// Awaited inside the try so a failure in the platform channel is
+  /// caught here rather than escaping as an unhandled rejection.
+  Future<bool> openSystemSettings() async {
+    try {
+      return await ref.read(locationServiceProvider).openSystemSettings();
+    } on Object {
+      return false;
+    }
   }
 
   /// The app must survive any failure down in the platform layer: without
@@ -100,19 +165,22 @@ class LocationController extends Notifier<LocationState> {
 /// exactly as they set it. The two are kept side by side rather than one
 /// silently overwriting the other.
 final resolvedHemisphereProvider = Provider<ResolvedHemisphere>((ref) {
+  final chosen = ref.watch(userSettingsProvider).hemisphere;
   final location = ref.watch(locationStateProvider).location;
+
   if (location != null) {
     return ResolvedHemisphere(
       hemisphere: location.hemisphere,
       source: HemisphereSource.derivedFromLocation,
+      userSelected: chosen,
     );
   }
 
-  final chosen = ref.watch(userSettingsProvider).hemisphere;
   if (chosen != null) {
     return ResolvedHemisphere(
       hemisphere: chosen,
       source: HemisphereSource.userSelected,
+      userSelected: chosen,
     );
   }
 
@@ -169,7 +237,14 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
     final events = await ref
         .watch(solarServiceProvider)
         .eventsFor(instant: now, timeZone: timeZone, location: location);
-    final dayNight = resolveDayNight(instant: now, events: events);
+    // The time zone is passed through so that, with no coordinates to
+    // calculate from, day/night can still be estimated from the local
+    // clock — flagged as an estimate rather than presented as sunrise.
+    final dayNight = resolveDayNight(
+      instant: now,
+      events: events,
+      timeZone: timeZone,
+    );
 
     if (ref.watch(environmentRefreshEnabledProvider)) {
       _scheduleNextRefresh(

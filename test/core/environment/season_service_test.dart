@@ -7,6 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/fake_environment_services.dart';
 
 void main() {
+  // Named time zones need the IANA database loaded.
+  setUpAll(useTimeZoneDatabase);
+
   const service = AstronomicalSeasonService();
 
   group('solarTermInstant', () {
@@ -172,12 +175,13 @@ void main() {
         // in Wellington is still the previous season, while the same local
         // clock time in London is already the new one.
         final equinox = solarTermInstant(2025, SolarTerm.marchEquinox);
-        final wellingtonNoon = TestTimeZones.wellington.instantOf(
-          DateTime.utc(2025, 3, 20, 12),
+        final wellingtonNoon = TestTimeZones.wellington.instantAtLocal(
+          2025,
+          3,
+          20,
+          12,
         );
-        final londonNoon = TestTimeZones.london.instantOf(
-          DateTime.utc(2025, 3, 20, 12),
-        );
+        final londonNoon = TestTimeZones.london.instantAtLocal(2025, 3, 20, 12);
 
         expect(wellingtonNoon.isBefore(equinox), isTrue);
         expect(londonNoon.isAfter(equinox), isTrue);

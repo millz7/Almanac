@@ -27,19 +27,41 @@ enum HemisphereSource {
 /// The hemisphere the app is using, and why.
 @immutable
 class ResolvedHemisphere {
-  const ResolvedHemisphere({required this.hemisphere, required this.source});
+  const ResolvedHemisphere({
+    required this.hemisphere,
+    required this.source,
+    this.userSelected,
+  });
 
+  /// The hemisphere used for environmental calculations.
   final Hemisphere hemisphere;
+
   final HemisphereSource source;
+
+  /// What the user chose, if they have chosen. Carried alongside so the
+  /// two are never confused and neither overwrites the other.
+  final Hemisphere? userSelected;
+
+  /// True when a real latitude disagrees with what the user chose.
+  ///
+  /// Nothing acts on this yet by design — the location-derived value wins
+  /// for calculations and the preference is left alone — but it is
+  /// surfaced so a future screen can explain the difference instead of
+  /// the app silently contradicting the user.
+  bool get disagreesWithPreference =>
+      source == HemisphereSource.derivedFromLocation &&
+      userSelected != null &&
+      userSelected != hemisphere;
 
   @override
   bool operator ==(Object other) =>
       other is ResolvedHemisphere &&
       other.hemisphere == hemisphere &&
-      other.source == source;
+      other.source == source &&
+      other.userSelected == userSelected;
 
   @override
-  int get hashCode => Object.hash(hemisphere, source);
+  int get hashCode => Object.hash(hemisphere, source, userSelected);
 
   @override
   String toString() => 'ResolvedHemisphere(${hemisphere.name}, ${source.name})';

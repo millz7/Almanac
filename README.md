@@ -97,6 +97,38 @@ Note that seasons are **astronomical**: they turn at the equinoxes and
 solstices, not on the 1st of a month. Early September is therefore still
 summer in the north and winter in the south.
 
+## Time, sun and place
+
+- **Time zone.** A real IANA zone (`Pacific/Auckland`, not "UTC+12"),
+  read from the device and re-read when the app resumes. That matters
+  because an offset cannot describe a place: a daylight-saving zone is
+  +12 for part of the year and +13 for the rest, and the local day it
+  implies is 23 or 25 hours long on the days the clocks shift.
+- **Sunrise and sunset** are calculated on the device from latitude,
+  longitude and the local date, using NOAA's published solar algorithm
+  (Meeus ch. 25). Accurate to about a minute below ~72° latitude. Results
+  are absolute UTC instants, converted to local time only for display —
+  never stored as a naive clock time.
+- **Polar days** are represented explicitly: inside the polar circles
+  `SolarEvents` reports `sunNeverRises` or `sunNeverSets` rather than
+  inventing a time, and the day/night engine pins the palette to full
+  night or full day accordingly.
+- **Without coordinates** the app cannot know sunrise, so it estimates
+  day/night from the local clock and flags the result
+  `DayNightAccuracy.estimatedWithoutLocation`. The estimate is good
+  enough to theme by and is never presented as a sunrise time.
+- **Location is read sparingly.** A fix is reused while it is less than
+  15 minutes old; the app re-checks permission on resume without
+  prompting, and only ever prompts from a deliberate tap. There is no
+  tracking, no background location and no stored history.
+
+## Settings
+
+A gear icon on Today opens `/settings` — pushed over the app rather than
+being a sixth tab. It has one section, "Location & Region": change the
+hemisphere, and see and act on location access. Changing the hemisphere
+takes effect immediately, with no restart.
+
 ### Previewing palettes during development
 
 In debug builds, the palette icon on the Today screen opens a preview

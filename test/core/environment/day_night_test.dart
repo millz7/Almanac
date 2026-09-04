@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/fake_environment_services.dart';
 
 void main() {
+  setUpAll(useTimeZoneDatabase);
+
   // A day with sunrise at 06:00 and sunset at 20:00 UTC.
-  final events = SolarEvents(
+  final events = SolarEvents.risesAndSets(
     sunrise: DateTime.utc(2025, 6, 15, 6),
     sunset: DateTime.utc(2025, 6, 15, 20),
   );
@@ -40,23 +42,30 @@ void main() {
     });
 
     test('sunrise itself is the midpoint of dawn', () {
-      final state = at(events.sunrise);
+      final state = at(events.sunrise!);
 
       expect(state.phase, DayPhase.dawn);
       expect(state.daylight, closeTo(0.5, 0.01));
     });
 
     test('sunset itself is the midpoint of dusk', () {
-      final state = at(events.sunset);
+      final state = at(events.sunset!);
 
       expect(state.phase, DayPhase.dusk);
       expect(state.daylight, closeTo(0.5, 0.01));
     });
 
+    test('real events are reported as such', () {
+      expect(
+        at(DateTime.utc(2025, 6, 15, 13)).accuracy,
+        DayNightAccuracy.fromSolarEvents,
+      );
+    });
+
     test('a fixed clock hour is not what decides day or night', () {
       // 21:00 is night on the day above, but broad daylight if the sun
       // sets later — which a clock-hour rule could never express.
-      final lateSunset = SolarEvents(
+      final lateSunset = SolarEvents.risesAndSets(
         sunrise: DateTime.utc(2025, 6, 15, 4),
         sunset: DateTime.utc(2025, 6, 15, 23),
       );
@@ -72,7 +81,7 @@ void main() {
 
   group('transitions', () {
     test('daylight rises steadily through dawn', () {
-      final start = events.sunrise.subtract(kTwilightWindow ~/ 2);
+      final start = events.sunrise!.subtract(kTwilightWindow ~/ 2);
       final readings = [
         for (var minutes = 0; minutes <= 45; minutes += 5)
           at(start.add(Duration(minutes: minutes))).daylight,
@@ -90,7 +99,7 @@ void main() {
     });
 
     test('daylight falls steadily through dusk', () {
-      final start = events.sunset.subtract(kTwilightWindow ~/ 2);
+      final start = events.sunset!.subtract(kTwilightWindow ~/ 2);
       final first = at(start).daylight;
       final middle = at(start.add(const Duration(minutes: 22))).daylight;
       final last = at(start.add(const Duration(minutes: 45))).daylight;
@@ -103,13 +112,13 @@ void main() {
     test('only dawn and dusk report themselves as transitioning', () {
       expect(at(DateTime.utc(2025, 6, 15, 3)).isTransitioning, isFalse);
       expect(at(DateTime.utc(2025, 6, 15, 13)).isTransitioning, isFalse);
-      expect(at(events.sunrise).isTransitioning, isTrue);
-      expect(at(events.sunset).isTransitioning, isTrue);
+      expect(at(events.sunrise!).isTransitioning, isTrue);
+      expect(at(events.sunset!).isTransitioning, isTrue);
     });
 
     test('a wider twilight window stretches the blend', () {
       final wide = resolveDayNight(
-        instant: events.sunrise.add(const Duration(minutes: 40)),
+        instant: events.sunrise!.add(const Duration(minutes: 40)),
         events: events,
         twilight: const Duration(hours: 3),
       );
@@ -123,13 +132,16 @@ void main() {
     test('night points at the start of dawn', () {
       final state = at(DateTime.utc(2025, 6, 15, 3));
 
-      expect(state.nextChangeAt, events.sunrise.subtract(kTwilightWindow ~/ 2));
+      expect(
+        state.nextChangeAt,
+        events.sunrise!.subtract(kTwilightWindow ~/ 2),
+      );
     });
 
     test('day points at the start of dusk', () {
       final state = at(DateTime.utc(2025, 6, 15, 13));
 
-      expect(state.nextChangeAt, events.sunset.subtract(kTwilightWindow ~/ 2));
+      expect(state.nextChangeAt, events.sunset!.subtract(kTwilightWindow ~/ 2));
     });
 
     test('after dusk there is nothing left today', () {
@@ -137,39 +149,127 @@ void main() {
     });
   });
 
-  group('placeholder solar service', () {
-    test('produces sunrise and sunset in the local day', () async {
-      const service = PlaceholderSolarService();
-      const timeZone = TestTimeZones.wellington;
-      final result = await service.eventsFor(
-        instant: DateTime.utc(2025, 6, 15, 2),
-        timeZone: timeZone,
-      );
+  group('polar days', () {
+    test('midnight sun is permanent daylight, at any hour', () {
+      for (final hour in [0, 3, 12, 23]) {
+        final state = resolveDayNight(
+          instant: DateTime.utc(2025, 6, 21, hour),
+          events: const SolarEvents.sunNeverSets(),
+        );
 
-      final localSunrise = timeZone.wallTimeAt(result.sunrise);
-      final localSunset = timeZone.wallTimeAt(result.sunset);
-
-      expect(localSunrise.hour, 6);
-      expect(localSunrise.minute, 30);
-      expect(localSunset.hour, 20);
-      expect(localSunset.minute, 30);
-      expect(result.sunrise.isBefore(result.sunset), isTrue);
+        expect(state.phase, DayPhase.day);
+        expect(state.daylight, 1);
+        expect(state.isDaytime, isTrue);
+      }
     });
 
-    test('needs only a time zone, so it works without any location', () async {
-      const service = PlaceholderSolarService();
-      final withLocation = await service.eventsFor(
-        instant: DateTime.utc(2025, 6, 15, 2),
+    test('polar night is permanent night, at any hour', () {
+      for (final hour in [0, 3, 12, 23]) {
+        final state = resolveDayNight(
+          instant: DateTime.utc(2025, 12, 21, hour),
+          events: const SolarEvents.sunNeverRises(),
+        );
+
+        expect(state.phase, DayPhase.night);
+        expect(state.daylight, 0);
+        expect(state.isDaytime, isFalse);
+      }
+    });
+
+    test('neither reports a next change, since none comes today', () {
+      expect(
+        resolveDayNight(
+          instant: DateTime.utc(2025, 6, 21, 12),
+          events: const SolarEvents.sunNeverSets(),
+        ).nextChangeAt,
+        isNull,
+      );
+    });
+  });
+
+  group('without coordinates', () {
+    // The app cannot know sunrise, but it still needs a day/night value
+    // to theme by. It estimates from the local clock and says so.
+    DayNightState estimate(DateTime instant) => resolveDayNight(
+      instant: instant,
+      events: const SolarEvents.locationRequired(),
+      timeZone: TestTimeZones.wellington,
+    );
+
+    test('local daytime is estimated as day, and flagged as an estimate', () {
+      final noon = TestTimeZones.wellington.instantAtLocal(2025, 7, 15, 12);
+      final state = estimate(noon);
+
+      expect(state.phase, DayPhase.day);
+      expect(state.daylight, 1);
+      expect(state.accuracy, DayNightAccuracy.estimatedWithoutLocation);
+    });
+
+    test('the small hours are estimated as night', () {
+      final threeAm = TestTimeZones.wellington.instantAtLocal(2025, 7, 15, 3);
+      final state = estimate(threeAm);
+
+      expect(state.phase, DayPhase.night);
+      expect(state.daylight, 0);
+      expect(state.accuracy, DayNightAccuracy.estimatedWithoutLocation);
+    });
+
+    test('the estimate follows the local zone, not UTC', () {
+      // 02:00 UTC is the afternoon in Wellington, so an estimate anchored
+      // to UTC would wrongly call this night.
+      final state = estimate(DateTime.utc(2025, 7, 15, 2));
+
+      expect(state.isDaytime, isTrue);
+    });
+
+    test('with no zone either, it falls back to daylight', () {
+      final state = resolveDayNight(
+        instant: DateTime.utc(2025, 7, 15, 12),
+        events: const SolarEvents.locationRequired(),
+      );
+
+      expect(state.daylight, 1);
+      expect(state.accuracy, DayNightAccuracy.estimatedWithoutLocation);
+    });
+  });
+
+  group('real solar service', () {
+    const service = AstronomicalSolarService();
+
+    test('reports that it needs a location when it has none', () async {
+      final events = await service.eventsFor(
+        instant: DateTime.utc(2025, 7, 15, 12),
+        timeZone: TestTimeZones.wellington,
+      );
+
+      expect(events.hasTimes, isFalse);
+      expect(events.sunrise, isNull);
+      expect(events.sunset, isNull);
+    });
+
+    test('calculates real times when it has coordinates', () async {
+      final events = await service.eventsFor(
+        instant: TestTimeZones.wellington.instantAtLocal(2025, 7, 15, 12),
         timeZone: TestTimeZones.wellington,
         location: TestLocations.wellington,
       );
-      final withoutLocation = await service.eventsFor(
-        instant: DateTime.utc(2025, 6, 15, 2),
+
+      expect(events.hasTimes, isTrue);
+      expect(events.sunrise!.isBefore(events.sunset!), isTrue);
+      expect(events.sunrise!.isUtc, isTrue);
+    });
+
+    test('uses the local calendar day, not the UTC one', () async {
+      // 20:00 UTC on 14 July is already midday on 15 July in Wellington,
+      // so the events should belong to the 15th locally.
+      final events = await service.eventsFor(
+        instant: DateTime.utc(2025, 7, 14, 20),
         timeZone: TestTimeZones.wellington,
+        location: TestLocations.wellington,
       );
 
-      expect(withoutLocation.sunrise, withLocation.sunrise);
-      expect(withoutLocation.sunset, withLocation.sunset);
+      final localSunrise = TestTimeZones.wellington.wallTimeAt(events.sunrise!);
+      expect(localSunrise.day, 15);
     });
   });
 }

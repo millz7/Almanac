@@ -419,7 +419,7 @@ void main() {
     /// local noon rather than UTC noon matters at +13: UTC midday is the
     /// small hours of the next NZ day.
     DateTime localNoon(int month, int day) =>
-        TestTimeZones.wellington.instantOf(DateTime.utc(2025, month, day, 12));
+        TestTimeZones.wellington.instantAtLocal(2025, month, day, 12);
 
     // Astronomical seasons, so the turning points are the equinoxes and
     // solstices rather than the 1st of a month.

@@ -58,6 +58,8 @@ dependencies:
   # denial — which is what the app's location state model is built on.
   # Only "while in use" is ever requested; never background location.
   geolocator: ^14.0.3
+  timezone: ^0.11.1
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:

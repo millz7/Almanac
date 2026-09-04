@@ -14,7 +14,7 @@ import '../../support/test_overrides.dart';
 void main() {
   ProviderContainer containerAt({
     required DateTime now,
-    LocalTimeZone timeZone = TestTimeZones.london,
+    LocalTimeZone? timeZone,
     Hemisphere? hemisphere = Hemisphere.northern,
     LocationState? locationState,
     DateTime? sunrise,
