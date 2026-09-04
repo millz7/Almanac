@@ -272,4 +272,73 @@ void main() {
       expect(localSunrise.day, 15);
     });
   });
+
+  group('solarDayProgress', () {
+    // A different quantity from `daylight`, and the reason it exists: the
+    // sun's position through the day, for drawing it on an arc.
+    double? progressAt(DateTime instant) =>
+        solarDayProgress(instant: instant, events: events);
+
+    test('is 0 at sunrise and 1 at sunset', () {
+      expect(progressAt(DateTime.utc(2025, 6, 15, 6)), 0);
+      expect(progressAt(DateTime.utc(2025, 6, 15, 20)), 1);
+    });
+
+    test('is halfway at solar midday', () {
+      expect(progressAt(DateTime.utc(2025, 6, 15, 13)), closeTo(0.5, 1e-9));
+    });
+
+    test('keeps moving through the middle of the day, unlike daylight', () {
+      // The whole point of the separation: daylight has already reached
+      // 1.0 by breakfast and stays there, so it cannot place the sun.
+      final morning = DateTime.utc(2025, 6, 15, 9);
+      final afternoon = DateTime.utc(2025, 6, 15, 17);
+
+      expect(at(morning).daylight, 1);
+      expect(at(afternoon).daylight, 1);
+
+      expect(progressAt(morning)!, lessThan(progressAt(afternoon)!));
+    });
+
+    test('rises monotonically across the day', () {
+      var previous = -1.0;
+      for (var hour = 6; hour <= 20; hour++) {
+        final value = progressAt(DateTime.utc(2025, 6, 15, hour))!;
+        expect(value, greaterThan(previous));
+        previous = value;
+      }
+    });
+
+    test('is null before sunrise and after sunset', () {
+      expect(progressAt(DateTime.utc(2025, 6, 15, 5, 59)), isNull);
+      expect(progressAt(DateTime.utc(2025, 6, 15, 20, 1)), isNull);
+    });
+
+    test('is null on a polar day, rather than inventing a position', () {
+      expect(
+        solarDayProgress(
+          instant: DateTime.utc(2025, 7, 1, 12),
+          events: const SolarEvents.sunNeverSets(),
+        ),
+        isNull,
+      );
+      expect(
+        solarDayProgress(
+          instant: DateTime.utc(2025, 1, 5, 12),
+          events: const SolarEvents.sunNeverRises(),
+        ),
+        isNull,
+      );
+    });
+
+    test('is null when no position has been shared', () {
+      expect(
+        solarDayProgress(
+          instant: DateTime.utc(2025, 6, 15, 12),
+          events: const SolarEvents.locationRequired(),
+        ),
+        isNull,
+      );
+    });
+  });
 }

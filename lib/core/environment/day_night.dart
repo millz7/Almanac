@@ -126,6 +126,38 @@ DayNightState resolveDayNight({
   );
 }
 
+/// How far through the daylight hours [instant] has got: 0.0 at sunrise,
+/// 1.0 at sunset.
+///
+/// This is **not** [DayNightState.daylight], and the two must not be
+/// confused. `daylight` is the twilight blend that drives the palette —
+/// it reaches 1.0 shortly after sunrise and stays there until dusk, which
+/// is exactly what a colour scheme wants and exactly what a drawing of
+/// the sun's position does not. This is the position through the day, so
+/// something drawing the sun on its arc has a value that actually moves
+/// between breakfast and teatime.
+///
+/// Null whenever there is no arc to trace: before sunrise, after sunset,
+/// inside the polar circles on a day the sun does not cross the horizon,
+/// and when no position has been shared so the times are unknown. Callers
+/// must handle null rather than substituting a value — a sun drawn at a
+/// made-up height is a made-up fact.
+double? solarDayProgress({
+  required DateTime instant,
+  required SolarEvents events,
+}) {
+  final sunrise = events.sunrise;
+  final sunset = events.sunset;
+  if (sunrise == null || sunset == null) return null;
+
+  final now = instant.toUtc();
+  if (now.isBefore(sunrise) || now.isAfter(sunset)) return null;
+
+  final span = sunset.difference(sunrise).inMicroseconds;
+  if (span <= 0) return null;
+  return (now.difference(sunrise).inMicroseconds / span).clamp(0.0, 1.0);
+}
+
 /// The shared easing logic, used for both real and estimated events.
 DayNightState _resolveAround({
   required DateTime instant,

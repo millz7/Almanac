@@ -9,6 +9,7 @@ import 'geolocator_location_service.dart';
 import 'local_time_zone.dart';
 import 'location_service.dart';
 import 'location_state.dart';
+import 'moon_service.dart';
 import 'natural_environment.dart';
 import 'season.dart';
 import 'season_service.dart';
@@ -66,6 +67,12 @@ final locationServiceProvider = Provider<LocationService>(
 /// Sunrise/sunset, calculated locally from the user's coordinates.
 final solarServiceProvider = Provider<SolarService>(
   (ref) => const AstronomicalSolarService(),
+);
+
+/// Moon phase, calculated locally. Needs no position and no network:
+/// the phase is the same for everyone on Earth at a given moment.
+final moonServiceProvider = Provider<MoonService>(
+  (ref) => const AstronomicalMoonService(),
 );
 
 /// Season calculation. Real astronomy, no placeholder needed.
@@ -245,6 +252,7 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
       events: events,
       timeZone: timeZone,
     );
+    final moon = ref.watch(moonServiceProvider).phaseAt(now);
 
     if (ref.watch(environmentRefreshEnabledProvider)) {
       _scheduleNextRefresh(
@@ -256,11 +264,14 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
     }
 
     return NaturalEnvironment(
+      resolvedAt: now,
       hemisphere: resolved.hemisphere,
       hemisphereSource: resolved.source,
       timeZone: timeZone,
       season: season,
       dayNight: dayNight,
+      solarEvents: events,
+      moon: moon,
       location: location,
     );
   }

@@ -197,4 +197,58 @@ void main() {
       },
     );
   });
+
+  group('the season cycle', () {
+    test('each season gives way to the next, in both hemispheres', () {
+      // The cycle is the same either side of the equator, because a
+      // Season here is the one the user is living in, not a month.
+      expect(Season.spring.next, Season.summer);
+      expect(Season.summer.next, Season.autumn);
+      expect(Season.autumn.next, Season.winter);
+      expect(Season.winter.next, Season.spring);
+    });
+
+    test('following `next` four times comes back round', () {
+      for (final season in Season.values) {
+        expect(season.next.next.next.next, season);
+      }
+    });
+  });
+
+  group('SeasonState.fractionElapsedAt', () {
+    final season = SeasonState(
+      season: Season.summer,
+      startedAt: DateTime.utc(2025, 6, 21, 2, 42),
+      endsAt: DateTime.utc(2025, 9, 22, 18, 19),
+    );
+
+    test('runs 0 to 1 between the two solstices', () {
+      expect(season.fractionElapsedAt(season.startedAt), 0);
+      expect(season.fractionElapsedAt(season.endsAt), 1);
+    });
+
+    test('is halfway at the midpoint', () {
+      final middle = season.startedAt.add(
+        season.endsAt.difference(season.startedAt) ~/ 2,
+      );
+      expect(season.fractionElapsedAt(middle), closeTo(0.5, 1e-6));
+    });
+
+    test('clamps rather than running past either end', () {
+      expect(season.fractionElapsedAt(DateTime.utc(2025, 1, 1)), 0);
+      expect(season.fractionElapsedAt(DateTime.utc(2026, 1, 1)), 1);
+    });
+
+    test('a real season is early at its start and late at its end', () {
+      final real = service.seasonAt(
+        DateTime.utc(2025, 7, 15),
+        Hemisphere.northern,
+      );
+      expect(real.fractionElapsedAt(DateTime.utc(2025, 6, 25)), lessThan(0.28));
+      expect(
+        real.fractionElapsedAt(DateTime.utc(2025, 9, 18)),
+        greaterThan(0.72),
+      );
+    });
+  });
 }

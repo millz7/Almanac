@@ -17,6 +17,13 @@ import 'app_shell.dart';
 /// Where the app lands once setup is done.
 const kTodayRoute = '/today';
 
+/// The other four tabs of the navigation shell. Named so screens can
+/// link to each other without repeating path strings.
+const kWellbeingRoute = '/wellbeing';
+const kRhythmsRoute = '/rhythms';
+const kNatureRoute = '/nature';
+const kFoodRoute = '/food';
+
 /// Onboarding lives outside the navigation shell — it is part of startup,
 /// not a place the user can navigate back to.
 const kHemisphereRoute = '/onboarding/hemisphere';
@@ -96,7 +103,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/wellbeing',
+                path: kWellbeingRoute,
                 builder: (context, state) => const WellbeingScreen(),
               ),
             ],
@@ -104,7 +111,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/rhythms',
+                path: kRhythmsRoute,
                 builder: (context, state) => const RhythmsScreen(),
               ),
             ],
@@ -112,7 +119,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/nature',
+                path: kNatureRoute,
                 builder: (context, state) => const NatureScreen(),
               ),
             ],
@@ -120,7 +127,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/food',
+                path: kFoodRoute,
                 builder: (context, state) => const FoodScreen(),
               ),
             ],

@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'astronomy.dart';
+
 /// What the sun does on a given day at a given place.
 enum SolarDayKind {
   /// An ordinary day: the sun rises and sets.
@@ -53,9 +55,10 @@ class SolarTimes {
 /// Calculates sunrise and sunset for a date and position.
 ///
 /// Implements the algorithm published by NOAA's Global Monitoring
-/// Laboratory (their Solar Calculator), which is the standard low-precision
-/// solar-position method from Jean Meeus, *Astronomical Algorithms*,
-/// chapters 25 and 15.
+/// Laboratory (their Solar Calculator), which is the standard
+/// low-precision solar-position method from Jean Meeus, *Astronomical
+/// Algorithms*, chapters 25 and 15. The solar-position parts live in
+/// `astronomy.dart`, shared with the moon calculation.
 ///
 /// **Accuracy.** Within about a minute for latitudes below roughly 72°,
 /// degrading closer to the poles where the sun crosses the horizon at a
@@ -83,6 +86,8 @@ abstract final class SolarCalculator {
   /// The solar zenith angle at which sunrise and sunset are defined.
   static const _sunriseZenithDegrees = 90.833;
 
+  static const _minutesPerDay = 1440.0;
+
   /// Sunrise and sunset for the calendar day [year]-[month]-[day] **as
   /// reckoned locally**, at the given position.
   ///
@@ -97,11 +102,11 @@ abstract final class SolarCalculator {
   }) {
     // Julian day at 00:00 UT on the requested date. The event times are
     // then found as offsets in minutes from that midnight.
-    final julianDay = _julianDayOfMidnightUtc(year, month, day);
+    final julianDay = julianDayOfMidnightUtc(year, month, day);
 
     final noonEstimate = _solarNoonMinutesUtc(julianDay, longitude);
-    final declinationAtNoon = _sunDeclination(
-      _julianCentury(julianDay + noonEstimate / _minutesPerDay),
+    final declinationAtNoon = sunDeclination(
+      julianCenturyOf(julianDay + noonEstimate / _minutesPerDay),
     );
 
     final hourAngle = _sunriseHourAngle(latitude, declinationAtNoon);
@@ -109,10 +114,7 @@ abstract final class SolarCalculator {
       // The sun never reaches the sunrise zenith today. Which side of the
       // horizon it stays on depends on whether the pole is tilted toward
       // or away from the sun.
-      final sunIsUp = _sunIsAlwaysUp(latitude, declinationAtNoon);
-      return sunIsUp
-          ? const SolarTimes.sunNeverSets()
-          : const SolarTimes.sunNeverRises();
+      return _polarResultFor(latitude, declinationAtNoon);
     }
 
     final sunriseMinutes = _refineEvent(
@@ -134,10 +136,7 @@ abstract final class SolarCalculator {
       // The refinement pass disagreed with the first: the day is right on
       // the edge of a polar day or night. Fall back to the unrefined
       // answer rather than reporting nothing.
-      final sunIsUp = _sunIsAlwaysUp(latitude, declinationAtNoon);
-      return sunIsUp
-          ? const SolarTimes.sunNeverSets()
-          : const SolarTimes.sunNeverRises();
+      return _polarResultFor(latitude, declinationAtNoon);
     }
 
     return SolarTimes.risesAndSets(
@@ -145,6 +144,11 @@ abstract final class SolarCalculator {
       sunset: _instantAt(year, month, day, sunsetMinutes),
     );
   }
+
+  static SolarTimes _polarResultFor(double latitude, double declination) =>
+      _sunIsAlwaysUp(latitude, declination)
+      ? const SolarTimes.sunNeverSets()
+      : const SolarTimes.sunNeverRises();
 
   /// Recomputes an event's time using the sun's position at the event
   /// rather than at noon, which is what brings the result inside a minute.
@@ -155,14 +159,14 @@ abstract final class SolarCalculator {
     required double approximateMinutes,
     required bool isSunrise,
   }) {
-    final century = _julianCentury(
+    final century = julianCenturyOf(
       julianDay + approximateMinutes / _minutesPerDay,
     );
-    final declination = _sunDeclination(century);
+    final declination = sunDeclination(century);
     final hourAngle = _sunriseHourAngle(latitude, declination);
     if (hourAngle == null) return null;
 
-    final noon = 720 - 4 * longitude - _equationOfTimeMinutes(century);
+    final noon = 720 - 4 * longitude - equationOfTimeMinutes(century);
     return isSunrise ? noon - 4 * hourAngle : noon + 4 * hourAngle;
   }
 
@@ -170,26 +174,21 @@ abstract final class SolarCalculator {
   ///
   /// At longitude 0 with no equation-of-time correction this is 720
   /// minutes — 12:00 UTC — as it should be.
-  static double _solarNoonMinutesUtc(double julianDay, double longitude) {
-    final century = _julianCentury(julianDay);
-    return 720 - 4 * longitude - _equationOfTimeMinutes(century);
-  }
+  static double _solarNoonMinutesUtc(double julianDay, double longitude) =>
+      720 - 4 * longitude - equationOfTimeMinutes(julianCenturyOf(julianDay));
 
   /// The hour angle, in degrees, between solar noon and sunrise.
   ///
   /// Null when the sun never reaches the sunrise zenith on this day,
   /// which is the polar-day/polar-night case.
   static double? _sunriseHourAngle(double latitude, double declination) {
-    final latitudeRadians = _radians(latitude);
-    final declinationRadians = _radians(declination);
-
     final cosHourAngle =
-        math.cos(_radians(_sunriseZenithDegrees)) /
-            (math.cos(latitudeRadians) * math.cos(declinationRadians)) -
-        math.tan(latitudeRadians) * math.tan(declinationRadians);
+        cosDegrees(_sunriseZenithDegrees) /
+            (cosDegrees(latitude) * cosDegrees(declination)) -
+        math.tan(radians(latitude)) * math.tan(radians(declination));
 
     if (cosHourAngle > 1 || cosHourAngle < -1) return null;
-    return _degrees(math.acos(cosHourAngle));
+    return degrees(math.acos(cosHourAngle));
   }
 
   /// On a day with no sunrise or sunset, decides which it is: the sun is
@@ -197,90 +196,6 @@ abstract final class SolarCalculator {
   /// when latitude and declination share a sign.
   static bool _sunIsAlwaysUp(double latitude, double declination) =>
       (latitude >= 0) == (declination >= 0);
-
-  // --- Solar position, following NOAA / Meeus ---------------------------
-
-  /// Julian centuries since J2000.0.
-  static double _julianCentury(double julianDay) =>
-      (julianDay - 2451545.0) / 36525.0;
-
-  /// Geometric mean longitude of the sun, in degrees.
-  static double _geometricMeanLongitude(double t) =>
-      _wrap360(280.46646 + t * (36000.76983 + t * 0.0003032));
-
-  /// Geometric mean anomaly of the sun, in degrees.
-  static double _geometricMeanAnomaly(double t) =>
-      357.52911 + t * (35999.05029 - t * 0.0001537);
-
-  /// Eccentricity of the Earth's orbit.
-  static double _orbitEccentricity(double t) =>
-      0.016708634 - t * (0.000042037 + t * 0.0000001267);
-
-  /// The sun's equation of the centre, in degrees.
-  static double _equationOfCentre(double t) {
-    final m = _radians(_geometricMeanAnomaly(t));
-    return math.sin(m) * (1.914602 - t * (0.004817 + t * 0.000014)) +
-        math.sin(2 * m) * (0.019993 - t * 0.000101) +
-        math.sin(3 * m) * 0.000289;
-  }
-
-  /// The sun's apparent longitude, in degrees, including the correction
-  /// for nutation and aberration.
-  static double _apparentLongitude(double t) {
-    final trueLongitude = _geometricMeanLongitude(t) + _equationOfCentre(t);
-    return trueLongitude -
-        0.00569 -
-        0.00478 * math.sin(_radians(125.04 - 1934.136 * t));
-  }
-
-  /// Obliquity of the ecliptic, corrected for nutation, in degrees.
-  static double _obliquity(double t) {
-    final seconds = 21.448 - t * (46.815 + t * (0.00059 - t * 0.001813));
-    final mean = 23 + (26 + seconds / 60) / 60;
-    return mean + 0.00256 * math.cos(_radians(125.04 - 1934.136 * t));
-  }
-
-  /// The sun's declination, in degrees.
-  static double _sunDeclination(double t) {
-    final sinDeclination =
-        math.sin(_radians(_obliquity(t))) *
-        math.sin(_radians(_apparentLongitude(t)));
-    return _degrees(math.asin(sinDeclination));
-  }
-
-  /// The equation of time — apparent solar time minus mean solar time —
-  /// in minutes.
-  static double _equationOfTimeMinutes(double t) {
-    final epsilon = _radians(_obliquity(t));
-    final l0 = _radians(_geometricMeanLongitude(t));
-    final e = _orbitEccentricity(t);
-    final m = _radians(_geometricMeanAnomaly(t));
-
-    final y = math.tan(epsilon / 2) * math.tan(epsilon / 2);
-
-    final equation =
-        y * math.sin(2 * l0) -
-        2 * e * math.sin(m) +
-        4 * e * y * math.sin(m) * math.cos(2 * l0) -
-        0.5 * y * y * math.sin(4 * l0) -
-        1.25 * e * e * math.sin(2 * m);
-
-    return _degrees(equation) * 4;
-  }
-
-  // --- Calendar and angle helpers ---------------------------------------
-
-  static const _minutesPerDay = 1440.0;
-
-  /// Julian Day number at 00:00 UTC on the given calendar date.
-  static double _julianDayOfMidnightUtc(int year, int month, int day) {
-    final utcMidnight = DateTime.utc(year, month, day);
-    return utcMidnight.millisecondsSinceEpoch / Duration.millisecondsPerDay +
-        _unixEpochJulianDay;
-  }
-
-  /// Julian Day of the Unix epoch (1970-01-01 00:00 UTC).
-  static const _unixEpochJulianDay = 2440587.5;
 
   /// The instant [minutesAfterUtcMidnight] after 00:00 UTC on the given
   /// date. Values outside 0–1440 are fine and roll into the neighbouring
@@ -295,13 +210,4 @@ abstract final class SolarCalculator {
     month,
     day,
   ).add(Duration(milliseconds: (minutesAfterUtcMidnight * 60000).round()));
-
-  static double _radians(double degrees) => degrees * math.pi / 180.0;
-
-  static double _degrees(double radians) => radians * 180.0 / math.pi;
-
-  static double _wrap360(double degrees) {
-    final wrapped = degrees % 360;
-    return wrapped < 0 ? wrapped + 360 : wrapped;
-  }
 }

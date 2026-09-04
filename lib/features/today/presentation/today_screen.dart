@@ -1,136 +1,181 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/environment/environment_providers.dart';
+import '../../../core/environment/natural_environment.dart';
 import '../../../core/widgets/widgets.dart';
+import 'today_text.dart';
+import 'widgets/explore_links.dart';
+import 'widgets/moon_card.dart';
+import 'widgets/sky_hero.dart';
+import 'widgets/sun_card.dart';
+import 'widgets/tides_card.dart';
 
-const _weekdays = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-String _formatToday(DateTime date) {
-  final weekday = _weekdays[date.weekday - 1];
-  final month = _months[date.month - 1];
-  return '$weekday ${date.day} $month';
-}
-
-/// The Today tab.
+/// The Today screen: what the world outside is doing, right now.
 ///
-/// This is a placeholder: it does not show sunrise, moon, tide or weather
-/// data, because none of that is implemented yet. It only establishes the
-/// visual language — typography, spacing, cards and hierarchy — that the
-/// real Today screen will be built inside later. The date shown is real
-/// (today's actual date), not fabricated content.
-class TodayScreen extends StatelessWidget {
+/// The order of the page is the point. The date and the season come
+/// first, then a large wordless picture of the sky, and only then the few
+/// facts worth knowing — when the sun rises and sets, and what the moon
+/// is doing. There is no score, no streak and no chart, because none of
+/// those would be about the world; they would be about the user.
+///
+/// Everything on it comes from [naturalEnvironmentProvider], which is
+/// already resolving season, daylight, sunrise and moon on its own
+/// schedule. This screen adds no clock of its own and no timer.
+class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final environment = ref.watch(naturalEnvironmentProvider);
+
+    // hasValue first, so a refresh in the background keeps showing the
+    // day rather than blanking the screen.
+    if (environment.hasValue) {
+      return _TodayView(environment: environment.requireValue);
+    }
+    if (environment.hasError) return const _TodayUnavailable();
+    return const _TodaySettling();
+  }
+}
+
+/// The title bar every state of this screen shares: today's real date,
+/// with the way into settings.
+class _TodayHeader {
+  const _TodayHeader._();
+
+  static String date(WidgetRef ref) {
+    final now = ref.watch(clockProvider)();
+    return formatLongDate(ref.watch(timeZoneProvider).wallTimeAt(now));
+  }
+
+  static Widget actions(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      // Debug builds only: a way into the seasonal theme preview.
+      // Absent from release builds, where the route does not exist.
+      if (kDebugMode)
+        IconButton(
+          onPressed: () => context.push(kThemePreviewRoute),
+          icon: const Icon(Icons.palette_outlined),
+          tooltip: 'Theme preview (debug)',
+        ),
+      IconButton(
+        onPressed: () => context.push(kSettingsRoute),
+        icon: const Icon(Icons.settings_outlined),
+        tooltip: 'Settings',
+      ),
+    ],
+  );
+}
+
+class _TodayView extends StatelessWidget {
+  const _TodayView({required this.environment});
+
+  final NaturalEnvironment environment;
+
+  @override
   Widget build(BuildContext context) {
-    final today = _formatToday(DateTime.now());
+    final local = environment.timeZone.wallTimeAt(environment.resolvedAt);
 
     return AppScaffold(
-      title: 'Today',
-      subtitle: today,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Debug builds only: a way into the seasonal theme preview.
-          // Absent from release builds, where the route does not exist.
-          if (kDebugMode)
-            IconButton(
-              onPressed: () => context.push(kThemePreviewRoute),
-              icon: const Icon(Icons.palette_outlined),
-              tooltip: 'Theme preview (debug)',
-            ),
-          IconButton(
-            onPressed: () => context.push(kSettingsRoute),
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
-          ),
-        ],
-      ),
+      title: formatLongDate(local),
+      subtitle: describeSeason(environment.season, environment.resolvedAt),
+      trailing: _TodayHeader.actions(context),
       body: [
-        const EmptyState(
-          icon: Icons.eco_outlined,
-          title: 'Your day, gently gathered',
-          message:
-              "Sunrise, moon phase, tides and the season's rhythm will "
-              'appear here once this screen knows where you are.',
-        ),
-        const SectionHeader(title: "What's coming here"),
-        const _ComingSoonGrid(),
+        _SkyBlock(environment: environment),
+        SunCard(environment: environment),
+        MoonCard(environment: environment),
+        const TidesCard(),
+        const ExploreLinks(),
       ],
     );
   }
 }
 
-class _ComingSoonGrid extends StatelessWidget {
-  const _ComingSoonGrid();
+/// The hero, and the two quiet lines that go with it.
+///
+/// Grouped into one block so the words sit close under the picture
+/// instead of being spaced out like separate sections.
+class _SkyBlock extends StatelessWidget {
+  const _SkyBlock({required this.environment});
 
-  static const _items = [
-    (icon: Icons.wb_twilight_outlined, label: 'Sun & moon'),
-    (icon: Icons.waves_outlined, label: 'Tides'),
-    (icon: Icons.park_outlined, label: 'Season'),
-    (icon: Icons.spa_outlined, label: 'Suggestions'),
-  ];
+  final NaturalEnvironment environment;
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: AppSpacing.md,
-        crossAxisSpacing: AppSpacing.md,
-        childAspectRatio: 2.4,
-      ),
-      itemBuilder: (context, index) {
-        final item = _items[index];
-        final theme = Theme.of(context);
-        return AppCard(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SkyHero(environment: environment),
+        const SizedBox(height: AppSpacing.md),
+        Text(describeLight(environment), style: textTheme.headlineSmall),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          describeNextSeason(environment.season, environment.resolvedAt),
+          style: textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+/// The first moment of the app's life, before sunrise and sunset have
+/// resolved. Deliberately quiet: a soft shape where the sky will be,
+/// rather than a spinner.
+class _TodaySettling extends ConsumerWidget {
+  const _TodaySettling();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AppScaffold(
+      title: _TodayHeader.date(ref),
+      trailing: _TodayHeader.actions(context),
+      body: [
+        Semantics(
+          label: 'Looking outside',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: AspectRatio(
+              aspectRatio: 16 / 10,
+              child: ColoredBox(color: context.palette.surface),
+            ),
           ),
-          child: Row(
-            children: [
-              Icon(
-                item.icon,
-                color: theme.colorScheme.primary,
-                size: AppIconSize.md,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(item.label, style: theme.textTheme.titleSmall),
-              ),
-            ],
+        ),
+      ],
+    );
+  }
+}
+
+/// The environment could not be resolved at all. Rare, and not the user's
+/// fault, so it says what happened without alarm.
+class _TodayUnavailable extends ConsumerWidget {
+  const _TodayUnavailable();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AppScaffold(
+      title: _TodayHeader.date(ref),
+      trailing: _TodayHeader.actions(context),
+      body: [
+        EmptyState(
+          icon: Icons.cloud_outlined,
+          title: 'Today is out of reach',
+          message:
+              'The app could not work out where the day has got to. '
+              'Reopening it usually settles this.',
+          action: PrimaryButton(
+            label: 'Try again',
+            onPressed: () => ref.invalidate(naturalEnvironmentProvider),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }

@@ -4,11 +4,11 @@ A nature-connected wellbeing app for Android, built with Flutter. Its
 central idea: wellbeing experienced through connection with the natural
 world — the sun, moon, tides, seasons and the life around us.
 
-This repository currently contains the **project foundation only**: the
-navigation shell, design system and placeholder screens that later
-features (Today, Wellbeing, Rhythms, Nature, Food) will be built inside.
-No feature functionality — real sun/moon/tide data, location, breathing
-exercises, recipes, etc. — is implemented yet.
+**Today** is the first real screen: the date, the season, a drawn sky
+that follows the sun, today's sunrise and sunset, and the moon's phase.
+The other four sections (Wellbeing, Rhythms, Nature, Food) are still
+placeholders, and tides are held open with no data rather than filled
+with a guess.
 
 ## Getting started
 
@@ -32,6 +32,9 @@ flutter run
 - `lib/features/<feature>/presentation/` — one folder per top-level tab
   (today, wellbeing, rhythms, nature, food). `data/` and `domain/`
   subfolders will be added to a feature once it has real business logic.
+  Today's screen is composed from small widgets under
+  `today/presentation/widgets/`, with all of its wording in
+  `today/presentation/today_text.dart`.
 - `lib/dev/` — development-only tooling, excluded from the production
   experience.
 
@@ -51,6 +54,13 @@ interpretation — and the active one is chosen automatically:
 - **Day/night** comes from sunrise/sunset for the user's location, as a
   continuous `daylight` value from 0 to 1. Dawn and dusk interpolate
   between the season's night and day palettes rather than snapping.
+
+During that interpolation the *grounds* — backgrounds, surfaces and
+decorative fills — cross-fade, but text, icons and the colours that sit
+on a coloured container do not: each is *chosen* from the day or night
+palette by which reads better on the ground it has landed on. Fading
+them alongside the background made them meet it in the middle and
+disappear (1.01:1, twice a day). See `SeasonalPalette.lerp`.
 
 Screens never ask what season it is. They read semantic tokens
 (`background`, `primary`, `accent`, `water`, `earth`, …) from the active
@@ -95,7 +105,9 @@ Location itself is optional and stays that way:
 
 Note that seasons are **astronomical**: they turn at the equinoxes and
 solstices, not on the 1st of a month. Early September is therefore still
-summer in the north and winter in the south.
+summer in the north and winter in the south. Today uses the same
+boundaries to say *where in* the season you are — "early summer", and
+how many days until autumn.
 
 ## Time, sun and place
 
@@ -121,6 +133,49 @@ summer in the north and winter in the south.
   15 minutes old; the app re-checks permission on resume without
   prompting, and only ever prompts from a deliberate tap. There is no
   tracking, no background location and no stored history.
+
+## The moon
+
+The phase is calculated on the device from the moon's elongation from the
+sun — the largest periodic terms of the lunar theory in Meeus ch. 47,
+sharing its solar position with the sunrise calculation
+(`lib/core/environment/astronomy.dart`). It needs no network and no
+position: the phase is the same for everybody on Earth at a given moment.
+Accurate to a couple of minutes of the moon's motion, which is checked
+against twelve published new and full moons.
+
+It is drawn, not shipped as artwork: `MoonDisc` paints the terminator as
+a projected ellipse, so the shape is right on every night of the cycle
+rather than snapping between eight pictures. The lit limb flips with the
+hemisphere, because a waxing moon is lit on the right from the north and
+on the left from the south.
+
+What it does **not** claim: moonrise and moonset, where the moon is in
+the sky, or whether it is visible from a particular place. Its placement
+in the Today screen's sky is composition, which is why that whole graphic
+is marked decorative and states nothing to a screen reader.
+
+## Today
+
+The order of the page is the design: the date and season, then a large
+wordless picture of the sky, then the few facts worth knowing. No score,
+no streak, no chart.
+
+- The sun's height on its arc comes from `solarDayProgress` — a
+  *different* quantity from `daylight`, which has already reached 1.0 by
+  breakfast and so cannot place the sun. It is null before sunrise, after
+  sunset and on polar days, and nothing draws a sun at a made-up height.
+- Sunrise and sunset are real local times from `SolarService`, converted
+  from absolute instants for display and following the device's 12/24-hour
+  setting.
+- Without location the section says what it needs and offers to ask, once,
+  from a deliberate tap. It is a quiet invitation, not an error — the
+  season, the moon and the rest of the day are all still there.
+- Inside the polar circles it says the sun does not rise or set today,
+  rather than printing a time.
+- Animation is implicit and one-shot: the sun glides when its position
+  changes and then stops. There is no repeating ticker, and
+  `MediaQuery.disableAnimationsOf` switches it off entirely.
 
 ## Settings
 
@@ -148,3 +203,15 @@ token classes) rather than hard-coding values.
 ```
 flutter test
 ```
+
+408 tests. The ones worth knowing about:
+
+- `moon_calculator_test.dart` checks the phase against twelve published
+  new and full moons across three years.
+- `solar_calculator_test.dart` checks sunrise and sunset against
+  published times and against an independent closed-form day length.
+- `palette_accessibility_test.dart` checks all eight palettes *and* forty
+  points through each season's dawn/dusk blend.
+- `today_appearance_test.dart` renders Today in all eight
+  season-and-phase combinations, at double text size, and with
+  animations disabled.

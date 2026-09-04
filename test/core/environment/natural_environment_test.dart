@@ -5,6 +5,7 @@ import 'package:almanac/core/environment/local_time_zone.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/natural_environment.dart';
 import 'package:almanac/core/environment/season.dart';
+import 'package:almanac/core/environment/solar_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -182,6 +183,110 @@ void main() {
 
       expect(environment.timeZone, TestTimeZones.wellington);
       expect(environment.location, isNull);
+    });
+  });
+
+  group('what the screens need is on the state, not recalculated', () {
+    test('carries the instant everything was resolved for', () async {
+      final now = DateTime.utc(2025, 7, 15, 12, 34);
+      final environment = await resolve(containerAt(now: now));
+
+      // A screen must be able to say "today" without reading the clock
+      // again — and in a test, without escaping the injected one.
+      expect(environment.resolvedAt, now);
+    });
+
+    test('carries today\'s sunrise and sunset, as instants', () async {
+      final environment = await resolve(
+        containerAt(
+          now: DateTime.utc(2025, 7, 15, 12),
+          locationState: const LocationAvailable(TestLocations.london),
+          sunrise: DateTime.utc(2025, 7, 15, 5, 12),
+          sunset: DateTime.utc(2025, 7, 15, 20, 41),
+        ),
+      );
+
+      expect(environment.solarEvents.hasTimes, isTrue);
+      expect(environment.solarEvents.sunrise, DateTime.utc(2025, 7, 15, 5, 12));
+      expect(environment.solarEvents.sunset, DateTime.utc(2025, 7, 15, 20, 41));
+      expect(environment.solarEvents.sunrise!.isUtc, isTrue);
+      expect(
+        environment.solarEvents.dayLength,
+        const Duration(hours: 15, minutes: 29),
+      );
+    });
+
+    test('reports no times when there is no position', () async {
+      // The real solar service answers `locationRequired` without
+      // coordinates, because sunrise genuinely cannot be calculated
+      // without them.
+      final container = ProviderContainer(
+        overrides: environmentOverrides(
+          now: DateTime.utc(2025, 7, 15, 12),
+          solarService: FakeSolarService(),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      final environment = await resolve(container);
+
+      expect(environment.hasPreciseLocation, isFalse);
+      expect(environment.solarEvents.hasTimes, isFalse);
+      expect(environment.solarEvents.dayLength, isNull);
+      expect(environment.dayProgress, isNull);
+      expect(
+        environment.dayNight.accuracy,
+        DayNightAccuracy.estimatedWithoutLocation,
+      );
+    });
+
+    test('carries the moon phase, which needs no position', () async {
+      // A known full moon. The phase is a property of the moment, so it
+      // is there whether or not location was ever shared.
+      final environment = await resolve(
+        containerAt(now: DateTime.utc(2025, 7, 10, 20, 37)),
+      );
+
+      expect(environment.moon.phase.name, 'fullMoon');
+      expect(environment.moon.illuminatedPercent, 100);
+    });
+
+    test('day progress moves through the day and stops at the ends', () async {
+      Future<double?> progressAt(int hour) async {
+        final environment = await resolve(
+          containerAt(
+            now: DateTime.utc(2025, 7, 15, hour),
+            locationState: const LocationAvailable(TestLocations.london),
+            sunrise: DateTime.utc(2025, 7, 15, 5),
+            sunset: DateTime.utc(2025, 7, 15, 20),
+          ),
+        );
+        return environment.dayProgress;
+      }
+
+      expect(await progressAt(4), isNull);
+      expect(await progressAt(5), 0);
+      expect((await progressAt(12))!, closeTo(7 / 15, 1e-9));
+      expect(await progressAt(20), 1);
+      expect(await progressAt(22), isNull);
+    });
+
+    test('a polar day has no progress rather than a made-up one', () async {
+      final container = ProviderContainer(
+        overrides: environmentOverrides(
+          now: DateTime.utc(2025, 7, 1, 12),
+          timeZone: TestTimeZones.tromso,
+          locationState: const LocationAvailable(TestLocations.tromso),
+          solarService: FakeSolarService(kind: SolarDayKind.sunNeverSets),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      final environment = await resolve(container);
+
+      expect(environment.solarEvents.kind, SolarDayKind.sunNeverSets);
+      expect(environment.dayProgress, isNull);
+      expect(environment.dayNight.daylight, 1);
     });
   });
 }

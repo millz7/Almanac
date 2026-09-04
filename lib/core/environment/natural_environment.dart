@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'day_night.dart';
 import 'geo_location.dart';
 import 'local_time_zone.dart';
+import 'moon_phase.dart';
 import 'season.dart';
+import 'solar_service.dart';
 
 /// Where the hemisphere the app is using actually came from.
 ///
@@ -75,26 +77,48 @@ class ResolvedHemisphere {
 /// feature screens — read from. Nothing recomputes seasons or day/night
 /// on its own.
 ///
-/// Note what is optional and what is not. [hemisphere] and [timeZone] are
-/// always known, so seasons always work. [location] is null unless the
-/// user has actually shared their position, and features that genuinely
-/// need coordinates must check for it rather than assume one.
+/// Note what is optional and what is not. [hemisphere], [timeZone],
+/// [season] and [moon] are always known, so those always work: the season
+/// needs only a date and a hemisphere, and the moon's phase is the same
+/// for everybody on Earth at a given moment. [location] is null unless
+/// the user has actually shared their position, and [solarEvents] carries
+/// no times without one — features that genuinely need coordinates must
+/// check rather than assume.
 @immutable
 class NaturalEnvironment {
   const NaturalEnvironment({
+    required this.resolvedAt,
     required this.hemisphere,
     required this.hemisphereSource,
     required this.timeZone,
     required this.season,
     required this.dayNight,
+    required this.solarEvents,
+    required this.moon,
     this.location,
   });
+
+  /// The instant all of this was resolved for.
+  ///
+  /// Carried so screens read the same "now" the season and day/night were
+  /// worked out from, instead of each one calling the clock again and
+  /// disagreeing with the others by a few milliseconds — or, worse,
+  /// ignoring the clock the tests injected.
+  final DateTime resolvedAt;
 
   final Hemisphere hemisphere;
   final HemisphereSource hemisphereSource;
   final LocalTimeZone timeZone;
   final SeasonState season;
   final DayNightState dayNight;
+
+  /// Today's sunrise and sunset, as absolute instants. Reports no times
+  /// when there is no position to calculate from, and inside the polar
+  /// circles on days the sun does not cross the horizon.
+  final SolarEvents solarEvents;
+
+  /// Where the moon is in its cycle.
+  final MoonPhaseState moon;
 
   /// The user's precise position, or null if they have not shared it.
   /// Never a stand-in value.
@@ -103,8 +127,15 @@ class NaturalEnvironment {
   /// Whether features that require coordinates can run.
   bool get hasPreciseLocation => location != null;
 
+  /// How far through the daylight hours it is, 0–1, or null when there is
+  /// no arc to trace. See [solarDayProgress] for why this is a different
+  /// quantity from [DayNightState.daylight].
+  double? get dayProgress =>
+      solarDayProgress(instant: resolvedAt, events: solarEvents);
+
   @override
   String toString() =>
       'NaturalEnvironment(${hemisphere.name} via ${hemisphereSource.name}, '
-      '$season, $dayNight, location: ${location ?? 'not shared'})';
+      '$season, $dayNight, $solarEvents, $moon, '
+      'location: ${location ?? 'not shared'})';
 }

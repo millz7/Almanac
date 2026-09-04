@@ -47,6 +47,12 @@ class SolarEvents {
   /// True when there are real times to work with.
   bool get hasTimes => sunrise != null && sunset != null;
 
+  /// How long the sun is above the horizon, or null when that is not
+  /// known. Polar days are deliberately not reported as 24 or 0 hours:
+  /// [kind] already says what is happening, and a duration would invite
+  /// callers to display it as an ordinary day length.
+  Duration? get dayLength => hasTimes ? sunset!.difference(sunrise!) : null;
+
   @override
   String toString() => hasTimes
       ? 'SolarEvents($sunrise → $sunset)'

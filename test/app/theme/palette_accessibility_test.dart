@@ -1,4 +1,5 @@
 import 'package:almanac/app/theme/seasonal_palettes.dart';
+import 'package:almanac/core/environment/season.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -208,6 +209,99 @@ void main() {
           lessThan(20),
           reason: 'approaching 21:1 means white-on-black glare',
         );
+      });
+    }
+  });
+
+  group('the twilight blend stays legible', () {
+    // Dawn and dusk interpolate a season's day and night palettes. That
+    // is where readability is most at risk, because a light ground and a
+    // dark ground meeting in the middle produce a mid-tone that neither
+    // palette was designed against — and if the text blended too it
+    // vanished entirely (it measured 1.01:1 before `lerp` was changed to
+    // choose content colours instead of fading them).
+    //
+    // 4.5:1 is not reachable at the very crossover with these palettes,
+    // so the floor here is the 3:1 bar for large text and graphical
+    // objects, checked at every point of the blend rather than only at
+    // the ends.
+    const blendMinimum = 3.0;
+
+    for (final season in Season.values) {
+      group(season.label, () {
+        test('text never disappears at any point of the transition', () {
+          for (var step = 0; step <= 40; step++) {
+            final daylight = step / 40;
+            final palette = SeasonalPalettes.resolve(
+              season: season,
+              daylight: daylight,
+            );
+
+            for (final (label, foreground, background) in [
+              (
+                'textPrimary on background',
+                palette.textPrimary,
+                palette.background,
+              ),
+              ('textPrimary on surface', palette.textPrimary, palette.surface),
+              (
+                'textSecondary on background',
+                palette.textSecondary,
+                palette.background,
+              ),
+              ('icon on background', palette.icon, palette.background),
+            ]) {
+              final ratio = contrastRatio(foreground, background);
+              expect(
+                ratio,
+                greaterThanOrEqualTo(blendMinimum),
+                reason:
+                    '${season.label} at daylight '
+                    '${daylight.toStringAsFixed(3)}: $label is '
+                    '${ratio.toStringAsFixed(2)}:1',
+              );
+            }
+          }
+        });
+
+        test('content on coloured containers survives the transition', () {
+          for (var step = 0; step <= 40; step++) {
+            final daylight = step / 40;
+            final palette = SeasonalPalettes.resolve(
+              season: season,
+              daylight: daylight,
+            );
+
+            for (final (label, foreground, background) in [
+              ('onPrimary', palette.onPrimary, palette.primary),
+              ('onPrimarySoft', palette.onPrimarySoft, palette.primarySoft),
+              ('onSecondary', palette.onSecondary, palette.secondary),
+              ('onAccent', palette.onAccent, palette.accent),
+              ('onError', palette.onError, palette.error),
+            ]) {
+              final ratio = contrastRatio(foreground, background);
+              expect(
+                ratio,
+                greaterThanOrEqualTo(blendMinimum),
+                reason:
+                    '${season.label} at daylight '
+                    '${daylight.toStringAsFixed(3)}: $label is '
+                    '${ratio.toStringAsFixed(2)}:1',
+              );
+            }
+          }
+        });
+
+        test('the ends of the blend are the designed palettes', () {
+          expect(
+            SeasonalPalettes.resolve(season: season, daylight: 0).name,
+            '${season.label} Night',
+          );
+          expect(
+            SeasonalPalettes.resolve(season: season, daylight: 1).name,
+            '${season.label} Day',
+          );
+        });
       });
     }
   });
