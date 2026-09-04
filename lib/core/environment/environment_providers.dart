@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings/settings_providers.dart';
 import 'day_night.dart';
 import 'geo_location.dart';
+import 'geolocator_location_service.dart';
+import 'local_time_zone.dart';
 import 'location_service.dart';
+import 'location_state.dart';
 import 'natural_environment.dart';
 import 'season.dart';
 import 'season_service.dart';
@@ -13,10 +17,15 @@ import 'solar_service.dart';
 /// The app's clock, injected so tests can pin "now" to a fixed instant.
 final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-/// Where the user is. Swap the implementation here when the real location
-/// service is built — nothing else needs to change.
+/// The device's time zone. Always available, no permission needed.
+final timeZoneProvider = Provider<LocalTimeZone>(
+  (ref) => LocalTimeZone.ofDevice(),
+);
+
+/// The platform location service. Tests override it; nothing else in the
+/// app knows which implementation is behind it.
 final locationServiceProvider = Provider<LocationService>(
-  (ref) => const DeviceOffsetLocationService(),
+  (ref) => const GeolocatorLocationService(),
 );
 
 /// Sunrise/sunset source. Currently a documented placeholder.
@@ -29,9 +38,89 @@ final seasonServiceProvider = Provider<SeasonService>(
   (ref) => const AstronomicalSeasonService(),
 );
 
-/// Hemisphere used before the real location has resolved. Only affects the
-/// first frame or two; see [DeviceOffsetLocationService] for the caveat.
-const kBootstrapHemisphere = Hemisphere.northern;
+/// The hemisphere assumed when the app knows nothing at all — no location
+/// and no choice yet.
+///
+/// This is a **technical** fallback for rendering the very first frame of
+/// onboarding, not an assumption about the user. As soon as they choose,
+/// their choice takes over; it is never used to decide anybody's season
+/// after that.
+const kTechnicalFallbackHemisphere = Hemisphere.northern;
+
+/// The app's access to the user's position.
+///
+/// Starts out as "never asked" and only changes when the app checks
+/// ([refresh], which never prompts) or the user asks for it
+/// ([requestAccess], the only thing that can show a permission dialog).
+final locationStateProvider =
+    NotifierProvider<LocationController, LocationState>(LocationController.new);
+
+class LocationController extends Notifier<LocationState> {
+  @override
+  LocationState build() => const LocationPermissionNotRequested();
+
+  /// Re-checks permission without prompting. Called at startup and on
+  /// resume, so permission granted or revoked in system settings is
+  /// picked up.
+  Future<void> refresh() async {
+    state = await _guard(
+      () => ref.read(locationServiceProvider).currentState(),
+    );
+  }
+
+  /// Asks the user for location access. Only ever called from a
+  /// deliberate tap.
+  Future<void> requestAccess() async {
+    state = await _guard(
+      () => ref.read(locationServiceProvider).requestAccess(),
+    );
+  }
+
+  /// The app must survive any failure down in the platform layer: without
+  /// location it simply keeps using the hemisphere the user chose.
+  Future<LocationState> _guard(Future<LocationState> Function() read) async {
+    try {
+      return await read();
+    } on Object catch (error) {
+      return LocationUnavailable('location lookup failed: $error');
+    }
+  }
+}
+
+/// Which hemisphere the app should use, and where that came from.
+///
+/// Priority, as required by the product rules:
+///
+/// 1. A real latitude, when the user has shared their location.
+/// 2. Otherwise the hemisphere they chose themselves.
+/// 3. Otherwise — only before onboarding — a technical fallback.
+///
+/// Note what this does *not* do: when location becomes available it is
+/// used for calculations, but the user's stored preference is left
+/// exactly as they set it. The two are kept side by side rather than one
+/// silently overwriting the other.
+final resolvedHemisphereProvider = Provider<ResolvedHemisphere>((ref) {
+  final location = ref.watch(locationStateProvider).location;
+  if (location != null) {
+    return ResolvedHemisphere(
+      hemisphere: location.hemisphere,
+      source: HemisphereSource.derivedFromLocation,
+    );
+  }
+
+  final chosen = ref.watch(userSettingsProvider).hemisphere;
+  if (chosen != null) {
+    return ResolvedHemisphere(
+      hemisphere: chosen,
+      source: HemisphereSource.userSelected,
+    );
+  }
+
+  return const ResolvedHemisphere(
+    hemisphere: kTechnicalFallbackHemisphere,
+    source: HemisphereSource.technicalFallback,
+  );
+});
 
 /// Whether the environment schedules its own refreshes (see
 /// [NaturalEnvironmentNotifier._scheduleNextRefresh]).
@@ -42,17 +131,19 @@ final environmentRefreshEnabledProvider = Provider<bool>((ref) => true);
 
 /// The single source of truth for the user's natural environment.
 ///
-/// Resolves location → season → sunrise/sunset → day/night once, then
-/// schedules itself to re-resolve when something can actually have changed
-/// (see [_scheduleNextRefresh]). It never polls on a short interval.
+/// Resolves hemisphere → season → sunrise/sunset → day/night, then
+/// schedules itself to re-resolve when something can actually have
+/// changed (see [_scheduleNextRefresh]). It never polls on a short
+/// interval. Because it watches [resolvedHemisphereProvider], choosing a
+/// hemisphere in onboarding recomputes the season immediately.
 final naturalEnvironmentProvider =
     AsyncNotifierProvider<NaturalEnvironmentNotifier, NaturalEnvironment>(
       NaturalEnvironmentNotifier.new,
     );
 
-/// How often the state refreshes *while* easing through dawn or dusk. Only
-/// active during the twilight window, so this costs roughly twenty extra
-/// rebuilds a day rather than one a second.
+/// How often the state refreshes *while* easing through dawn or dusk.
+/// Only active during the twilight window, so this costs roughly twenty
+/// extra rebuilds a day rather than one a second.
 const kTwilightRefreshInterval = Duration(minutes: 2);
 
 /// Upper bound on how long we will sleep between refreshes. A season
@@ -68,28 +159,34 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
     ref.onDispose(() => _refreshTimer?.cancel());
 
     final now = ref.watch(clockProvider)();
-    final location = await ref.watch(locationServiceProvider).currentLocation();
+    final timeZone = ref.watch(timeZoneProvider);
+    final resolved = ref.watch(resolvedHemisphereProvider);
+    final location = ref.watch(locationStateProvider).location;
+
     final season = ref
         .watch(seasonServiceProvider)
-        .seasonAt(now, location.hemisphere);
+        .seasonAt(now, resolved.hemisphere);
     final events = await ref
         .watch(solarServiceProvider)
-        .eventsFor(location, now);
+        .eventsFor(instant: now, timeZone: timeZone, location: location);
     final dayNight = resolveDayNight(instant: now, events: events);
 
     if (ref.watch(environmentRefreshEnabledProvider)) {
       _scheduleNextRefresh(
         now: now,
-        location: location,
+        timeZone: timeZone,
         season: season,
         dayNight: dayNight,
       );
     }
 
     return NaturalEnvironment(
-      location: location,
+      hemisphere: resolved.hemisphere,
+      hemisphereSource: resolved.source,
+      timeZone: timeZone,
       season: season,
       dayNight: dayNight,
+      location: location,
     );
   }
 
@@ -99,14 +196,14 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
 
   void _scheduleNextRefresh({
     required DateTime now,
-    required GeoLocation location,
+    required LocalTimeZone timeZone,
     required SeasonState season,
     required DayNightState dayNight,
   }) {
     _refreshTimer?.cancel();
 
     final target = _earliest([
-      _nextDayNightChange(now, location, dayNight),
+      _nextDayNightChange(now, timeZone, dayNight),
       season.endsAt,
     ]);
 
@@ -117,7 +214,7 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
   /// When the day/night state can next differ.
   DateTime _nextDayNightChange(
     DateTime now,
-    GeoLocation location,
+    LocalTimeZone timeZone,
     DayNightState dayNight,
   ) {
     // Mid-transition: step forward in small increments so the palette
@@ -130,8 +227,7 @@ class NaturalEnvironmentNotifier extends AsyncNotifier<NaturalEnvironment> {
     if (next != null) return next;
     // After dusk: tomorrow's sunrise needs tomorrow's solar events, so
     // wake at the start of the next local day and resolve again then.
-    final localMidnight = location.localMidnight(now);
-    return location.toInstant(localMidnight.add(const Duration(days: 1)));
+    return timeZone.midnightOf(now).add(const Duration(days: 1));
   }
 
   Duration _clampDelay(Duration delay) {

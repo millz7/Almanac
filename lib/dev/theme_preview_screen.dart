@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/theme/app_theme.dart';
 import '../core/environment/environment_providers.dart';
+import '../core/environment/natural_environment.dart';
 import '../core/environment/season.dart';
 import '../core/widgets/widgets.dart';
 import 'theme_preview.dart';
@@ -131,25 +132,31 @@ class _DetectedEnvironmentCard extends ConsumerWidget {
                 label: 'Daylight',
                 value: data.dayNight.daylight.toStringAsFixed(2),
               ),
-              _Row(label: 'Hemisphere', value: data.location.hemisphere.name),
+              _Row(label: 'Hemisphere', value: data.hemisphere.name),
+              _Row(
+                label: 'Hemisphere from',
+                value: _sourceLabel(data.hemisphereSource),
+              ),
               _Row(
                 label: 'UTC offset',
-                value: '${data.location.utcOffset.inHours}h',
+                value: '${data.timeZone.utcOffset.inHours}h',
+              ),
+              _Row(
+                label: 'Precise location',
+                value: data.location?.toString() ?? 'not shared',
               ),
               _Row(
                 label: 'Next change',
                 value: nextChange == null
                     ? 'tomorrow'
-                    : _formatLocalTime(
-                        data.location.toLocalWallTime(nextChange),
-                      ),
+                    : _formatLocalTime(data.timeZone.wallTimeAt(nextChange)),
               ),
-              if (data.location.isFallback)
+              if (data.hemisphereSource == HemisphereSource.technicalFallback)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.sm),
                   child: Text(
-                    'Location is a placeholder, so the hemisphere may be '
-                    'wrong until the real location service is connected.',
+                    'No hemisphere has been chosen or derived yet, so this '
+                    'is a technical fallback for the first frame only.',
                     style: textTheme.bodySmall,
                   ),
                 ),
@@ -160,6 +167,12 @@ class _DetectedEnvironmentCard extends ConsumerWidget {
     );
   }
 }
+
+String _sourceLabel(HemisphereSource source) => switch (source) {
+  HemisphereSource.derivedFromLocation => 'your location',
+  HemisphereSource.userSelected => 'your choice',
+  HemisphereSource.technicalFallback => 'fallback',
+};
 
 String _formatLocalTime(DateTime localWallTime) {
   final hour = localWallTime.hour.toString().padLeft(2, '0');

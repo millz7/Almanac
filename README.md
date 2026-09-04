@@ -22,8 +22,10 @@ flutter run
 - `lib/app/` — app entry widget, router, and the central theme/design
   system (`lib/app/theme/`).
 - `lib/core/environment/` — the natural environment: season, day/night,
-  location and solar services. The single source of truth the theme (and
-  later, features) read from.
+  hemisphere, location and solar services. The single source of truth the
+  theme (and later, features) read from.
+- `lib/core/settings/` — the small set of persisted user choices, behind a
+  `SettingsStore` interface.
 - `lib/core/widgets/` — small reusable UI building blocks shared across
   features (`AppScaffold`, `AppCard`, `SectionHeader`, `PrimaryButton`,
   `EmptyState`, `FeaturePlaceholderScreen`).
@@ -60,6 +62,40 @@ Only the summer palette is designed — it is built on supplied reference
 colours (`SummerReferenceColors`). Spring, autumn and winter are marked
 **PROVISIONAL** and exist to prove the engine works; they will be
 replaced with designed palettes.
+
+## Hemisphere, location and privacy
+
+The app needs to know which hemisphere the user is in, because the same
+date is a different season north and south. It gets that in one of three
+ways, in priority order:
+
+1. **A real latitude**, if the user has shared their location.
+2. **The hemisphere they chose** during onboarding — the normal case.
+3. A documented technical fallback, reachable only before onboarding has
+   been completed.
+
+A location-derived hemisphere is used for calculations but **never
+overwrites the stored choice**, so revoking location returns the user to
+their own preference. `HemisphereSource` records which of the three is in
+play.
+
+Location itself is optional and stays that way:
+
+- The first screen is the hemisphere question, never a permission dialog.
+- The explanation of what location is for is shown once, and "Not Now" is
+  a first-class answer.
+- Everything seasonal works without it. Features that genuinely need
+  coordinates must check `NaturalEnvironment.hasPreciseLocation` rather
+  than assume a position.
+- Only `ACCESS_COARSE_LOCATION` is declared, only "while in use" is ever
+  requested, and no position is written to disk — the app asks the
+  platform when it needs one.
+- The app never re-prompts on its own; a permanent denial sets
+  `canRequest` to false.
+
+Note that seasons are **astronomical**: they turn at the equinoxes and
+solstices, not on the 1st of a month. Early September is therefore still
+summer in the north and winter in the south.
 
 ### Previewing palettes during development
 

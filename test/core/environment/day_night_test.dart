@@ -138,23 +138,38 @@ void main() {
   });
 
   group('placeholder solar service', () {
-    test('produces sunrise and sunset in the location local day', () async {
+    test('produces sunrise and sunset in the local day', () async {
       const service = PlaceholderSolarService();
-      final instant = DateTime.utc(2025, 6, 15, 2);
-      final result = await service.eventsFor(TestLocations.wellington, instant);
+      const timeZone = TestTimeZones.wellington;
+      final result = await service.eventsFor(
+        instant: DateTime.utc(2025, 6, 15, 2),
+        timeZone: timeZone,
+      );
 
-      final localSunrise = TestLocations.wellington.toLocalWallTime(
-        result.sunrise,
-      );
-      final localSunset = TestLocations.wellington.toLocalWallTime(
-        result.sunset,
-      );
+      final localSunrise = timeZone.wallTimeAt(result.sunrise);
+      final localSunset = timeZone.wallTimeAt(result.sunset);
 
       expect(localSunrise.hour, 6);
       expect(localSunrise.minute, 30);
       expect(localSunset.hour, 20);
       expect(localSunset.minute, 30);
       expect(result.sunrise.isBefore(result.sunset), isTrue);
+    });
+
+    test('needs only a time zone, so it works without any location', () async {
+      const service = PlaceholderSolarService();
+      final withLocation = await service.eventsFor(
+        instant: DateTime.utc(2025, 6, 15, 2),
+        timeZone: TestTimeZones.wellington,
+        location: TestLocations.wellington,
+      );
+      final withoutLocation = await service.eventsFor(
+        instant: DateTime.utc(2025, 6, 15, 2),
+        timeZone: TestTimeZones.wellington,
+      );
+
+      expect(withoutLocation.sunrise, withLocation.sunrise);
+      expect(withoutLocation.sunset, withLocation.sunset);
     });
   });
 }

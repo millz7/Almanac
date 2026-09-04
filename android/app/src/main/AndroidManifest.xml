@@ -1,4 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Approximate location only, and only while the app is in use.
+         City-level accuracy is enough for seasons and sunrise/sunset, so
+         ACCESS_FINE_LOCATION is deliberately not requested. Background
+         location is never requested: the app has no use for the user's
+         whereabouts when it is not open.
+
+         Location is optional throughout — the app works without it,
+         using the hemisphere the user chose. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:label="Almanac"
         android:name="${applicationName}"

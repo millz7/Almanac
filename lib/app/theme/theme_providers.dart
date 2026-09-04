@@ -35,13 +35,15 @@ final activePaletteProvider = Provider<SeasonalPalette>((ref) {
     );
   }
 
-  // Location and sunrise/sunset are asynchronous. For the first frame,
-  // show the correct season for the device clock in daylight rather than
-  // flashing an arbitrary palette.
+  // Sunrise/sunset resolution is asynchronous. For the first frame, show
+  // the correct season for the hemisphere already known — the user's own
+  // choice whenever they have made one — rather than flashing an
+  // arbitrary palette.
   final now = ref.watch(clockProvider)();
+  final hemisphere = ref.watch(resolvedHemisphereProvider).hemisphere;
   final season = ref
       .watch(seasonServiceProvider)
-      .seasonAt(now, kBootstrapHemisphere)
+      .seasonAt(now, hemisphere)
       .season;
   return SeasonalPalettes.resolve(season: season, daylight: 1);
 });

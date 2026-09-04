@@ -172,10 +172,10 @@ void main() {
         // in Wellington is still the previous season, while the same local
         // clock time in London is already the new one.
         final equinox = solarTermInstant(2025, SolarTerm.marchEquinox);
-        final wellingtonNoon = TestLocations.wellington.toInstant(
+        final wellingtonNoon = TestTimeZones.wellington.instantOf(
           DateTime.utc(2025, 3, 20, 12),
         );
-        final londonNoon = TestLocations.london.toInstant(
+        final londonNoon = TestTimeZones.london.instantOf(
           DateTime.utc(2025, 3, 20, 12),
         );
 

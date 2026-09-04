@@ -1,44 +1,31 @@
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/app/theme/theme_providers.dart';
-import 'package:almanac/core/environment/environment_providers.dart';
+import 'package:almanac/core/environment/geo_location.dart';
+import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/season.dart';
 import 'package:almanac/dev/theme_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// Riverpod 3 keeps the Override type out of its main export.
-import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_environment_services.dart';
-
-/// Pins the environment so the app under test is not affected by the real
-/// date, time or device time zone.
-List<Override> _pinnedEnvironment({
-  DateTime? now,
-  DateTime? sunrise,
-  DateTime? sunset,
-}) => [
-  // No background refresh timer, so no timers outlive the test.
-  environmentRefreshEnabledProvider.overrideWithValue(false),
-  clockProvider.overrideWithValue(() => now ?? DateTime.utc(2025, 7, 15, 12)),
-  locationServiceProvider.overrideWithValue(
-    FakeLocationService(TestLocations.london),
-  ),
-  solarServiceProvider.overrideWithValue(
-    FakeSolarService(
-      sunrise: sunrise ?? DateTime.utc(2025, 7, 15, 5),
-      sunset: sunset ?? DateTime.utc(2025, 7, 15, 21),
-    ),
-  ),
-];
+import 'support/test_overrides.dart';
 
 void main() {
+  /// The palette the app is actually wearing, read from a widget deep in
+  /// the tree so this asserts what the user sees.
+  SeasonalPalette paletteOf(WidgetTester tester) =>
+      tester.element(find.byType(NavigationBar)).palette;
+
   testWidgets('app launches on Today and can navigate to other tabs', (
     tester,
   ) async {
     await tester.pumpWidget(
-      ProviderScope(overrides: _pinnedEnvironment(), child: const AlmanacApp()),
+      ProviderScope(
+        overrides: environmentOverrides(),
+        child: const AlmanacApp(),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -58,7 +45,10 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      ProviderScope(overrides: _pinnedEnvironment(), child: const AlmanacApp()),
+      ProviderScope(
+        overrides: environmentOverrides(),
+        child: const AlmanacApp(),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -69,72 +59,83 @@ void main() {
   testWidgets('the app dresses itself in the season it detects', (
     tester,
   ) async {
-    // Mid-July in London, at midday: summer, in daylight.
+    // Mid-July, northern hemisphere, midday: summer, in daylight.
     await tester.pumpWidget(
-      ProviderScope(overrides: _pinnedEnvironment(), child: const AlmanacApp()),
+      ProviderScope(
+        overrides: environmentOverrides(),
+        child: const AlmanacApp(),
+      ),
     );
     await tester.pumpAndSettle();
 
-    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-    final context = tester.element(find.byType(NavigationBar));
-
-    expect(context.palette, same(SummerPalettes.day));
+    expect(paletteOf(tester), same(SummerPalettes.day));
     expect(
-      Theme.of(context).scaffoldBackgroundColor,
+      Theme.of(tester.element(find.byType(NavigationBar)))
+          .scaffoldBackgroundColor,
       SummerPalettes.day.background,
     );
-    expect(scaffold, isNotNull);
   });
 
   testWidgets('the same app at night wears the night palette', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         // 23:00, well after the 21:00 sunset.
-        overrides: _pinnedEnvironment(now: DateTime.utc(2025, 7, 15, 23)),
+        overrides: environmentOverrides(now: DateTime.utc(2025, 7, 15, 23)),
         child: const AlmanacApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    final context = tester.element(find.byType(NavigationBar));
-
-    expect(context.palette, same(SummerPalettes.night));
-    expect(Theme.of(context).brightness, Brightness.dark);
+    expect(paletteOf(tester), same(SummerPalettes.night));
+    expect(
+      Theme.of(tester.element(find.byType(NavigationBar))).brightness,
+      Brightness.dark,
+    );
   });
 
-  testWidgets('winter in the southern hemisphere is winter, in July', (
+  testWidgets('July in the southern hemisphere is winter', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: environmentOverrides(
+          // Local noon in Wellington, which is the previous day in UTC.
+          now: TestTimeZones.wellington.instantOf(
+            DateTime.utc(2025, 7, 15, 12),
+          ),
+          timeZone: TestTimeZones.wellington,
+          hemisphere: Hemisphere.southern,
+        ),
+        child: const AlmanacApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(paletteOf(tester).name, 'Winter Day');
+  });
+
+  testWidgets('a shared location overrides the stored hemisphere', (
     tester,
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          environmentRefreshEnabledProvider.overrideWithValue(false),
-          clockProvider.overrideWithValue(() => DateTime.utc(2025, 7, 15, 0)),
-          locationServiceProvider.overrideWithValue(
-            FakeLocationService(TestLocations.wellington),
-          ),
-          solarServiceProvider.overrideWithValue(
-            FakeSolarService(
-              sunrise: DateTime.utc(2025, 7, 14, 19, 30),
-              sunset: DateTime.utc(2025, 7, 15, 5, 10),
-            ),
-          ),
-        ],
+        overrides: environmentOverrides(
+          now: DateTime.utc(2025, 7, 15, 12),
+          // Stored choice says northern; the device says Wellington.
+          hemisphere: Hemisphere.northern,
+          locationState: const LocationAvailable(TestLocations.wellington),
+        ),
         child: const AlmanacApp(),
       ),
     );
     await tester.pumpAndSettle();
 
-    final context = tester.element(find.byType(NavigationBar));
-
-    expect(context.palette.name, 'Winter Day');
+    expect(paletteOf(tester).name, 'Winter Day');
   });
 
   group('developer preview', () {
     testWidgets('overrides the detected season and time of day', (
       tester,
     ) async {
-      final container = ProviderContainer(overrides: _pinnedEnvironment());
+      final container = ProviderContainer(overrides: environmentOverrides());
       addTearDown(container.dispose);
 
       await tester.pumpWidget(
@@ -145,11 +146,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Detected: summer day.
-      expect(
-        tester.element(find.byType(NavigationBar)).palette,
-        same(SummerPalettes.day),
-      );
+      expect(paletteOf(tester), same(SummerPalettes.day));
 
       container
           .read(themePreviewProvider.notifier)
@@ -158,25 +155,19 @@ void main() {
           );
       await tester.pumpAndSettle();
 
-      expect(
-        tester.element(find.byType(NavigationBar)).palette,
-        same(WinterPalettes.night),
-      );
+      expect(paletteOf(tester), same(WinterPalettes.night));
 
       // Handing control back returns to the detected environment.
       container.read(themePreviewProvider.notifier).clear();
       await tester.pumpAndSettle();
 
-      expect(
-        tester.element(find.byType(NavigationBar)).palette,
-        same(SummerPalettes.day),
-      );
+      expect(paletteOf(tester), same(SummerPalettes.day));
     });
 
     testWidgets('can reach all eight season and phase combinations', (
       tester,
     ) async {
-      final container = ProviderContainer(overrides: _pinnedEnvironment());
+      final container = ProviderContainer(overrides: environmentOverrides());
       addTearDown(container.dispose);
 
       await tester.pumpWidget(
@@ -195,7 +186,7 @@ void main() {
               .select(ThemePreviewSelection(season: season, isNight: isNight));
           await tester.pumpAndSettle();
 
-          seen.add(tester.element(find.byType(NavigationBar)).palette.name);
+          seen.add(paletteOf(tester).name);
         }
       }
 
@@ -214,7 +205,7 @@ void main() {
 
   group('theme providers', () {
     test('a preview selection takes precedence over the environment', () {
-      final container = ProviderContainer(overrides: _pinnedEnvironment());
+      final container = ProviderContainer(overrides: environmentOverrides());
       addTearDown(container.dispose);
 
       container
@@ -227,11 +218,22 @@ void main() {
     });
 
     test('before the environment resolves, the season is still correct', () {
-      final container = ProviderContainer(overrides: _pinnedEnvironment());
+      final container = ProviderContainer(overrides: environmentOverrides());
       addTearDown(container.dispose);
 
       // Read the palette without awaiting the async environment.
       expect(container.read(activePaletteProvider), same(SummerPalettes.day));
+    });
+
+    test('the bootstrap palette respects the chosen hemisphere', () {
+      final container = ProviderContainer(
+        overrides: environmentOverrides(hemisphere: Hemisphere.southern),
+      );
+      addTearDown(container.dispose);
+
+      // Even before anything async resolves, a southern user in July must
+      // not be shown summer.
+      expect(container.read(activePaletteProvider), same(WinterPalettes.day));
     });
   });
 }

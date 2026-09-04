@@ -47,6 +47,18 @@ dependencies:
   # design system, with on-device caching (no placeholder system fonts).
   google_fonts: ^8.2.1
 
+  # Local storage for the small set of user preferences (currently just the
+  # chosen hemisphere). Maintained by the Flutter team. Uses
+  # SharedPreferencesWithCache so reads are synchronous after one async
+  # open, which lets startup decide about onboarding without a loading flash.
+  shared_preferences: ^2.5.5
+
+  # Location permission and position. Separates checkPermission() (never
+  # prompts) from requestPermission() (prompts), and reports permanent
+  # denial — which is what the app's location state model is built on.
+  # Only "while in use" is ever requested; never background location.
+  geolocator: ^14.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,6 +1,5 @@
 import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/app/theme/theme_providers.dart';
-import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/widgets/widgets.dart';
 import 'package:almanac/dev/theme_preview.dart';
 import 'package:almanac/dev/theme_preview_screen.dart';
@@ -8,26 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/fake_environment_services.dart';
+import '../support/test_overrides.dart';
 
 void main() {
   ProviderContainer buildContainer() {
-    final container = ProviderContainer(
-      overrides: [
-        // No background refresh timer, so nothing is left pending.
-        environmentRefreshEnabledProvider.overrideWithValue(false),
-        clockProvider.overrideWithValue(() => DateTime.utc(2025, 7, 15, 12)),
-        locationServiceProvider.overrideWithValue(
-          FakeLocationService(TestLocations.london),
-        ),
-        solarServiceProvider.overrideWithValue(
-          FakeSolarService(
-            sunrise: DateTime.utc(2025, 7, 15, 5),
-            sunset: DateTime.utc(2025, 7, 15, 21),
-          ),
-        ),
-      ],
-    );
+    final container = ProviderContainer(overrides: environmentOverrides());
     addTearDown(container.dispose);
     return container;
   }

@@ -10,9 +10,9 @@ import 'theme/theme_providers.dart';
 ///
 /// Watches the active seasonal palette and rebuilds the theme when the
 /// season or the sun changes. Because the theme is set on [MaterialApp],
-/// every screen — including ones not written yet — inherits the current
-/// season automatically, and Flutter animates the change rather than
-/// snapping to it.
+/// every screen — onboarding included, and screens not written yet —
+/// inherits the current season automatically, and Flutter animates the
+/// change rather than snapping to it.
 class AlmanacApp extends ConsumerWidget {
   const AlmanacApp({super.key});
 
@@ -25,18 +25,21 @@ class AlmanacApp extends ConsumerWidget {
         title: 'Almanac',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.fromPalette(palette),
-        routerConfig: appRouter,
+        routerConfig: ref.watch(routerProvider),
       ),
     );
   }
 }
 
-/// Re-resolves the natural environment when the app comes back to the
-/// foreground.
+/// Keeps the environment in step with the world outside the app.
 ///
-/// A phone can sit in a pocket from afternoon to well after dark; the
-/// scheduled refresh timer covers a running app, and this covers the case
-/// where the app was not running at the moment the sun set.
+/// Two jobs, both about time having passed while the app was not looking:
+///
+/// * On startup and on resume it re-checks location **without
+///   prompting**, so permission granted or revoked in system settings is
+///   noticed.
+/// * On resume it re-resolves the environment, since a phone can sit in
+///   a pocket from afternoon until well after dark.
 class _EnvironmentRefresher extends ConsumerStatefulWidget {
   const _EnvironmentRefresher({required this.child});
 
@@ -53,9 +56,17 @@ class _EnvironmentRefresherState extends ConsumerState<_EnvironmentRefresher> {
   @override
   void initState() {
     super.initState();
-    _listener = AppLifecycleListener(
-      onResume: () => ref.invalidate(naturalEnvironmentProvider),
-    );
+    _listener = AppLifecycleListener(onResume: _refresh);
+    // Deferred past the first frame so the app paints immediately rather
+    // than waiting on a platform call.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refresh();
+    });
+  }
+
+  void _refresh() {
+    ref.read(locationStateProvider.notifier).refresh();
+    ref.invalidate(naturalEnvironmentProvider);
   }
 
   @override

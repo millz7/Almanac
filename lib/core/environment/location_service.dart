@@ -1,41 +1,38 @@
-import 'geo_location.dart';
+import 'location_state.dart';
 
-/// Supplies the user's location.
+/// The app's only route to the user's position.
 ///
-/// Asynchronous because the real implementation will consult the platform
-/// (and, at that point, ask permission). Nothing in this step requests any
-/// permission or transmits anything.
+/// Nothing above this interface knows that Android, permissions or
+/// geolocator exist. The two methods are deliberately different:
+/// [currentState] must never show a permission dialog, while
+/// [requestAccess] is the one place that may.
 abstract interface class LocationService {
-  Future<GeoLocation> currentLocation();
+  /// Reports the current state **without prompting**.
+  ///
+  /// Safe to call on every launch and on resume: it is how the app
+  /// notices that permission was granted or revoked in system settings.
+  Future<LocationState> currentState();
+
+  /// Asks the user for permission, then tries to obtain a position.
+  ///
+  /// Only ever called in response to a deliberate user action. Returns
+  /// the resulting state; it does not throw for an ordinary refusal.
+  Future<LocationState> requestAccess();
 }
 
-/// PROVISIONAL — a permission-free stand-in for real location.
+/// A location service that always reports "unavailable".
 ///
-/// The device's UTC offset is genuinely available without permission, so
-/// the local calendar day is correct. Latitude is *not* knowable this way,
-/// so the hemisphere is a documented assumption ([fallbackLatitude]) and
-/// the result is flagged [GeoLocation.isFallback].
-///
-/// This matters: a user in New Zealand would be shown winter in January
-/// until the real location service is connected. Change
-/// [fallbackLatitude] to a southern value while developing, or use the
-/// developer theme preview to inspect any season.
-class DeviceOffsetLocationService implements LocationService {
-  const DeviceOffsetLocationService({
-    this.fallbackLatitude = 51.5,
-    this.fallbackLongitude = 0,
-  });
-
-  /// Assumed latitude when the real position is unknown. Positive values
-  /// mean northern hemisphere seasons.
-  final double fallbackLatitude;
-  final double fallbackLongitude;
+/// Used as a safe default where no platform is present — tests, and any
+/// build without the platform implementation wired up. The app must work
+/// with this, since it is indistinguishable from a user who declines.
+class UnavailableLocationService implements LocationService {
+  const UnavailableLocationService();
 
   @override
-  Future<GeoLocation> currentLocation() async => GeoLocation(
-    latitude: fallbackLatitude,
-    longitude: fallbackLongitude,
-    utcOffset: DateTime.now().timeZoneOffset,
-    isFallback: true,
-  );
+  Future<LocationState> currentState() async =>
+      const LocationUnavailable('no location service configured');
+
+  @override
+  Future<LocationState> requestAccess() async =>
+      const LocationUnavailable('no location service configured');
 }
