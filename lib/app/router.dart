@@ -1,11 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
+import '../dev/theme_preview_screen.dart';
 import '../features/food/presentation/food_screen.dart';
 import '../features/nature/presentation/nature_screen.dart';
 import '../features/rhythms/presentation/rhythms_screen.dart';
 import '../features/today/presentation/today_screen.dart';
 import '../features/wellbeing/presentation/wellbeing_screen.dart';
 import 'app_shell.dart';
+
+/// Route for the developer theme preview. Only registered in debug builds.
+const kThemePreviewRoute = '/dev/theme';
 
 /// The app's route table.
 ///
@@ -16,6 +21,13 @@ import 'app_shell.dart';
 final appRouter = GoRouter(
   initialLocation: '/today',
   routes: [
+    // Declared outside the navigation shell so it covers the whole screen,
+    // and omitted entirely from release builds.
+    if (kDebugMode)
+      GoRoute(
+        path: kThemePreviewRoute,
+        builder: (context, state) => const ThemePreviewScreen(),
+      ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
           AppShell(navigationShell: navigationShell),

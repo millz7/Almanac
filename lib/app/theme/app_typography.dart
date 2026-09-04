@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'app_colors.dart';
-
 /// Typography tokens.
 ///
 /// Pairs an editorial serif ([Fraunces], for headings and display text —
@@ -11,6 +9,9 @@ import 'app_colors.dart';
 /// and UI text). Widgets should pull from a [TextTheme] via
 /// `Theme.of(context).textTheme` rather than constructing [TextStyle]s
 /// directly, so sizes stay centralised here.
+///
+/// Typography does **not** change with the season — only its colour does.
+/// The app should read as the same publication in January and July.
 abstract final class AppTypography {
   static TextTheme textTheme(Color onSurface, Color onSurfaceMuted) {
     final display = GoogleFonts.frauncesTextTheme();
@@ -112,7 +113,4 @@ abstract final class AppTypography {
       ),
     );
   }
-
-  static TextTheme get light =>
-      textTheme(AppColors.textPrimary, AppColors.textSecondary);
 }

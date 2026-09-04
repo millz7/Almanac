@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/router.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 
@@ -50,6 +53,15 @@ class TodayScreen extends StatelessWidget {
     return AppScaffold(
       title: 'Today',
       subtitle: today,
+      // Debug builds only: a way into the seasonal theme preview. Absent
+      // from release builds, where the route does not exist either.
+      trailing: kDebugMode
+          ? IconButton(
+              onPressed: () => context.push(kThemePreviewRoute),
+              icon: const Icon(Icons.palette_outlined),
+              tooltip: 'Theme preview (debug)',
+            )
+          : null,
       body: [
         const EmptyState(
           icon: Icons.eco_outlined,
