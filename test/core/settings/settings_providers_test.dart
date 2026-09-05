@@ -28,10 +28,19 @@ void main() {
   }
 
   group('first launch', () {
-    test('nothing stored means onboarding starts at the hemisphere', () {
+    test('nothing stored means onboarding starts at the name', () {
       final container = containerWith(InMemorySettingsStore());
 
+      expect(container.read(userSettingsProvider).name, isNull);
       expect(container.read(userSettingsProvider).hemisphere, isNull);
+      expect(container.read(onboardingStageProvider), OnboardingStage.name);
+    });
+
+    test('answering the name question moves on to the hemisphere', () async {
+      final container = containerWith(InMemorySettingsStore());
+
+      await container.read(userSettingsProvider.notifier).setName('Millie');
+
       expect(
         container.read(onboardingStageProvider),
         OnboardingStage.hemisphere,
@@ -41,7 +50,9 @@ void main() {
 
   group('selecting a hemisphere', () {
     test('northern is saved and moves setup on', () async {
-      final store = InMemorySettingsStore();
+      // The name question has already been answered, so the hemisphere is
+      // the step in hand.
+      final store = InMemorySettingsStore(const UserSettings(nameAsked: true));
       final container = containerWith(store);
 
       await container
@@ -74,8 +85,10 @@ void main() {
     test('the choice can be changed later', () async {
       final store = InMemorySettingsStore(
         const UserSettings(
+          nameAsked: true,
           hemisphere: Hemisphere.northern,
           locationIntroSeen: true,
+          onboardingCompleted: true,
         ),
       );
       final container = containerWith(store);
@@ -95,8 +108,10 @@ void main() {
       final container = containerWith(
         InMemorySettingsStore(
           const UserSettings(
+            nameAsked: true,
             hemisphere: Hemisphere.southern,
             locationIntroSeen: true,
+            onboardingCompleted: true,
           ),
         ),
       );
@@ -111,7 +126,7 @@ void main() {
     test('a hemisphere without the location intro resumes at location', () {
       final container = containerWith(
         InMemorySettingsStore(
-          const UserSettings(hemisphere: Hemisphere.southern),
+          const UserSettings(nameAsked: true, hemisphere: Hemisphere.southern),
         ),
       );
 
@@ -125,15 +140,18 @@ void main() {
       final store = InMemorySettingsStore();
 
       final firstRun = containerWith(store);
+      await firstRun.read(userSettingsProvider.notifier).setName('Millie');
       await firstRun
           .read(userSettingsProvider.notifier)
           .selectHemisphere(Hemisphere.southern);
       await firstRun
           .read(userSettingsProvider.notifier)
           .markLocationIntroSeen();
+      await firstRun.read(userSettingsProvider.notifier).completeOnboarding();
 
       final secondRun = containerWith(store);
 
+      expect(secondRun.read(userSettingsProvider).name, 'Millie');
       expect(
         secondRun.read(userSettingsProvider).hemisphere,
         Hemisphere.southern,
@@ -155,17 +173,14 @@ void main() {
 
       // The app must not act as though the choice was saved.
       expect(container.read(userSettingsProvider).hemisphere, isNull);
-      expect(
-        container.read(onboardingStageProvider),
-        OnboardingStage.hemisphere,
-      );
+      expect(container.read(onboardingStageProvider), OnboardingStage.name);
     });
   });
 
   group('location intro', () {
     test('is recorded so the user is only asked once', () async {
       final store = InMemorySettingsStore(
-        const UserSettings(hemisphere: Hemisphere.northern),
+        const UserSettings(nameAsked: true, hemisphere: Hemisphere.northern),
       );
       final container = containerWith(store);
 
@@ -176,7 +191,8 @@ void main() {
           .markLocationIntroSeen();
 
       expect(store.read().locationIntroSeen, isTrue);
-      expect(container.read(onboardingStageProvider), OnboardingStage.complete);
+      // The last question — what to put in the Almanac — is still to come.
+      expect(container.read(onboardingStageProvider), OnboardingStage.features);
     });
   });
 }

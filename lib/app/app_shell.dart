@@ -1,53 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// The persistent bottom-navigation frame around the five primary tabs.
+import '../features/almanac/presentation/almanac_drawer.dart';
+import 'almanac_button.dart';
+import 'navigation/almanac_navigation_bar.dart';
+import 'navigation/navigation_providers.dart';
+
+/// The frame around the app: the user's own navigation at the bottom, and
+/// their Almanac a swipe or a tap away at the top right.
 ///
-/// Wraps the [StatefulNavigationShell] go_router hands us for a
-/// [StatefulShellRoute], so each tab keeps its own navigation stack and
-/// scroll position when switching between them.
-class AppShell extends StatelessWidget {
+/// Wraps the [StatefulNavigationShell] go_router hands us, so each
+/// destination keeps its own navigation stack and scroll position when
+/// switching between them — including destinations the user has
+/// temporarily switched off, which is why coming back to one lands where
+/// they left it.
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final destinations = ref.watch(visibleDestinationsProvider);
+
+    // The bar's own indices, which are not branch indices: branches exist
+    // for every feature, the bar only shows the chosen ones.
+    final selected = destinations.indexWhere(
+      (feature) => branchIndexOf(feature) == navigationShell.currentIndex,
+    );
+
     return Scaffold(
+      // Held in a provider so a tab screen's own header can open this
+      // Scaffold's drawer rather than its own.
+      key: ref.watch(almanacScaffoldKeyProvider),
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (index) => navigationShell.goBranch(
-          index,
-          initialLocation: index == navigationShell.currentIndex,
-        ),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.wb_sunny_outlined),
-            selectedIcon: Icon(Icons.wb_sunny),
-            label: 'Today',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.self_improvement_outlined),
-            selectedIcon: Icon(Icons.self_improvement),
-            label: 'Wellbeing',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.brightness_3_outlined),
-            selectedIcon: Icon(Icons.brightness_3),
-            label: 'Rhythms',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.forest_outlined),
-            selectedIcon: Icon(Icons.forest),
-            label: 'Nature',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.eco_outlined),
-            selectedIcon: Icon(Icons.eco),
-            label: 'Food',
-          ),
-        ],
+      endDrawer: const AlmanacDrawer(),
+      // Opened from the top-right control, not by dragging from the
+      // screen edge: an accidental swipe while reading the sky should not
+      // pull the settings panel out.
+      endDrawerEnableOpenDragGesture: false,
+      bottomNavigationBar: AlmanacNavigationBar(
+        destinations: destinations,
+        selectedIndex: selected,
+        onDestinationSelected: (index) {
+          final branch = branchIndexOf(destinations[index]);
+          navigationShell.goBranch(
+            branch,
+            // Tapping the destination you are already on returns to the
+            // top of it, which is the convention everywhere else.
+            initialLocation: branch == navigationShell.currentIndex,
+          );
+        },
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:almanac/core/environment/location_service.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/solar_service.dart';
 import 'package:almanac/core/environment/time_zone_service.dart';
+import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
 import 'package:almanac/core/settings/user_settings.dart';
@@ -16,8 +17,11 @@ import 'fake_environment_services.dart';
 /// affected by the real date, the machine's time zone, or the platform.
 ///
 /// Defaults describe a settled user: mid-July, London time, midday,
-/// onboarding already finished and location never shared. Tests override
-/// only the part they are about.
+/// onboarding already finished, no name, no chosen features and location
+/// never shared. Tests override only the part they are about.
+///
+/// Pass `onboardingCompleted: false` (and whichever earlier answers are
+/// still missing) to land in the middle of first-launch setup.
 ///
 /// Loads the IANA time-zone database as a side effect, since almost every
 /// test needs a named zone.
@@ -33,6 +37,10 @@ List<Override> environmentOverrides({
   Hemisphere? hemisphere = Hemisphere.northern,
   bool locationIntroSeen = true,
   bool refreshEnabled = false,
+  String? name,
+  bool? nameAsked,
+  Set<FeatureId> features = const {},
+  bool onboardingCompleted = true,
 }) {
   useTimeZoneDatabase();
 
@@ -41,8 +49,14 @@ List<Override> environmentOverrides({
       settingsStore ??
       InMemorySettingsStore(
         UserSettings(
+          name: name,
+          // A supplied name implies the question was asked, which is
+          // almost always what a test means.
+          nameAsked: nameAsked ?? (name != null || onboardingCompleted),
           hemisphere: hemisphere,
           locationIntroSeen: locationIntroSeen,
+          features: features,
+          onboardingCompleted: onboardingCompleted,
         ),
       );
 

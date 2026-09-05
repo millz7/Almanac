@@ -1,9 +1,11 @@
 import 'package:almanac/app/app.dart';
+import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
 import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/app/theme/theme_providers.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/season.dart';
+import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/dev/theme_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,9 +18,43 @@ void main() {
   /// The palette the app is actually wearing, read from a widget deep in
   /// the tree so this asserts what the user sees.
   SeasonalPalette paletteOf(WidgetTester tester) =>
-      tester.element(find.byType(NavigationBar)).palette;
+      tester.element(find.byType(AlmanacNavigationBar)).palette;
 
-  testWidgets('app launches on Today and can navigate to other tabs', (
+  testWidgets(
+    'the app launches on the Environment and shows the Almanac the user '
+    'chose',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: environmentOverrides(
+            features: const {FeatureId.meditation, FeatureId.natureLog},
+          ),
+          child: const AlmanacApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The Environment screen itself: a real date, not a placeholder.
+      expect(find.text('Tuesday 15 July'), findsOneWidget);
+
+      final bar = tester.widget<AlmanacNavigationBar>(
+        find.byType(AlmanacNavigationBar),
+      );
+      expect(bar.destinations.map((feature) => feature.name).toList(), [
+        'Environment',
+        'Meditation',
+        'Nature Log',
+      ]);
+      expect(bar.selectedIndex, 0);
+
+      await tester.tap(find.bySemanticsLabel('Meditation'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Coming soon'), findsOneWidget);
+    },
+  );
+
+  testWidgets('an Almanac with nothing added is just the Environment', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -29,31 +65,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Today'), findsWidgets);
-    expect(find.text('Wellbeing'), findsOneWidget);
-    expect(find.text('Rhythms'), findsOneWidget);
-    expect(find.text('Nature'), findsOneWidget);
-    expect(find.text('Food'), findsOneWidget);
-
-    await tester.tap(find.text('Nature'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Coming soon'), findsOneWidget);
-  });
-
-  testWidgets('bottom navigation exposes all five destinations', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: environmentOverrides(),
-        child: const AlmanacApp(),
-      ),
+    final bar = tester.widget<AlmanacNavigationBar>(
+      find.byType(AlmanacNavigationBar),
     );
-    await tester.pumpAndSettle();
-
-    final navBar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(navBar.destinations.length, 5);
+    expect(bar.destinations.single.name, 'Environment');
   });
 
   testWidgets('the app dresses itself in the season it detects', (
@@ -70,7 +85,7 @@ void main() {
 
     expect(paletteOf(tester), same(SummerPalettes.day));
     expect(
-      Theme.of(tester.element(find.byType(NavigationBar)))
+      Theme.of(tester.element(find.byType(AlmanacNavigationBar)))
           .scaffoldBackgroundColor,
       SummerPalettes.day.background,
     );
@@ -88,7 +103,7 @@ void main() {
 
     expect(paletteOf(tester), same(SummerPalettes.night));
     expect(
-      Theme.of(tester.element(find.byType(NavigationBar))).brightness,
+      Theme.of(tester.element(find.byType(AlmanacNavigationBar))).brightness,
       Brightness.dark,
     );
   });

@@ -11,7 +11,7 @@ import 'theme_preview.dart';
 /// DEVELOPMENT ONLY — lets the eight seasonal palettes be inspected on
 /// device without waiting for the real season or time of day to change.
 ///
-/// Reached from a debug-only affordance on the Today screen and registered
+/// Reached from a debug-only affordance on the Environment screen and registered
 /// on a debug-only route. It is not part of the production experience.
 class ThemePreviewScreen extends ConsumerWidget {
   const ThemePreviewScreen({super.key});

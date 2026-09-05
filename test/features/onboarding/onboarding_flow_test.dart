@@ -1,10 +1,12 @@
 import 'package:almanac/app/app.dart';
+import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
 import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/natural_environment.dart';
 import 'package:almanac/core/environment/season.dart';
+import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
 import 'package:almanac/core/settings/user_settings.dart';
@@ -19,11 +21,14 @@ import '../../support/fake_environment_services.dart';
 import '../../support/test_overrides.dart';
 
 /// A store whose writes always fail, for the error path.
+///
+/// Reads as somebody who has passed the name question, so the failure
+/// under test is the hemisphere's rather than the name's.
 class _FailingSettingsStore implements SettingsStore {
   const _FailingSettingsStore();
 
   @override
-  UserSettings read() => const UserSettings();
+  UserSettings read() => const UserSettings(nameAsked: true);
 
   @override
   Future<void> write(UserSettings settings) async =>
@@ -62,12 +67,97 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  final nameQuestion = find.text('What should we call you?');
   final hemisphereQuestion = find.text('Where are you in the world?');
-  final locationIntro = find.text('Connect with your surroundings');
+  final locationIntro = find.text(
+    'Let your Almanac follow the world around you',
+  );
+  final featureQuestion = find.text('What would you like in your Almanac?');
   final northernChoice = find.widgetWithText(ChoiceCard, 'Northern Hemisphere');
   final southernChoice = find.widgetWithText(ChoiceCard, 'Southern Hemisphere');
 
+  /// A device that has answered the name question and nothing else, so
+  /// the hemisphere is the step in hand. Most of the tests below are
+  /// about a later stage than the name, and this keeps them from having
+  /// to walk past it.
+  InMemorySettingsStore atHemisphereQuestion() =>
+      InMemorySettingsStore(const UserSettings(nameAsked: true));
+
+  /// Settings for somebody who has finished setup.
+  UserSettings settled({
+    Hemisphere hemisphere = Hemisphere.southern,
+    String? name,
+    Set<FeatureId> features = const {},
+  }) => UserSettings(
+    name: name,
+    nameAsked: true,
+    hemisphere: hemisphere,
+    locationIntroSeen: true,
+    features: features,
+    onboardingCompleted: true,
+  );
+
+  /// Answers the last question — what to put in the Almanac — which is
+  /// what actually lands the user in the app.
+  Future<void> finishSetup(WidgetTester tester) async {
+    expect(featureQuestion, findsOneWidget);
+    await tapControl(
+      tester,
+      find.widgetWithText(ElevatedButton, 'Just the Environment'),
+    );
+  }
+
   group('first launch', () {
+    testWidgets('opens on the name question, which can be skipped', (
+      tester,
+    ) async {
+      final store = InMemorySettingsStore();
+      final service = FakeLocationService();
+      final container = await pumpApp(
+        tester,
+        overrides: environmentOverrides(
+          settingsStore: store,
+          locationService: service,
+        ),
+      );
+
+      expect(nameQuestion, findsOneWidget);
+      expect(find.text('Skip'), findsOneWidget);
+      // Nothing about accounts, and no permission dialog on the very
+      // first screen either.
+      expect(find.textContaining('sign in', findRichText: true), findsNothing);
+      expect(service.requestCount, 0);
+      expect(
+        container.read(locationStateProvider),
+        isA<LocationPermissionNotRequested>(),
+      );
+
+      await tapControl(tester, find.text('Skip'));
+
+      // Skipped means no name stored, and on to the next question.
+      expect(store.read().name, isNull);
+      expect(store.read().nameAsked, isTrue);
+      expect(hemisphereQuestion, findsOneWidget);
+    });
+
+    testWidgets('a supplied name is kept and titles their Almanac', (
+      tester,
+    ) async {
+      final store = InMemorySettingsStore();
+      final container = await pumpApp(
+        tester,
+        overrides: environmentOverrides(settingsStore: store),
+      );
+
+      await tester.enterText(find.byType(TextField), '  Millie  ');
+      await tapControl(tester, find.widgetWithText(ElevatedButton, 'Continue'));
+
+      // Trimmed, stored, and used for the one thing it is for.
+      expect(store.read().name, 'Millie');
+      expect(container.read(almanacTitleProvider), "Millie's Almanac");
+      expect(hemisphereQuestion, findsOneWidget);
+    });
+
     testWidgets('asks which hemisphere, with no location prompt', (
       tester,
     ) async {
@@ -75,7 +165,7 @@ void main() {
       final container = await pumpApp(
         tester,
         overrides: environmentOverrides(
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
           locationService: service,
         ),
       );
@@ -99,14 +189,14 @@ void main() {
       );
 
       // And it is not the main app either.
-      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(AlmanacNavigationBar), findsNothing);
     });
 
     testWidgets('onboarding wears the active seasonal theme', (tester) async {
       // Mid-July, nothing chosen yet: the screen still looks like the app.
       await pumpApp(
         tester,
-        overrides: environmentOverrides(settingsStore: InMemorySettingsStore()),
+        overrides: environmentOverrides(settingsStore: atHemisphereQuestion()),
       );
 
       final palette = paletteAt(tester, hemisphereQuestion);
@@ -118,7 +208,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: DateTime.utc(2025, 7, 15, 23),
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
 
@@ -131,19 +221,17 @@ void main() {
       await pumpApp(
         tester,
         overrides: environmentOverrides(
-          settingsStore: InMemorySettingsStore(
-            const UserSettings(
-              hemisphere: Hemisphere.southern,
-              locationIntroSeen: true,
-            ),
-          ),
+          settingsStore: InMemorySettingsStore(settled()),
         ),
       );
 
+      expect(nameQuestion, findsNothing);
       expect(hemisphereQuestion, findsNothing);
       expect(locationIntro, findsNothing);
-      expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.text('Today'), findsWidgets);
+      expect(featureQuestion, findsNothing);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
+      // The Environment, with a real date on it.
+      expect(find.text('Tuesday 15 July'), findsOneWidget);
     });
   });
 
@@ -151,7 +239,7 @@ void main() {
     testWidgets('saves the choice and moves to the location explanation', (
       tester,
     ) async {
-      final store = InMemorySettingsStore();
+      final store = atHemisphereQuestion();
       final container = await pumpApp(
         tester,
         overrides: environmentOverrides(settingsStore: store),
@@ -182,7 +270,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: september,
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
       await tapControl(tester, southernChoice);
@@ -194,7 +282,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: september,
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
       await tapControl(tester, northernChoice);
@@ -213,7 +301,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: october,
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
       await tapControl(tester, southernChoice);
@@ -224,7 +312,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: october,
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
       await tapControl(tester, northernChoice);
@@ -241,7 +329,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: december,
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
       await tapControl(tester, southernChoice);
@@ -251,7 +339,7 @@ void main() {
         tester,
         overrides: environmentOverrides(
           now: december,
-          settingsStore: InMemorySettingsStore(),
+          settingsStore: atHemisphereQuestion(),
         ),
       );
       await tapControl(tester, northernChoice);
@@ -287,7 +375,10 @@ void main() {
     }) => environmentOverrides(
       now: now,
       settingsStore:
-          store ?? InMemorySettingsStore(UserSettings(hemisphere: hemisphere)),
+          store ??
+          InMemorySettingsStore(
+            UserSettings(nameAsked: true, hemisphere: hemisphere),
+          ),
       locationService: service ?? FakeLocationService(),
     );
 
@@ -308,7 +399,7 @@ void main() {
       tester,
     ) async {
       final store = InMemorySettingsStore(
-        const UserSettings(hemisphere: Hemisphere.southern),
+        const UserSettings(nameAsked: true, hemisphere: Hemisphere.southern),
       );
       final service = FakeLocationService();
       final container = await pumpApp(
@@ -317,10 +408,11 @@ void main() {
       );
 
       await tapControl(tester, find.text('Not Now'));
+      await finishSetup(tester);
 
       // Never prompted, and the app is usable.
       expect(service.requestCount, 0);
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
 
       // The hemisphere still drives the season: July in the south.
       expect(store.read().hemisphere, Hemisphere.southern);
@@ -328,7 +420,10 @@ void main() {
         container.read(resolvedHemisphereProvider).hemisphere,
         Hemisphere.southern,
       );
-      expect(paletteAt(tester, find.byType(NavigationBar)).name, 'Winter Day');
+      expect(
+        paletteAt(tester, find.byType(AlmanacNavigationBar)).name,
+        'Winter Day',
+      );
     });
 
     testWidgets('"Allow Location" prompts once and continues either way', (
@@ -343,10 +438,11 @@ void main() {
       );
 
       await tapControl(tester, find.text('Allow Location'));
+      await finishSetup(tester);
 
       expect(service.requestCount, 1);
       // A refusal is not an error: the app opens anyway.
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
       expect(
         container.read(resolvedHemisphereProvider).hemisphere,
         Hemisphere.southern,
@@ -369,6 +465,7 @@ void main() {
       );
 
       await tapControl(tester, find.text('Allow Location'));
+      await finishSetup(tester);
 
       final resolved = container.read(resolvedHemisphereProvider);
       expect(resolved.hemisphere, Hemisphere.southern);
@@ -377,7 +474,10 @@ void main() {
         container.read(userSettingsProvider).hemisphere,
         Hemisphere.northern,
       );
-      expect(paletteAt(tester, find.byType(NavigationBar)).name, 'Winter Day');
+      expect(
+        paletteAt(tester, find.byType(AlmanacNavigationBar)).name,
+        'Winter Day',
+      );
     });
 
     testWidgets('a permanently denied permission does not trap the user', (
@@ -389,8 +489,9 @@ void main() {
       await pumpApp(tester, overrides: afterHemisphere(service: service));
 
       await tapControl(tester, find.text('Allow Location'));
+      await finishSetup(tester);
 
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
     });
 
     testWidgets('a broken platform layer does not trap the user', (
@@ -400,15 +501,19 @@ void main() {
         tester,
         overrides: environmentOverrides(
           settingsStore: InMemorySettingsStore(
-            const UserSettings(hemisphere: Hemisphere.southern),
+            const UserSettings(
+              nameAsked: true,
+              hemisphere: Hemisphere.southern,
+            ),
           ),
           locationService: const ThrowingLocationService(),
         ),
       );
 
       await tapControl(tester, find.text('Allow Location'));
+      await finishSetup(tester);
 
-      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
     });
   });
 
@@ -443,18 +548,13 @@ void main() {
           overrides: environmentOverrides(
             now: testCase.date,
             timeZone: TestTimeZones.wellington,
-            settingsStore: InMemorySettingsStore(
-              const UserSettings(
-                hemisphere: Hemisphere.southern,
-                locationIntroSeen: true,
-              ),
-            ),
+            settingsStore: InMemorySettingsStore(settled()),
             // Daylight is derived from the local day by the helper.
           ),
         );
 
         expect(
-          paletteAt(tester, find.byType(NavigationBar)).name,
+          paletteAt(tester, find.byType(AlmanacNavigationBar)).name,
           testCase.palette,
         );
       });
@@ -468,12 +568,7 @@ void main() {
         overrides: environmentOverrides(
           now: DateTime.utc(2025, 10, 15, 12),
           timeZone: TestTimeZones.wellington,
-          settingsStore: InMemorySettingsStore(
-            const UserSettings(
-              hemisphere: Hemisphere.southern,
-              locationIntroSeen: true,
-            ),
-          ),
+          settingsStore: InMemorySettingsStore(settled()),
           locationState: const LocationAvailable(TestLocations.wellington),
         ),
       );
@@ -499,20 +594,22 @@ void main() {
         tester,
         overrides: environmentOverrides(
           settingsStore: InMemorySettingsStore(
-            const UserSettings(
+            settled(
               hemisphere: Hemisphere.northern,
-              locationIntroSeen: true,
+              features: FeatureId.values.toSet()..remove(FeatureId.environment),
             ),
           ),
         ),
       );
 
-      // Every tab is reachable; none of them is onboarding.
-      for (final tab in ['Wellbeing', 'Rhythms', 'Nature', 'Food', 'Today']) {
-        await tester.tap(find.text(tab));
+      // Every destination is reachable; none of them is onboarding.
+      for (final feature in FeatureRegistry.all) {
+        await tester.tap(find.bySemanticsLabel(feature.name));
         await tester.pumpAndSettle();
+        expect(nameQuestion, findsNothing);
         expect(hemisphereQuestion, findsNothing);
         expect(locationIntro, findsNothing);
+        expect(featureQuestion, findsNothing);
       }
     });
   });
@@ -521,7 +618,7 @@ void main() {
     testWidgets('both hemisphere options are labelled buttons', (tester) async {
       await pumpApp(
         tester,
-        overrides: environmentOverrides(settingsStore: InMemorySettingsStore()),
+        overrides: environmentOverrides(settingsStore: atHemisphereQuestion()),
       );
 
       final handle = tester.ensureSemantics();
@@ -538,7 +635,7 @@ void main() {
     testWidgets('the choices clear the minimum touch target', (tester) async {
       await pumpApp(
         tester,
-        overrides: environmentOverrides(settingsStore: InMemorySettingsStore()),
+        overrides: environmentOverrides(settingsStore: atHemisphereQuestion()),
       );
 
       for (final choice in [northernChoice, southernChoice]) {

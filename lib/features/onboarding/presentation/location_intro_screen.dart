@@ -5,6 +5,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/environment/environment_providers.dart';
 import '../../../core/settings/settings_providers.dart';
 import '../../../core/widgets/widgets.dart';
+import 'onboarding_page.dart';
 
 /// Explains what location would be used for, then lets the user decide.
 ///
@@ -28,9 +29,9 @@ class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
   /// things the app could show, not things the user is missing out on.
   static const _benefits = <String>[
     'Sunrise and sunset where you are',
-    'Tides on your stretch of coast',
+    'How much daylight your day actually has',
     "The season's nature near you",
-    'Flora and fauna to look out for',
+    'Tides on your stretch of coast',
   ];
 
   Future<void> _allow() async {
@@ -73,84 +74,51 @@ class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
     final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppDimens.maxContentWidth,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.xxl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      'Connect with your surroundings',
-                      style: textTheme.displaySmall,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'If you allow location access, we can show you what the '
-                    'world is doing right where you are:',
-                    style: textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  for (final benefit in _benefits)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.circle,
-                            size: AppSpacing.sm,
-                            color: palette.primary,
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Text(benefit, style: textTheme.bodyLarge),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    'The seasons will follow your hemisphere either way, and '
-                    'your location is only ever read on your device.',
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  PrimaryButton(
-                    label: 'Allow Location',
-                    onPressed: _busy ? null : _allow,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  OutlinedButton(
-                    onPressed: _busy ? null : _notNow,
-                    child: const Text('Not Now'),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'You can turn this on whenever you like.',
-                    style: textTheme.bodySmall,
-                  ),
-                ],
-              ),
+    return OnboardingPage(
+      heading: 'Let your Almanac follow the world around you',
+      supporting:
+          'With location, the app can show you what the world is doing right '
+          'where you are:',
+      children: [
+        for (final benefit in _benefits)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.circle, size: AppSpacing.sm, color: palette.primary),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: Text(benefit, style: textTheme.bodyLarge)),
+              ],
             ),
           ),
+
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'Your position is read on this device, never sent anywhere, and '
+          'never shown to you as coordinates. No history of it is kept. '
+          'The seasons follow your hemisphere either way.',
+          style: textTheme.bodySmall,
         ),
-      ),
+        const SizedBox(height: AppSpacing.xl),
+
+        // Nothing has been requested yet. Android is only asked once the
+        // user presses this, never on arriving at the screen.
+        PrimaryButton(
+          label: 'Allow Location',
+          onPressed: _busy ? null : _allow,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton(
+          onPressed: _busy ? null : _notNow,
+          child: const Text('Not Now'),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'You can turn this on whenever you like.',
+          style: textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }

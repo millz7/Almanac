@@ -17,7 +17,7 @@ class AppScaffold extends StatelessWidget {
     this.trailing,
   });
 
-  /// The screen's large heading, e.g. "Today".
+  /// The screen's large heading, e.g. a date or a feature name.
   final String title;
 
   /// An optional short line under the title, e.g. a date or place name.

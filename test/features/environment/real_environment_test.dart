@@ -1,4 +1,5 @@
 import 'package:almanac/app/app.dart';
+import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
 import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/core/environment/day_night.dart';
 import 'package:almanac/core/environment/environment_providers.dart';
@@ -8,7 +9,6 @@ import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/natural_environment.dart';
 import 'package:almanac/core/environment/season.dart';
 import 'package:almanac/core/environment/solar_service.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Riverpod 3 keeps the Override type out of its main export.
 import 'package:flutter_riverpod/misc.dart';
@@ -276,7 +276,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final palette = tester.element(find.byType(NavigationBar)).palette;
+      final palette = tester.element(find.byType(AlmanacNavigationBar)).palette;
       expect(palette.name, 'Winter Day');
     });
 
@@ -297,7 +297,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final palette = tester.element(find.byType(NavigationBar)).palette;
+      final palette = tester.element(find.byType(AlmanacNavigationBar)).palette;
       expect(palette.name, 'Winter Night');
     });
   });

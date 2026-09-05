@@ -4,11 +4,17 @@ A nature-connected wellbeing app for Android, built with Flutter. Its
 central idea: wellbeing experienced through connection with the natural
 world — the sun, moon, tides, seasons and the life around us.
 
-**Today** is the first real screen: the date, the season, a drawn sky
-that follows the sun, today's sunrise and sunset, and the moon's phase.
-The other four sections (Wellbeing, Rhythms, Nature, Food) are still
-placeholders, and tides are held open with no data rather than filled
+**Environment** is the first real screen and the app's anchor: the date,
+the season, a drawn sky that follows the sun, today's sunrise and sunset,
+and the moon's phase. Tides are held open with no data rather than filled
 with a guess.
+
+Everything else is the user's choice. On first launch the app asks four
+short questions — a name, a hemisphere, whether to use location, and what
+they would like in their Almanac — and the bottom navigation is then built
+from the Environment plus whatever they picked. Meditation, Yoga, Chakras,
+Cycle, Cookbook, Garden and Nature Log exist as destinations; none of them
+is implemented yet.
 
 ## Getting started
 
@@ -29,12 +35,20 @@ flutter run
 - `lib/core/widgets/` — small reusable UI building blocks shared across
   features (`AppScaffold`, `AppCard`, `SectionHeader`, `PrimaryButton`,
   `EmptyState`, `FeaturePlaceholderScreen`).
-- `lib/features/<feature>/presentation/` — one folder per top-level tab
-  (today, wellbeing, rhythms, nature, food). `data/` and `domain/`
-  subfolders will be added to a feature once it has real business logic.
-  Today's screen is composed from small widgets under
-  `today/presentation/widgets/`, with all of its wording in
-  `today/presentation/today_text.dart`.
+- `lib/core/features/` — the feature catalogue: `FeatureId`,
+  `FeatureDefinition`, `FeatureRegistry`. The single place a feature's
+  name, short name, icon, route and description are written down.
+- `lib/app/navigation/` — how the catalogue plus the user's preferences
+  become a bottom navigation bar.
+- `lib/features/<feature>/presentation/` — one folder per built feature.
+  `data/` and `domain/` subfolders are added once a feature has real
+  business logic. The Environment screen is composed from small widgets
+  under `environment/presentation/widgets/`, with all of its wording in
+  `environment/presentation/environment_text.dart`.
+- `lib/features/almanac/` — the user's own panel: name, hemisphere,
+  location and which features they keep.
+- `lib/features/placeholder/` — one screen, driven by a
+  `FeatureDefinition`, standing in for every feature not yet built.
 - `lib/dev/` — development-only tooling, excluded from the production
   experience.
 
@@ -105,9 +119,9 @@ Location itself is optional and stays that way:
 
 Note that seasons are **astronomical**: they turn at the equinoxes and
 solstices, not on the 1st of a month. Early September is therefore still
-summer in the north and winter in the south. Today uses the same
-boundaries to say *where in* the season you are — "early summer", and
-how many days until autumn.
+summer in the north and winter in the south. The Environment screen uses
+the same boundaries to say *where in* the season you are — "early
+summer" — and how many days until autumn.
 
 ## Time, sun and place
 
@@ -152,10 +166,10 @@ on the left from the south.
 
 What it does **not** claim: moonrise and moonset, where the moon is in
 the sky, or whether it is visible from a particular place. Its placement
-in the Today screen's sky is composition, which is why that whole graphic
-is marked decorative and states nothing to a screen reader.
+in the Environment screen's sky is composition, which is why that whole
+graphic is marked decorative and states nothing to a screen reader.
 
-## Today
+## The Environment screen
 
 The order of the page is the design: the date and season, then a large
 wordless picture of the sky, then the few facts worth knowing. No score,
@@ -177,19 +191,77 @@ no streak, no chart.
   changes and then stops. There is no repeating ticker, and
   `MediaQuery.disableAnimationsOf` switches it off entirely.
 
-## Settings
+## First launch
 
-A gear icon on Today opens `/settings` — pushed over the app rather than
-being a sixth tab. It has one section, "Location & Region": change the
-hemisphere, and see and act on location access. Changing the hemisphere
-takes effect immediately, with no restart.
+Four questions, in this order, each derived from stored settings rather
+than from a wizard's own state — so closing the app halfway through
+resumes in the right place:
+
+1. **A name.** Optional and plainly skippable. Used for exactly one
+   thing: the title of their panel. No account, nothing sent anywhere.
+2. **A hemisphere.** The one question that must be answered, because the
+   same date is a different season north and south.
+3. **Location.** Explained, then offered. Android is asked only after a
+   deliberate tap on "Allow Location" — never on arriving at the screen —
+   and "Not Now" is a first-class answer.
+4. **What they would like in their Almanac.** Multi-select; choosing
+   nothing is allowed and gets an app that is just the Environment.
+
+`onboardingCompleted` is a stored flag rather than something inferred,
+because every one of those questions has a legitimate "no" that cannot
+otherwise be told apart from "not asked yet". Anyone who finished setup
+before a question existed is treated as complete, not sent back through
+it.
+
+## Personalised navigation
+
+The bottom bar is the Environment plus the user's chosen features, in
+registry order. There is no More, no Explore, no hub and no overflow: if
+it is in the bar it is its own destination, and if the user did not choose
+it, it is not in the bar.
+
+**Routes and visibility are separate concerns.** Every feature's route is
+registered permanently as a shell branch; preferences decide only what
+appears in the bar. So removing the feature you are standing in bounces
+you to the Environment immediately, and adding one back makes it reachable
+there and then — with no router rebuild, which would otherwise tear down
+the shell and close the panel mid-tap.
+
+### Labels
+
+The bar never truncates. It measures the real labels at the real text
+scale and picks, in order:
+
+1. Full names — `Environment · Meditation · Yoga`.
+2. Each feature's deliberate short name — `Env · Med · Yoga · Chak ·
+   Cycle · Cook · Garden · Nature`. Chosen words, not truncations.
+3. A strip that scrolls sideways, with every destination still present at
+   full size.
+
+Whether a full eight-destination Almanac fits without scrolling depends
+on the width and the rendered font; on a typical modern phone it does, on
+a narrow one it scrolls. Items never shrink below the minimum touch
+target to make room, and the bar grows taller for larger text rather than
+clipping it. The visible label may be `Chak`; the accessibility label is
+always `Chakras`.
+
+## The Almanac panel
+
+A leaf mark at the top right of every screen opens a panel titled
+"[Name]'s Almanac", or "Your Almanac" for someone who skipped the name.
+It is not a tab and not a settings screen: Profile (the name), Location &
+Region (hemisphere and location access, reusing the same widgets the old
+standalone settings screen used), and Your Almanac (a switch per feature,
+with the Environment listed as always on and no control to remove it).
+Changes are written before the control moves, and take effect
+immediately.
 
 ### Previewing palettes during development
 
-In debug builds, the palette icon on the Today screen opens a preview
-screen (`/dev/theme`) for inspecting all eight combinations, the semantic
-tokens and the environment the engine detected. It is not a user setting
-and is absent from release builds.
+In debug builds, the palette icon on the Environment screen opens a
+preview screen (`/dev/theme`) for inspecting all eight combinations, the
+semantic tokens and the environment the engine detected. It is not a user
+setting and is absent from release builds.
 
 ## Design system
 
@@ -204,7 +276,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-408 tests. The ones worth knowing about:
+509 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -212,6 +284,11 @@ flutter test
   published times and against an independent closed-form day length.
 - `palette_accessibility_test.dart` checks all eight palettes *and* forty
   points through each season's dawn/dusk blend.
-- `today_appearance_test.dart` renders Today in all eight
-  season-and-phase combinations, at double text size, and with
-  animations disabled.
+- `environment_appearance_test.dart` renders the Environment in all eight
+  season-and-phase combinations, at double text size, and with animations
+  disabled.
+- `navigation_labels_test.dart` checks the never-truncate rule as an
+  invariant: for every plausible width, text scale and Almanac size, the
+  chosen label is narrower than the item drawn for it.
+- `onboarding_accessibility_test.dart` renders all four setup questions at
+  1x, 1.5x and 2x text on a phone-sized viewport.
