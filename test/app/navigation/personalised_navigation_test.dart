@@ -172,11 +172,11 @@ void main() {
     });
 
     testWidgets('each one shows its own name and message', (tester) async {
-      await pumpApp(tester, features: {FeatureId.garden, FeatureId.chakras});
+      await pumpApp(tester, features: {FeatureId.garden, FeatureId.cookbook});
 
       for (final feature in [
         FeatureRegistry.byId(FeatureId.garden),
-        FeatureRegistry.byId(FeatureId.chakras),
+        FeatureRegistry.byId(FeatureId.cookbook),
       ]) {
         await tester.tap(find.bySemanticsLabel(feature.name));
         await tester.pumpAndSettle();
@@ -193,9 +193,9 @@ void main() {
     ) async {
       // A feature that is still a placeholder, so "Coming soon" is the
       // right thing to look for.
-      await pumpApp(tester, features: {FeatureId.chakras});
+      await pumpApp(tester, features: {FeatureId.cookbook});
 
-      await tester.tap(find.bySemanticsLabel('Chakras'));
+      await tester.tap(find.bySemanticsLabel('Cookbook'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
 
@@ -211,15 +211,15 @@ void main() {
     testWidgets('removing the feature you are standing in returns you home', (
       tester,
     ) async {
-      final container = await pumpApp(tester, features: {FeatureId.chakras});
+      final container = await pumpApp(tester, features: {FeatureId.cookbook});
 
-      await tester.tap(find.bySemanticsLabel('Chakras'));
+      await tester.tap(find.bySemanticsLabel('Cookbook'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
 
       await container
           .read(userSettingsProvider.notifier)
-          .setFeatureChosen(FeatureId.chakras, false);
+          .setFeatureChosen(FeatureId.cookbook, false);
       await tester.pumpAndSettle();
 
       // Not stranded on a screen the navigation can no longer reach.
@@ -257,13 +257,13 @@ void main() {
 
       await container
           .read(userSettingsProvider.notifier)
-          .setFeatureChosen(FeatureId.chakras, true);
+          .setFeatureChosen(FeatureId.cookbook, true);
       await tester.pumpAndSettle();
 
-      expect(destinationsOf(tester), ['Environment', 'Chakras']);
+      expect(destinationsOf(tester), ['Environment', 'Cookbook']);
 
       // No restart needed: the route was always registered.
-      await tester.tap(find.bySemanticsLabel('Chakras'));
+      await tester.tap(find.bySemanticsLabel('Cookbook'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
     });

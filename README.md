@@ -15,8 +15,9 @@ they would like in their Almanac — and the bottom navigation is then built
 from the Environment plus whatever they picked. **Meditation** is built:
 four breathing practices, a glowing orb, and nothing else on screen once
 you begin. **Yoga** is built too: three short practices, choose then
-prepare then move. Chakras, Cycle, Cookbook, Garden and Nature Log exist
-as destinations but are not implemented yet.
+prepare then move. **Chakras** is a quiet visual pause — seven traditional
+centres down an abstract body line, one at a time. Cycle, Cookbook,
+Garden and Nature Log exist as destinations but are not implemented yet.
 
 ## Getting started
 
@@ -394,6 +395,89 @@ previous or next, and — everywhere in Yoga — no sound of any kind.
   announcement — "Cat cow. On your hands and knees, slowly round and
   lengthen your spine." — on each new movement, not each frame.
 
+## Chakras
+
+Seven points down an abstract body line, the crown at the top and the
+root at the base. Tap one to sit with it; sit with it long enough and
+there is somewhere to write.
+
+| | Sanskrit | Traditionally | |
+|---|---|---|---|
+| **Root** | Muladhara | grounding, stability and belonging | red, 4 points |
+| **Sacral** | Svadhisthana | creativity, feeling and flow | orange, 6 |
+| **Solar Plexus** | Manipura | personal agency, confidence and will | yellow, 10 |
+| **Heart** | Anahata | compassion, connection and openness | green, 12 |
+| **Throat** | Vishuddha | expression, truth and communication | blue, 16 |
+| **Third Eye** | Ajna | insight, awareness and intuition | indigo, 2 |
+| **Crown** | Sahasrara | contemplation, connection and transcendence | violet, a full ring |
+
+### How it is framed
+
+"In some traditions, seven centres are described along the body. They are
+not measurements of anything. They are a way of pausing, one at a time."
+
+That framing is the feature. Everything here is written as a traditional
+association and never as a fact about the body: no diagnosis, no
+treatment, no claim that anything is blocked or can be fixed. There is no
+quiz, no score, no streak and nothing to complete.
+`chakra_content_test.dart` reads every string the feature can show —
+catalogue and framing copy alike — against a list of clinical words and a
+list of gamified ones, so the wording cannot drift later.
+
+### Colour that belongs to the season
+
+The traditional hues are the one place chakras could have dragged an
+unrelated aesthetic into the app. They do not: `chakra_accents.dart` holds
+the seven as *illustration tokens* alongside the rest of the theme, and
+the colour that actually gets painted is derived from the palette in
+force. Take the traditional hue at the app's muted saturation, stir in a
+little of the season's own primary, then move it away from the page until
+it clears 3:1 as a graphical object. There are no hex values in any chakra
+widget.
+
+`chakra_accents_test.dart` checks all seven in all eight palettes and
+forty points through a dusk blend: legible on the page, still recognisably
+their own colour, and still distinguishable from each other.
+
+Nothing depends on seeing them. Each chakra's symbol carries its
+traditional petal count — four at the Root, sixteen at the Throat, two at
+the Third Eye — so the seven differ in shape as well as hue, and the
+colour is named in words on the page ("shown as green") as well as drawn.
+
+### The artwork
+
+Two custom painters and no assets. The overview is a single line with a
+dome suggested at the top and a resting mark at the base, seven points
+along it, and the words beside each one — abstract, with no anatomy
+anywhere. The individual screen draws a ring of points around a quiet
+centre with a soft radial halo. Both are `ExcludeSemantics`: everything
+they carry is written out in real text.
+
+### No clock, and no permanent ticker
+
+Unlike Meditation and Yoga there is nothing here that runs, so Chakras
+needs neither a session nor the immersive infrastructure, and the Almanac
+panel stays reachable throughout. The two animations are one-shot
+arrivals: the seven points rise into place from the base upwards, once,
+and the symbol comes into focus when a chakra is opened. With reduced
+motion both simply start where they finish. There is no `Timer.periodic`
+and no repeating controller — the same rule the Environment screen has
+kept since it was built.
+
+### Reflections stay here, and only for now
+
+Writing is optional everywhere: the prompt is an invitation, and pressing
+**Save reflection** on an untouched field is a normal thing to do.
+
+Reflections are held in memory for as long as the Almanac is open and are
+**not persisted** — the screen says so in those words. The app's only
+store holds one small settings object written whole, which is the right
+shape for preferences and the wrong shape for somebody's private writing;
+bending it into a journal, or adding a database for seven short strings,
+is a decision that deserves its own step. What is true either way is the
+part that matters: nothing written here leaves the device. No account, no
+sync, no network, no analytics, and no new permissions.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -425,7 +509,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-669 tests. The ones worth knowing about:
+845 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -458,3 +542,12 @@ flutter test
   progression, the step timer, completion, stopping, backgrounding, a tab
   switch, reduced motion, double text size — and asserts nothing is left
   ticking afterwards.
+- `chakra_content_test.dart` pins the seven, their order and their
+  wording, including that nothing the feature can say sounds clinical or
+  gamified.
+- `chakra_accents_test.dart` checks every chakra colour in every palette
+  and through a dusk blend: legible, recognisable, and distinguishable
+  from the other six.
+- `chakras_screen_test.dart` opens each of the seven in turn, writes and
+  discards reflections, and checks the touch targets, the semantics, 2x
+  text and that nothing is animating once the screen has arrived.

@@ -6,6 +6,7 @@ import 'seasonal_palettes.dart';
 
 export 'app_spacing.dart';
 export 'app_typography.dart';
+export 'chakra_accents.dart';
 export 'seasonal_palettes.dart';
 
 /// Reaches the active seasonal palette from any widget.
