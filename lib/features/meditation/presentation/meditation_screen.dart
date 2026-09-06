@@ -1,86 +1,104 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/almanac_button.dart';
+import '../../../app/navigation/immersion.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
-import '../domain/breathing_pattern.dart';
-import 'widgets/breathing_circle.dart';
+import '../domain/meditation_technique.dart';
+import 'meditation_text.dart';
+import 'widgets/breath_guidance.dart';
+import 'widgets/duration_stepper.dart';
+import 'widgets/glowing_orb.dart';
+import 'widgets/technique_chooser.dart';
 
-/// Where a session has got to.
-enum MeditationSessionState { idle, breathing, finished }
+/// Where the user has got to.
+enum MeditationStage {
+  /// Four practices to choose between.
+  choosingTechnique,
 
-/// Two quiet minutes, following a circle.
-///
-/// The whole feature is one screen with one control on it. There is no
-/// duration to pick, no sound to choose and nothing to configure, because
-/// the point is to press one button and stop deciding things for a while.
-///
-/// **One clock.** A single [AnimationController] spans the entire
-/// session: its value is how far through the two minutes we are, and both
-/// the drawn breath and the words come from that same number by way of
-/// [BreathingPattern.momentAt]. There is no second timer to drift against
-/// and no way for the circle and the instruction to disagree. It exists
-/// only while a session is running, and is stopped and reset the moment
-/// one ends.
-///
-/// **Leaving the screen ends the session.** Backgrounding the app, or
-/// switching to another part of the Almanac, stops it and returns here to
-/// the beginning. A breathing session you cannot see is not happening,
-/// and quietly "completing" one in a pocket would be a lie. It also keeps
-/// the rule simple enough to state, which pausing and resuming would not
-/// — and this screen deliberately has no resume control.
-class MeditationScreen extends StatefulWidget {
-  const MeditationScreen({super.key, this.pattern = kAlmanacBreath});
+  /// A practice chosen, a length to set, and an orb to tap.
+  ready,
 
-  /// The rhythm to breathe to. Injected only so a test can use a short
-  /// one; the app has exactly one pattern.
-  final BreathingPattern pattern;
+  /// The quiet second after the interface goes and before the first
+  /// breath is asked for.
+  settling,
 
-  @override
-  State<MeditationScreen> createState() => _MeditationScreenState();
+  /// Breathing.
+  breathing,
+
+  /// Done.
+  finished;
+
+  /// Whether the app's frame should step out of the way.
+  bool get isImmersive =>
+      this == MeditationStage.settling || this == MeditationStage.breathing;
 }
 
-class _MeditationScreenState extends State<MeditationScreen>
+/// A quiet room with a glowing ball in it.
+///
+/// Choose a practice, choose how long, tap the ball. Then everything else
+/// goes away and the ball is the whole of it: bigger is breathing in,
+/// still is holding, smaller is breathing out.
+///
+/// **One clock.** A single [AnimationController] spans the settling
+/// second *and* the session, so the orb, the words and the timing all
+/// come from one number. Elapsed below one second is the settling pause;
+/// above it, subtract the pause and hand the rest to
+/// [BreathingPattern.momentAt]. There is no second timer to drift
+/// against, and no way for the orb and the instruction to disagree. It
+/// exists only while a session runs, and is stopped and reset the moment
+/// one ends.
+///
+/// **Leaving ends the session.** Backgrounding the app, or switching to
+/// another part of the Almanac, stops it and returns to the setup. A
+/// session you cannot see is not happening, and quietly completing one in
+/// a pocket would be a lie.
+class MeditationScreen extends ConsumerStatefulWidget {
+  const MeditationScreen({super.key});
+
+  @override
+  ConsumerState<MeditationScreen> createState() => _MeditationScreenState();
+}
+
+class _MeditationScreenState extends ConsumerState<MeditationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _session;
   late final AppLifecycleListener _lifecycle;
 
-  /// The current phase, republished only when it actually changes.
+  /// The current step, republished only when it actually changes.
   ///
-  /// The circle follows every frame; the words must not. Driving them
-  /// from this instead means the instruction — and the announcement a
-  /// screen reader makes from it — is rebuilt about thirty times in two
-  /// minutes rather than seven thousand.
-  final _phase = ValueNotifier<BreathingMoment>(
-    const BreathingMoment(
-      phase: BreathingPhase.inhale,
-      elapsedInPhase: Duration.zero,
-      phaseLength: Duration(seconds: 4),
-    ),
-  );
+  /// The orb follows every frame; the words must not. Driving them from
+  /// this means the instruction — and the announcement a screen reader
+  /// makes from it — arrives once a step rather than once a frame.
+  final _step = ValueNotifier<BreathingMoment?>(null);
 
-  MeditationSessionState _state = MeditationSessionState.idle;
+  MeditationStage _stage = MeditationStage.choosingTechnique;
+  MeditationTechnique? _technique;
+  int _minutes = kDefaultSessionMinutes;
 
   @override
   void initState() {
     super.initState();
     _session = AnimationController(
       vsync: this,
-      duration: kMeditationSessionLength,
-      // Two minutes must stay two minutes. Left to its default, a
-      // controller shortens itself twentyfold when the device asks for
-      // reduced motion — which is right for a transition and wrong for a
+      // Set for real when a session starts; a controller needs one now.
+      duration: kSettlingPause + Duration(minutes: _minutes),
+      // The chosen minutes must stay the chosen minutes. Left to its
+      // default, a controller shortens itself twentyfold when the device
+      // asks for reduced motion — right for a transition, wrong for a
       // clock. Reduced motion changes how this looks, never how long it
-      // lasts; see the `still` circle below.
+      // lasts; see `still` on the orb.
       animationBehavior: AnimationBehavior.preserve,
     )..addListener(_onTick);
 
     // Both, and deliberately not `onInactive`: hidden and paused mean the
     // app is genuinely out of sight, whereas inactive is a notification
     // shade or an incoming call, which should not throw away somebody's
-    // session. `_endSession` is idempotent, so whichever fires first
-    // wins and the second does nothing.
+    // session. `_endSession` is idempotent.
     _lifecycle = AppLifecycleListener(
       onHide: _endSession,
       onPause: _endSession,
@@ -92,48 +110,101 @@ class _MeditationScreenState extends State<MeditationScreen>
     super.didChangeDependencies();
     // Switching to another part of the Almanac leaves this screen alive
     // but mutes its ticker, which would otherwise freeze a session
-    // half-finished and resume it days later. Same rule as backgrounding:
-    // end it.
+    // half-finished and resume it days later. Same rule as backgrounding.
     if (!TickerMode.valuesOf(context).enabled) _endSession();
+  }
+
+  @override
+  void deactivate() {
+    // Whatever the reason this screen is leaving the tree, the frame
+    // comes back.
+    ref.read(immersiveModeProvider.notifier).exit();
+    super.deactivate();
   }
 
   @override
   void dispose() {
     _lifecycle.dispose();
     _session.dispose();
-    _phase.dispose();
+    _step.dispose();
     super.dispose();
   }
 
-  Duration get _elapsed => kMeditationSessionLength * _session.value;
+  Duration get _sessionLength => Duration(minutes: _minutes);
+
+  /// Time since the orb was tapped, settling pause included.
+  Duration get _elapsed =>
+      (_session.duration ?? Duration.zero) * _session.value;
+
+  /// Time since the first breath was asked for. Negative during settling.
+  Duration get _breathElapsed => _elapsed - kSettlingPause;
 
   void _onTick() {
-    final moment = widget.pattern.momentAt(_elapsed);
-    if (moment.phase != _phase.value.phase) _phase.value = moment;
+    final elapsed = _elapsed;
 
-    if (_session.isCompleted && _state == MeditationSessionState.breathing) {
-      setState(() => _state = MeditationSessionState.finished);
+    // The settling second, ending exactly once.
+    if (_stage == MeditationStage.settling && elapsed >= kSettlingPause) {
+      setState(() => _stage = MeditationStage.breathing);
+    }
+
+    if (_stage == MeditationStage.breathing) {
+      final moment = _technique!.pattern.momentAt(_breathElapsed);
+      final previous = _step.value;
+      if (previous == null ||
+          previous.stepIndex != moment.stepIndex ||
+          // A cycle can be shorter than a session, so the same step comes
+          // round again; the step index alone would not notice.
+          moment.elapsedInStep < previous.elapsedInStep) {
+        _step.value = moment;
+      }
+    }
+
+    if (_session.isCompleted && _stage == MeditationStage.breathing) {
+      _session.stop();
+      ref.read(immersiveModeProvider.notifier).exit();
+      setState(() => _stage = MeditationStage.finished);
     }
   }
 
-  void _start() {
-    _phase.value = widget.pattern.momentAt(Duration.zero);
-    _session
-      ..reset()
-      ..forward();
-    setState(() => _state = MeditationSessionState.breathing);
+  void _chooseTechnique(MeditationTechnique technique) => setState(() {
+    _technique = technique;
+    _stage = MeditationStage.ready;
+  });
+
+  void _backToTechniques() {
+    _endSession();
+    setState(() {
+      _technique = null;
+      _stage = MeditationStage.choosingTechnique;
+    });
   }
 
-  /// Stops everything and returns to the beginning.
+  void _setMinutes(int minutes) => setState(
+    () => _minutes = minutes.clamp(kMinSessionMinutes, kMaxSessionMinutes),
+  );
+
+  void _start() {
+    _step.value = null;
+    _session
+      ..duration = kSettlingPause + _sessionLength
+      ..reset()
+      ..forward();
+    ref.read(immersiveModeProvider.notifier).enter();
+    setState(() => _stage = MeditationStage.settling);
+  }
+
+  /// Stops everything and returns to the setup.
   ///
   /// Safe to call when nothing is running, which is what lets the
   /// lifecycle hooks call it without first asking what state we are in.
   void _endSession() {
-    if (_state != MeditationSessionState.breathing) return;
+    if (!_stage.isImmersive) return;
     _session
       ..stop()
       ..reset();
-    setState(() => _state = MeditationSessionState.idle);
+    _step.value = null;
+    ref.read(immersiveModeProvider.notifier).exit();
+    setState(() => _stage = MeditationStage.ready);
   }
 
   @override
@@ -142,159 +213,58 @@ class _MeditationScreenState extends State<MeditationScreen>
     // Environment screen's sky.
     final still = MediaQuery.disableAnimationsOf(context);
 
+    if (_stage.isImmersive) {
+      return _Immersive(
+        session: _session,
+        technique: _technique!,
+        step: _step,
+        settling: _stage == MeditationStage.settling,
+        still: still,
+        onEnd: _endSession,
+      );
+    }
+
     return AppScaffold(
       title: 'Meditation',
+      // Which practice you are in, said once, where every screen in the
+      // app says that sort of thing.
+      subtitle: _technique?.name,
       trailing: const AlmanacButton(),
       body: [
-        Column(
-          children: [
-            const SizedBox(height: AppSpacing.lg),
-            _Circle(
-              session: _session,
-              pattern: widget.pattern,
-              phase: _phase,
-              still: still,
-              running: _state == MeditationSessionState.breathing,
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _Words(state: _state, phase: _phase, session: _session),
-            const SizedBox(height: AppSpacing.xl),
-            _Control(state: _state, onStart: _start, onStop: _endSession),
-          ],
-        ),
+        switch (_stage) {
+          MeditationStage.choosingTechnique => TechniqueChooser(
+            onChosen: _chooseTechnique,
+          ),
+          MeditationStage.finished => _Finished(
+            minutes: _minutes,
+            onStartAgain: _start,
+            onChooseAnother: _backToTechniques,
+          ),
+          _ => _Ready(
+            minutes: _minutes,
+            onMinutesChanged: _setMinutes,
+            onStart: _start,
+            onChangeTechnique: _backToTechniques,
+          ),
+        },
       ],
     );
   }
 }
 
-/// The breath itself.
-///
-/// Rebuilt every frame while a session runs, and only on a phase change
-/// when the device has asked for reduced motion — so nothing repaints
-/// sixty times a second to draw a circle that is not moving.
-class _Circle extends StatelessWidget {
-  const _Circle({
-    required this.session,
-    required this.pattern,
-    required this.phase,
-    required this.still,
-    required this.running,
+/// A practice chosen, and an orb waiting to be tapped.
+class _Ready extends StatelessWidget {
+  const _Ready({
+    required this.minutes,
+    required this.onMinutesChanged,
+    required this.onStart,
+    required this.onChangeTechnique,
   });
 
-  final AnimationController session;
-  final BreathingPattern pattern;
-  final ValueListenable<BreathingMoment> phase;
-  final bool still;
-  final bool running;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!running) {
-      // Nothing is animating between sessions: the circle simply rests.
-      return const BreathingCircle(
-        openness: kBreathStillScale,
-        sessionProgress: 0,
-        still: true,
-      );
-    }
-
-    if (still) {
-      return ValueListenableBuilder<BreathingMoment>(
-        valueListenable: phase,
-        builder: (context, moment, _) => BreathingCircle(
-          openness: moment.openness,
-          sessionProgress: session.value,
-          still: true,
-        ),
-      );
-    }
-
-    return AnimatedBuilder(
-      animation: session,
-      builder: (context, _) => BreathingCircle(
-        openness: pattern
-            .momentAt(kMeditationSessionLength * session.value)
-            .openness,
-        sessionProgress: session.value,
-      ),
-    );
-  }
-}
-
-/// What the screen says: one instruction, and one quiet line under it.
-class _Words extends StatelessWidget {
-  const _Words({
-    required this.state,
-    required this.phase,
-    required this.session,
-  });
-
-  final MeditationSessionState state;
-  final ValueListenable<BreathingMoment> phase;
-  final AnimationController session;
-
-  @override
-  Widget build(BuildContext context) {
-    if (state != MeditationSessionState.breathing) {
-      return _Lines(
-        heading: state == MeditationSessionState.finished
-            ? 'Well done.'
-            : 'Take a slow breath',
-        supporting: state == MeditationSessionState.finished
-            ? 'Two quiet minutes.'
-            : 'Two quiet minutes, following the circle.',
-        // Announced on arrival, which is how a screen reader learns the
-        // session has ended without being told every second that it has
-        // not.
-        announce: state == MeditationSessionState.finished,
-      );
-    }
-
-    return ValueListenableBuilder<BreathingMoment>(
-      valueListenable: phase,
-      builder: (context, moment, _) => _Lines(
-        heading: moment.phase.instruction,
-        // The drawn circle is not information a screen reader can use, so
-        // the length of the phase is said out loud instead: "Breathe in,
-        // 4 seconds". Rebuilt once per phase, so it is a cue to breathe
-        // by rather than a stream of chatter.
-        spoken:
-            '${moment.phase.instruction}, '
-            '${moment.phaseLength.inSeconds} seconds',
-        supporting: _remaining(session.value),
-        announce: true,
-      ),
-    );
-  }
-
-  /// A coarse sense of how much is left. Deliberately vague: the ring
-  /// around the circle carries the detail, and a ticking clock is the
-  /// opposite of what this screen is for.
-  static String _remaining(double progress) {
-    final left = kMeditationSessionLength * (1 - progress);
-    if (left > const Duration(minutes: 1)) {
-      return '${(left.inSeconds / 60).ceil()} minutes left';
-    }
-    if (left > const Duration(seconds: 20)) return 'Less than a minute left';
-    return 'Almost there';
-  }
-}
-
-class _Lines extends StatelessWidget {
-  const _Lines({
-    required this.heading,
-    required this.supporting,
-    this.spoken,
-    this.announce = false,
-  });
-
-  final String heading;
-  final String supporting;
-
-  /// What a screen reader hears in place of [heading], when there is more
-  /// to say than is worth printing.
-  final String? spoken;
-  final bool announce;
+  final int minutes;
+  final ValueChanged<int> onMinutesChanged;
+  final VoidCallback onStart;
+  final VoidCallback onChangeTechnique;
 
   @override
   Widget build(BuildContext context) {
@@ -302,57 +272,269 @@ class _Lines extends StatelessWidget {
 
     return Column(
       children: [
-        Semantics(
-          // Its own node, so the live region announces this line and
-          // nothing else. When there is a spoken form it replaces the
-          // printed one; otherwise the printed text is what is read.
-          container: true,
-          liveRegion: announce,
-          label: spoken,
-          excludeSemantics: spoken != null,
-          child: Text(
-            heading,
-            style: textTheme.headlineSmall,
-            textAlign: TextAlign.center,
+        const SizedBox(height: AppSpacing.md),
+        // Already the focus of the page, and already the control.
+        _TappableOrb(
+          label: 'Begin',
+          size: kOrbSetupSize,
+          onTap: onStart,
+          child: const GlowingOrb(
+            openness: kOrbStillScale,
+            size: kOrbSetupSize,
+            still: true,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.lg),
         Text(
-          supporting,
-          style: textTheme.bodyMedium,
+          'Tap to begin',
           textAlign: TextAlign.center,
+          style: textTheme.bodyMedium,
+        ),
+
+        const SizedBox(height: AppSpacing.xl),
+        DurationStepper(minutes: minutes, onChanged: onMinutesChanged),
+
+        const SizedBox(height: AppSpacing.lg),
+        TextButton(
+          onPressed: onChangeTechnique,
+          child: const Text('Choose a different practice'),
         ),
       ],
     );
   }
 }
 
-/// One button, whichever state the screen is in.
-class _Control extends StatelessWidget {
-  const _Control({
-    required this.state,
-    required this.onStart,
-    required this.onStop,
+/// Nothing but the orb.
+///
+/// No title, no controls, no progress, no navigation. The one thing that
+/// is not the orb is the line of guidance underneath, which arrives with
+/// each breath and fades — the parts of a practice a size cannot say.
+class _Immersive extends StatelessWidget {
+  const _Immersive({
+    required this.session,
+    required this.technique,
+    required this.step,
+    required this.settling,
+    required this.still,
+    required this.onEnd,
   });
 
-  final MeditationSessionState state;
-  final VoidCallback onStart;
-  final VoidCallback onStop;
+  final AnimationController session;
+  final MeditationTechnique technique;
+  final ValueListenable<BreathingMoment?> step;
+  final bool settling;
+  final bool still;
+  final VoidCallback onEnd;
+
+  /// Where the breath is now, read straight from the clock.
+  BreathingMoment _momentNow() => technique.pattern.momentAt(
+    (session.duration ?? Duration.zero) * session.value - kSettlingPause,
+  );
 
   @override
-  Widget build(BuildContext context) => switch (state) {
-    MeditationSessionState.idle => PrimaryButton(
-      label: 'Start',
-      onPressed: onStart,
-    ),
-    // Quieter than starting: stopping early is allowed, not encouraged.
-    MeditationSessionState.breathing => OutlinedButton(
-      onPressed: onStop,
-      child: const Text('Stop'),
-    ),
-    MeditationSessionState.finished => PrimaryButton(
-      label: 'Start again',
-      onPressed: onStart,
-    ),
-  };
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: SafeArea(
+        // A stack rather than a column, so the length of a line of
+        // guidance can never move the orb. Release Tension's out-breath
+        // needs a whole sentence and Focus's needs two words; the orb
+        // sits in the same place for both, and at any text size.
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final orbBox = math.min(kOrbImmersiveSize, constraints.maxWidth);
+
+            return Stack(
+              children: [
+                Center(
+                  child: _TappableOrb(
+                    label: 'End the session',
+                    size: orbBox,
+                    onTap: onEnd,
+                    child: settling
+                        // The quiet second: the orb, and nothing being
+                        // asked of anyone yet.
+                        ? GlowingOrb(
+                            openness: kOrbStillScale,
+                            size: orbBox,
+                            still: true,
+                          )
+                        : _BreathingOrb(
+                            session: session,
+                            step: step,
+                            momentNow: _momentNow,
+                            size: orbBox,
+                            still: still,
+                          ),
+                  ),
+                ),
+
+                Positioned(
+                  top: constraints.maxHeight / 2 + orbBox / 2 + AppSpacing.xl,
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  child: settling
+                      ? Text(
+                          'Tap the orb to end',
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodySmall,
+                        )
+                      : ValueListenableBuilder<BreathingMoment?>(
+                          valueListenable: step,
+                          builder: (context, moment, _) => moment == null
+                              ? const SizedBox.shrink()
+                              : still
+                              ? BreathGuidance(moment: moment, persistent: true)
+                              : AnimatedBuilder(
+                                  animation: session,
+                                  builder: (context, _) => BreathGuidance(
+                                    moment: _momentNow(),
+                                    persistent: false,
+                                  ),
+                                ),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// The orb, following the breath.
+///
+/// Rebuilt every frame while a session runs, and only on a step change
+/// when the device has asked for reduced motion — so nothing repaints
+/// sixty times a second to draw an orb that is not moving.
+class _BreathingOrb extends StatelessWidget {
+  const _BreathingOrb({
+    required this.session,
+    required this.step,
+    required this.momentNow,
+    required this.size,
+    required this.still,
+  });
+
+  final AnimationController session;
+  final ValueListenable<BreathingMoment?> step;
+  final BreathingMoment Function() momentNow;
+  final double size;
+  final bool still;
+
+  @override
+  Widget build(BuildContext context) {
+    if (still) {
+      return ValueListenableBuilder<BreathingMoment?>(
+        valueListenable: step,
+        builder: (context, moment, _) => GlowingOrb(
+          openness: kOrbStillScale,
+          size: size,
+          still: true,
+          nostril: moment?.nostril,
+          countdown: moment?.countdown,
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: session,
+      builder: (context, _) {
+        final moment = momentNow();
+        return GlowingOrb(
+          openness: moment.openness,
+          size: size,
+          nostril: moment.nostril,
+          countdown: moment.countdown,
+        );
+      },
+    );
+  }
+}
+
+/// The orb as a control, in one place so it behaves the same before and
+/// during a session.
+///
+/// The painting inside says nothing to a screen reader — the guidance
+/// does that. What this adds is the one thing the orb *is*: a labelled
+/// button, so a session can be begun and ended without a visible control
+/// cluttering the room.
+class _TappableOrb extends StatelessWidget {
+  const _TappableOrb({
+    required this.label,
+    required this.size,
+    required this.onTap,
+    required this.child,
+  });
+
+  final String label;
+  final double size;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      // Its own node, so the orb is announced as the one control it is
+      // rather than being merged into whatever is around it.
+      container: true,
+      button: true,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox.square(dimension: size, child: child),
+      ),
+    );
+  }
+}
+
+/// The end. Two words and two ways on.
+class _Finished extends StatelessWidget {
+  const _Finished({
+    required this.minutes,
+    required this.onStartAgain,
+    required this.onChooseAnother,
+  });
+
+  final int minutes;
+  final VoidCallback onStartAgain;
+  final VoidCallback onChooseAnother;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        const SizedBox(height: AppSpacing.xl),
+        const GlowingOrb(
+          openness: kOrbStillScale,
+          size: kOrbSetupSize,
+          still: true,
+        ),
+        const SizedBox(height: AppSpacing.xl),
+
+        Semantics(
+          container: true,
+          liveRegion: true,
+          child: Text('Well done.', style: textTheme.headlineSmall),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(describeSessionLength(minutes), style: textTheme.bodyMedium),
+
+        const SizedBox(height: AppSpacing.xl),
+        PrimaryButton(label: 'Start again', onPressed: onStartAgain),
+        const SizedBox(height: AppSpacing.sm),
+        TextButton(
+          onPressed: onChooseAnother,
+          child: const Text('Choose another practice'),
+        ),
+      ],
+    );
+  }
 }

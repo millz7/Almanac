@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/almanac/presentation/almanac_drawer.dart';
 import 'almanac_button.dart';
 import 'navigation/almanac_navigation_bar.dart';
+import 'navigation/immersion.dart';
 import 'navigation/navigation_providers.dart';
 
 /// The frame around the app: the user's own navigation at the bottom, and
@@ -23,6 +24,10 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final destinations = ref.watch(visibleDestinationsProvider);
+    // A screen can ask for the frame to step back — Meditation does,
+    // once a session starts, because the whole point is that everything
+    // else disappears.
+    final immersive = ref.watch(immersiveModeProvider);
 
     // The bar's own indices, which are not branch indices: branches exist
     // for every feature, the bar only shows the chosen ones.
@@ -40,19 +45,22 @@ class AppShell extends ConsumerWidget {
       // screen edge: an accidental swipe while reading the sky should not
       // pull the settings panel out.
       endDrawerEnableOpenDragGesture: false,
-      bottomNavigationBar: AlmanacNavigationBar(
-        destinations: destinations,
-        selectedIndex: selected,
-        onDestinationSelected: (index) {
-          final branch = branchIndexOf(destinations[index]);
-          navigationShell.goBranch(
-            branch,
-            // Tapping the destination you are already on returns to the
-            // top of it, which is the convention everywhere else.
-            initialLocation: branch == navigationShell.currentIndex,
-          );
-        },
-      ),
+      bottomNavigationBar: immersive
+          ? null
+          : AlmanacNavigationBar(
+              destinations: destinations,
+              selectedIndex: selected,
+              onDestinationSelected: (index) {
+                final branch = branchIndexOf(destinations[index]);
+                navigationShell.goBranch(
+                  branch,
+                  // Tapping the destination you are already on returns
+                  // to the top of it, which is the convention everywhere
+                  // else.
+                  initialLocation: branch == navigationShell.currentIndex,
+                );
+              },
+            ),
     );
   }
 }

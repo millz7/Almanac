@@ -1,9 +1,11 @@
+import 'package:almanac/app/almanac_button.dart';
 import 'package:almanac/app/app.dart';
-import 'package:almanac/app/theme/app_theme.dart';
+import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
+import 'package:almanac/app/navigation/immersion.dart';
 import 'package:almanac/core/features/feature_registry.dart';
-import 'package:almanac/features/meditation/domain/breathing_pattern.dart';
-import 'package:almanac/features/meditation/presentation/meditation_screen.dart';
-import 'package:almanac/features/meditation/presentation/widgets/breathing_circle.dart';
+import 'package:almanac/core/widgets/widgets.dart';
+import 'package:almanac/features/meditation/domain/meditation_technique.dart';
+import 'package:almanac/features/meditation/presentation/widgets/glowing_orb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,17 +16,26 @@ import '../../support/test_overrides.dart';
 void main() {
   setUpAll(useTimeZoneDatabase);
 
-  final start = find.widgetWithText(ElevatedButton, 'Start');
+  final orb = find.byType(GlowingOrb);
+  // By icon rather than by tooltip: a tooltip finder matches the tooltip
+  // itself, not the button wrapped around it.
+  final longer = find.widgetWithIcon(IconButton, Icons.add);
+  final shorter = find.widgetWithIcon(IconButton, Icons.remove);
   final startAgain = find.widgetWithText(ElevatedButton, 'Start again');
-  final stop = find.widgetWithText(OutlinedButton, 'Stop');
+  // `late`, because a semantics finder reaches for the binding as soon as
+  // it is built and the binding does not exist until a test runs.
+  late final begin = find.bySemanticsLabel('Begin');
+  late final endSession = find.bySemanticsLabel('End the session');
+
+  Finder practice(String name) => find.widgetWithText(ChoiceCard, name);
 
   /// Opens Meditation through the real navigation, as a user with it in
   /// their Almanac would.
-  Future<void> openMeditation(
+  Future<ProviderContainer> openMeditation(
     WidgetTester tester, {
     double textScale = 1,
     bool reducedMotion = false,
-    Size surface = const Size(400, 1000),
+    Size surface = const Size(420, 1400),
   }) async {
     tester.view.physicalSize = surface * 2;
     tester.view.devicePixelRatio = 2;
@@ -40,9 +51,14 @@ void main() {
       );
     }
 
+    final container = ProviderContainer(
+      overrides: environmentOverrides(features: const {FeatureId.meditation}),
+    );
+    addTearDown(container.dispose);
+
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: environmentOverrides(features: const {FeatureId.meditation}),
+      UncontrolledProviderScope(
+        container: container,
         child: const AlmanacApp(),
       ),
     );
@@ -50,171 +66,599 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Meditation'));
     await tester.pumpAndSettle();
+    return container;
   }
 
-  /// The breath as it is currently drawn.
-  BreathingCircle circleOf(WidgetTester tester) =>
-      tester.widget<BreathingCircle>(find.byType(BreathingCircle));
+  /// Chooses a practice and lands in the ready state.
+  Future<void> choose(WidgetTester tester, String name) async {
+    await tester.ensureVisible(practice(name));
+    await tester.pumpAndSettle();
+    await tester.tap(practice(name));
+    await tester.pumpAndSettle();
+  }
 
-  group('before starting', () {
-    testWidgets('shows a circle, an invitation and one button', (tester) async {
+  /// Taps the orb and lets the settling second pass, so the next pump is
+  /// the first breath.
+  Future<void> beginAndSettle(WidgetTester tester) async {
+    await tester.tap(begin);
+    // A bare pump first: a ticker's clock starts on its first frame.
+    await tester.pump();
+    await tester.pump(kSettlingPause);
+  }
+
+  GlowingOrb orbOf(WidgetTester tester) => tester.widget<GlowingOrb>(orb.first);
+
+  group('choosing a practice', () {
+    testWidgets('all four are offered, with a line each', (tester) async {
       await openMeditation(tester);
 
-      expect(find.text('Meditation'), findsWidgets);
-      expect(find.byType(BreathingCircle), findsOneWidget);
-      expect(find.text('Take a slow breath'), findsOneWidget);
-      expect(start, findsOneWidget);
-
-      // Nothing to configure: no duration, no sounds, no presets.
-      expect(stop, findsNothing);
-      expect(find.byType(Slider), findsNothing);
-      expect(find.byType(DropdownButton<Object>), findsNothing);
-      expect(find.textContaining('minutes left'), findsNothing);
+      expect(find.text('Choose a practice'), findsOneWidget);
+      for (final technique in MeditationTechniques.all) {
+        expect(practice(technique.name), findsOneWidget);
+        expect(find.text(technique.description), findsOneWidget);
+      }
+      // Nothing to start yet.
+      expect(begin, findsNothing);
+      expect(orb, findsNothing);
     });
 
-    testWidgets('the circle rests, and nothing is animating', (tester) async {
+    testWidgets('choosing one puts the orb in front of you', (tester) async {
       await openMeditation(tester);
+      await choose(tester, 'Sleep');
 
-      expect(circleOf(tester).still, isTrue);
-      expect(circleOf(tester).sessionProgress, 0);
-      // pumpAndSettle returned, so no frames are being scheduled.
-      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(orb, findsOneWidget);
+      expect(begin, findsOneWidget);
+      expect(find.text('Tap to begin'), findsOneWidget);
+      // The other doors have closed behind you.
+      for (final technique in MeditationTechniques.all) {
+        expect(practice(technique.name), findsNothing);
+      }
+      // But which room you are in is still clear.
+      expect(find.text('Sleep'), findsOneWidget);
     });
 
-    testWidgets('says how long a session is, without a clock', (tester) async {
+    testWidgets('you can change your mind without leaving Meditation', (
+      tester,
+    ) async {
       await openMeditation(tester);
+      await choose(tester, 'Focus');
+      expect(find.text('Focus'), findsOneWidget);
 
-      expect(
-        find.text('Two quiet minutes, following the circle.'),
-        findsOneWidget,
+      await tester.tap(
+        find.widgetWithText(TextButton, 'Choose a different practice'),
       );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose a practice'), findsOneWidget);
+      expect(practice('Balance'), findsOneWidget);
+
+      await choose(tester, 'Balance');
+      expect(find.text('Balance'), findsOneWidget);
+      // Still inside Meditation, with its navigation intact.
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
     });
   });
 
-  group('during a session', () {
-    testWidgets('starting swaps the invitation for an instruction', (
+  group('how long', () {
+    testWidgets('four minutes to begin with, marked as a good place', (
       tester,
     ) async {
       await openMeditation(tester);
+      await choose(tester, 'Focus');
 
-      await tester.tap(start);
-      await tester.pump();
-
-      expect(find.text('Breathe in'), findsOneWidget);
-      expect(find.text('Take a slow breath'), findsNothing);
-      expect(stop, findsOneWidget);
-      expect(start, findsNothing);
+      expect(find.text('4 minutes'), findsOneWidget);
+      expect(find.text('A good place to start'), findsOneWidget);
     });
 
-    testWidgets('the words follow the breath', (tester) async {
+    testWidgets('can be lengthened and shortened a minute at a time', (
+      tester,
+    ) async {
       await openMeditation(tester);
-      await tester.tap(start);
+      await choose(tester, 'Focus');
+
+      await tester.tap(longer);
+      await tester.pumpAndSettle();
+      expect(find.text('5 minutes'), findsOneWidget);
+
+      await tester.tap(longer);
+      await tester.pumpAndSettle();
+      expect(find.text('6 minutes'), findsOneWidget);
+
+      await tester.tap(shorter);
+      await tester.pumpAndSettle();
+      expect(find.text('5 minutes'), findsOneWidget);
+    });
+
+    testWidgets('the recommendation only marks the recommended length', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(longer);
+      await tester.pumpAndSettle();
+
+      final hint = tester.widget<Opacity>(
+        find.ancestor(
+          of: find.text('A good place to start'),
+          matching: find.byType(Opacity),
+        ),
+      );
+      expect(hint.opacity, 0);
+    });
+
+    testWidgets('stops at the ends of its range rather than running on', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      for (var tap = 0; tap < kMaxSessionMinutes; tap++) {
+        if (tester.widget<IconButton>(longer).onPressed == null) break;
+        await tester.tap(longer);
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('$kMaxSessionMinutes minutes'), findsOneWidget);
+
+      for (var tap = 0; tap < kMaxSessionMinutes; tap++) {
+        if (tester.widget<IconButton>(shorter).onPressed == null) break;
+        await tester.tap(shorter);
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('$kMinSessionMinutes minutes'), findsOneWidget);
+    });
+
+    testWidgets('the chosen length survives a change of practice', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(longer);
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.widgetWithText(TextButton, 'Choose a different practice'),
+      );
+      await tester.pumpAndSettle();
+      await choose(tester, 'Sleep');
+
+      expect(find.text('5 minutes'), findsOneWidget);
+    });
+  });
+
+  group('the start transition', () {
+    testWidgets('tapping the orb takes everything else away', (tester) async {
+      final container = await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(begin);
       await tester.pump();
 
+      // Only the orb is left.
+      expect(orb, findsOneWidget);
+      expect(find.text('Meditation'), findsNothing);
+      expect(find.text('Tap to begin'), findsNothing);
+      expect(find.text('4 minutes'), findsNothing);
+      expect(longer, findsNothing);
+      expect(shorter, findsNothing);
+      expect(find.byType(AlmanacButton), findsNothing);
+      // Including the app's own navigation.
+      expect(find.byType(AlmanacNavigationBar), findsNothing);
+      expect(container.read(immersiveModeProvider), isTrue);
+    });
+
+    testWidgets('nothing is asked of you for exactly one second', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(begin);
+      await tester.pump();
+
+      // The quiet second: an orb, and no instruction.
+      expect(orb, findsOneWidget);
+      expect(find.text('Breathe in'), findsNothing);
+      expect(orbOf(tester).still, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 999));
+      expect(
+        find.text('Breathe in'),
+        findsNothing,
+        reason: 'the first breath must not begin before the second is up',
+      );
+
+      // And then it begins.
+      await tester.pump(const Duration(milliseconds: 2));
       expect(find.text('Breathe in'), findsOneWidget);
+      expect(orbOf(tester).still, isFalse);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('the orb does not start growing during the quiet second', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(begin);
+      await tester.pump();
+      final resting = orbOf(tester).openness;
+
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(orbOf(tester).openness, resting);
+      expect(orbOf(tester).still, isTrue);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a hint says how to get out, and does not persist', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(begin);
+      await tester.pump();
+      expect(find.text('Tap the orb to end'), findsOneWidget);
+
+      await tester.pump(kSettlingPause);
+      expect(find.text('Tap the orb to end'), findsNothing);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+  });
+
+  group('breathing', () {
+    testWidgets('Focus runs its square', (tester) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
+
+      expect(find.text('Breathe in'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('Hold'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('Breathe out'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('Breathe in'), findsOneWidget);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Sleep holds for seven and breathes out for eight', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Sleep');
+      await beginAndSettle(tester);
 
       await tester.pump(const Duration(seconds: 4));
       expect(find.text('Hold'), findsOneWidget);
-
+      // Still holding at six seconds, which Focus would not be.
       await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Hold'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
       expect(find.text('Breathe out'), findsOneWidget);
 
-      // And round again.
-      await tester.pump(const Duration(seconds: 6));
-      expect(find.text('Breathe in'), findsOneWidget);
-
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
     });
 
-    testWidgets('the circle opens and closes with the breath', (tester) async {
+    testWidgets('the orb grows, holds and shrinks with the breath', (
+      tester,
+    ) async {
       await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump();
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
 
-      final atStart = circleOf(tester).openness;
-      expect(circleOf(tester).still, isFalse);
-
+      final atStart = orbOf(tester).openness;
       await tester.pump(const Duration(seconds: 2));
-      final midInhale = circleOf(tester).openness;
+      final midInhale = orbOf(tester).openness;
       expect(midInhale, greaterThan(atStart));
 
       await tester.pump(const Duration(seconds: 2));
-      final held = circleOf(tester).openness;
-      expect(held, closeTo(1, 0.01));
+      expect(orbOf(tester).openness, closeTo(1, 0.01));
 
-      // Two seconds of hold, then part-way through the out-breath.
-      await tester.pump(const Duration(seconds: 5));
-      expect(circleOf(tester).openness, lessThan(held));
+      // Held.
+      await tester.pump(const Duration(seconds: 2));
+      expect(orbOf(tester).openness, closeTo(1, 0.01));
 
-      await tester.tap(stop);
+      // And on the way out.
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).openness, lessThan(0.9));
+
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
     });
 
-    testWidgets('the session ring fills as the two minutes pass', (
+    testWidgets('Release Tension guides the mouth, tongue and sound', (
       tester,
     ) async {
       await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump();
+      await choose(tester, 'Release Tension');
+      await beginAndSettle(tester);
 
-      expect(circleOf(tester).sessionProgress, closeTo(0, 0.01));
+      expect(find.text('Deep inhale through the nose'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(
+        find.text('Exhale through the mouth with a haa sound, tongue out'),
+        findsOneWidget,
+      );
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('the immersive screen stays free of everything else', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
+      await tester.pump(const Duration(seconds: 6));
+
+      expect(find.byType(AlmanacNavigationBar), findsNothing);
+      expect(find.byType(ElevatedButton), findsNothing);
+      expect(find.byType(OutlinedButton), findsNothing);
+      expect(find.byType(IconButton), findsNothing);
+      expect(find.byType(AppBar), findsNothing);
+      expect(find.textContaining('minutes'), findsNothing);
+      expect(find.textContaining('left'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+  });
+
+  group('Balance while it runs', () {
+    testWidgets('leans the orb to the side the breath is using', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Balance');
+      await beginAndSettle(tester);
+
+      // In on the left...
+      expect(orbOf(tester).nostril, Nostril.left);
+
+      // ...held with both...
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).nostril, Nostril.both);
+
+      // ...out on the right...
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).nostril, Nostril.right);
+
+      // ...then in on the right, and out on the left.
+      await tester.pump(const Duration(seconds: 6));
+      expect(orbOf(tester).nostril, Nostril.right);
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).nostril, Nostril.both);
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).nostril, Nostril.left);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('counts the hold down inside the orb', (tester) async {
+      await openMeditation(tester);
+      await choose(tester, 'Balance');
+      await beginAndSettle(tester);
+
+      // Nothing to count on the way in.
+      expect(orbOf(tester).countdown, isNull);
+      expect(find.text('4'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).countdown, 4);
+      expect(find.text('4'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('3'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('2'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('1'), findsOneWidget);
+
+      // Gone again on the out-breath.
+      await tester.pump(const Duration(seconds: 1));
+      expect(orbOf(tester).countdown, isNull);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('says the side out loud, which a lean cannot', (tester) async {
+      final handle = tester.ensureSemantics();
+      await openMeditation(tester);
+      await choose(tester, 'Balance');
+      await beginAndSettle(tester);
+
+      expect(
+        find.bySemanticsLabel('Inhale through the left nostril'),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(
+        find.bySemanticsLabel('Hold with both nostrils closed, 4 seconds'),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(
+        find.bySemanticsLabel('Exhale through the right nostril'),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(seconds: 6));
+      expect(
+        find.bySemanticsLabel('Inhale through the right nostril'),
+        findsOneWidget,
+      );
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+      handle.dispose();
+    });
+  });
+
+  group('the session lasts the length that was chosen', () {
+    testWidgets('four minutes of breathing, after the settling second', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
+
+      await tester.pump(const Duration(seconds: 239));
+      expect(find.text('Well done.'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.text('Well done.'), findsOneWidget);
+    });
+
+    testWidgets('a longer session really is longer', (tester) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      await tester.tap(longer);
+      await tester.pumpAndSettle();
+      await beginAndSettle(tester);
+
+      // Four minutes in, a five-minute session is still going.
+      await tester.pump(const Duration(minutes: 4));
+      expect(find.text('Well done.'), findsNothing);
 
       await tester.pump(const Duration(minutes: 1));
-      expect(circleOf(tester).sessionProgress, closeTo(0.5, 0.02));
+      await tester.pumpAndSettle();
+      expect(find.text('Well done.'), findsOneWidget);
+      expect(find.text('Five quiet minutes.'), findsOneWidget);
+    });
 
-      await tester.pump(const Duration(seconds: 30));
-      expect(circleOf(tester).sessionProgress, closeTo(0.75, 0.02));
+    testWidgets('ends cleanly part-way through a cycle', (tester) async {
+      // Four minutes is not a whole number of Sleep's 19-second cycles,
+      // so this ends mid-breath — which is the session's business, not
+      // the cycle's.
+      await openMeditation(tester);
+      await choose(tester, 'Sleep');
+      await beginAndSettle(tester);
 
-      await tester.pump(const Duration(seconds: 30));
+      await tester.pump(const Duration(minutes: 4));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Well done.'), findsOneWidget);
+      expect(find.text('Four quiet minutes.'), findsOneWidget);
+    });
+  });
+
+  group('finishing', () {
+    Future<void> runToEnd(WidgetTester tester) async {
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
+      await tester.pump(const Duration(minutes: 4));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('says two words and nothing more', (tester) async {
+      final container = await openMeditation(tester);
+      await runToEnd(tester);
+
+      expect(find.text('Well done.'), findsOneWidget);
+      expect(find.text('Four quiet minutes.'), findsOneWidget);
+      // Understated: nothing counted, nothing awarded.
+      expect(find.textContaining('streak'), findsNothing);
+      expect(find.textContaining('%'), findsNothing);
+      expect(find.textContaining('total'), findsNothing);
+
+      // The frame is back.
+      expect(container.read(immersiveModeProvider), isFalse);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
+    });
+
+    testWidgets('offers another go and another practice', (tester) async {
+      await openMeditation(tester);
+      await runToEnd(tester);
+
+      expect(startAgain, findsOneWidget);
+      expect(
+        find.widgetWithText(TextButton, 'Choose another practice'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('starting again runs a whole new session', (tester) async {
+      await openMeditation(tester);
+      await runToEnd(tester);
+
+      await tester.tap(startAgain);
+      await tester.pump();
+      await tester.pump(kSettlingPause);
+
+      expect(find.text('Breathe in'), findsOneWidget);
+      expect(find.byType(AlmanacNavigationBar), findsNothing);
+
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
     });
 
-    testWidgets('says roughly how much is left, and never ticks', (
-      tester,
-    ) async {
+    testWidgets('another practice goes back to the four doors', (tester) async {
       await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump();
+      await runToEnd(tester);
 
-      expect(find.text('2 minutes left'), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 66));
-      expect(find.text('Less than a minute left'), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 42));
-      expect(find.text('Almost there'), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 12));
+      await tester.tap(
+        find.widgetWithText(TextButton, 'Choose another practice'),
+      );
       await tester.pumpAndSettle();
+
+      expect(find.text('Choose a practice'), findsOneWidget);
+      expect(practice('Balance'), findsOneWidget);
+    });
+
+    testWidgets('nothing is left running', (tester) async {
+      await openMeditation(tester);
+      await runToEnd(tester);
+
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(tester.binding.transientCallbackCount, 0);
     });
   });
 
   group('stopping', () {
-    testWidgets('returns to the beginning', (tester) async {
-      await openMeditation(tester);
-      await tester.tap(start);
+    testWidgets('tapping the orb returns to the setup', (tester) async {
+      final container = await openMeditation(tester);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
       await tester.pump(const Duration(seconds: 30));
 
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
 
-      expect(find.text('Take a slow breath'), findsOneWidget);
-      expect(start, findsOneWidget);
-      expect(stop, findsNothing);
-      expect(circleOf(tester).sessionProgress, 0);
+      // Back where you were, with the practice and length still chosen.
+      expect(find.text('Focus'), findsOneWidget);
+      expect(find.text('4 minutes'), findsOneWidget);
+      expect(begin, findsOneWidget);
+      expect(container.read(immersiveModeProvider), isFalse);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
     });
 
     testWidgets('leaves nothing running', (tester) async {
       await openMeditation(tester);
-      await tester.tap(start);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
       await tester.pump(const Duration(seconds: 30));
 
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
 
-      // No ticker, no timer, nothing scheduled — and pumpAndSettle would
-      // have hung if a session were still going.
       expect(tester.binding.hasScheduledFrame, isFalse);
       expect(tester.binding.transientCallbackCount, 0);
     });
@@ -223,93 +667,46 @@ void main() {
       tester,
     ) async {
       await openMeditation(tester);
-      await tester.tap(start);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
       await tester.pump(const Duration(seconds: 30));
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
 
-      await tester.tap(start);
-      await tester.pump();
-
+      await beginAndSettle(tester);
       expect(find.text('Breathe in'), findsOneWidget);
-      expect(find.text('2 minutes left'), findsOneWidget);
-      expect(circleOf(tester).sessionProgress, closeTo(0, 0.01));
+      expect(orbOf(tester).openness, closeTo(0, 0.05));
 
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
     });
-  });
 
-  group('finishing', () {
-    testWidgets('two minutes ends the session quietly', (tester) async {
+    testWidgets('can be stopped during the settling second', (tester) async {
       await openMeditation(tester);
-      await tester.tap(start);
+      await choose(tester, 'Focus');
+
+      await tester.tap(begin);
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.pump(kMeditationSessionLength);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
 
-      expect(find.text('Well done.'), findsOneWidget);
-      expect(startAgain, findsOneWidget);
-      expect(stop, findsNothing);
-      // Understated: no score, no streak, no statistics.
-      expect(find.textContaining('streak'), findsNothing);
-      expect(find.textContaining('%'), findsNothing);
-    });
-
-    testWidgets('does not end early', (tester) async {
-      await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump();
-
-      await tester.pump(const Duration(seconds: 119));
-      expect(find.text('Well done.'), findsNothing);
-      expect(stop, findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
-      expect(find.text('Well done.'), findsOneWidget);
-    });
-
-    testWidgets('nothing is left running afterwards', (tester) async {
-      await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump(kMeditationSessionLength);
-      await tester.pumpAndSettle();
-
-      expect(tester.binding.hasScheduledFrame, isFalse);
+      expect(begin, findsOneWidget);
       expect(tester.binding.transientCallbackCount, 0);
-    });
-
-    testWidgets('starting again runs a whole new session', (tester) async {
-      await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump(kMeditationSessionLength);
-      await tester.pumpAndSettle();
-
-      await tester.tap(startAgain);
-      await tester.pump();
-
-      expect(find.text('Breathe in'), findsOneWidget);
-      expect(circleOf(tester).sessionProgress, closeTo(0, 0.01));
-
-      await tester.tap(stop);
-      await tester.pumpAndSettle();
     });
   });
 
   group('leaving the screen', () {
     testWidgets('backgrounding the app ends the session', (tester) async {
-      await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump();
+      final container = await openMeditation(tester);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
       await tester.pump(const Duration(seconds: 30));
-      expect(stop, findsOneWidget);
 
-      // Out of sight and back again, walking the real Android sequence:
-      // resumed, inactive, hidden, paused. `onHide` and `onPause` are
-      // what the screen listens for; `inactive` alone — a notification
-      // shade — deliberately does not end a session.
+      // Out of sight and back again, walking the real Android sequence.
+      // `inactive` alone — a notification shade — deliberately does not
+      // end a session.
       for (final state in [
         AppLifecycleState.resumed,
         AppLifecycleState.inactive,
@@ -320,8 +717,6 @@ void main() {
         await tester.pump();
       }
       await tester.pumpAndSettle();
-
-      // And back, which Android also walks a state at a time.
       for (final state in [
         AppLifecycleState.hidden,
         AppLifecycleState.inactive,
@@ -332,26 +727,28 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      // Back at the beginning rather than half a session in, and with
-      // nothing having run on in a pocket.
-      expect(find.text('Take a slow breath'), findsOneWidget);
-      expect(start, findsOneWidget);
-      expect(circleOf(tester).sessionProgress, 0);
+      expect(begin, findsOneWidget);
+      expect(container.read(immersiveModeProvider), isFalse);
       expect(tester.binding.transientCallbackCount, 0);
     });
 
-    testWidgets('switching to another part of the Almanac ends the session', (
+    testWidgets('switching to another part of the Almanac ends it too', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.physicalSize = const Size(900, 2400);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
 
+      final container = ProviderContainer(
+        overrides: environmentOverrides(
+          features: const {FeatureId.meditation, FeatureId.garden},
+        ),
+      );
+      addTearDown(container.dispose);
+
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: environmentOverrides(
-            features: const {FeatureId.meditation, FeatureId.garden},
-          ),
+        UncontrolledProviderScope(
+          container: container,
           child: const AlmanacApp(),
         ),
       );
@@ -359,31 +756,38 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Meditation'));
       await tester.pumpAndSettle();
-      await tester.tap(start);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
       await tester.pump(const Duration(seconds: 30));
 
+      // The navigation is gone, so leaving means coming out of immersion
+      // first — which is exactly what tapping the orb does.
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Garden'));
       await tester.pumpAndSettle();
 
-      // A session you cannot see is not happening.
+      expect(container.read(immersiveModeProvider), isFalse);
+      expect(tester.binding.transientCallbackCount, 0);
+
       await tester.tap(find.bySemanticsLabel('Meditation'));
       await tester.pumpAndSettle();
-
-      expect(find.text('Take a slow breath'), findsOneWidget);
-      expect(start, findsOneWidget);
+      expect(begin, findsOneWidget);
     });
   });
 
   group('reduced motion', () {
-    testWidgets('the session still lasts its full two minutes', (tester) async {
+    testWidgets('the session still lasts its full four minutes', (
+      tester,
+    ) async {
       // The trap this guards: an AnimationController shortens itself
-      // twentyfold when animations are disabled, which would turn two
-      // minutes into six seconds.
+      // twentyfold when animations are disabled, which would turn four
+      // minutes into twelve seconds.
       await openMeditation(tester, reducedMotion: true);
-      await tester.tap(start);
-      await tester.pump();
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
 
-      await tester.pump(const Duration(seconds: 119));
+      await tester.pump(const Duration(seconds: 239));
       expect(find.text('Well done.'), findsNothing);
 
       await tester.pump(const Duration(seconds: 1));
@@ -391,226 +795,190 @@ void main() {
       expect(find.text('Well done.'), findsOneWidget);
     });
 
-    testWidgets('the circle holds still, and the words carry the rhythm', (
-      tester,
-    ) async {
+    testWidgets('the settling second is still a second', (tester) async {
       await openMeditation(tester, reducedMotion: true);
-      await tester.tap(start);
+      await choose(tester, 'Focus');
+
+      await tester.tap(begin);
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 999));
+      expect(find.text('Breathe in'), findsNothing);
 
-      expect(circleOf(tester).still, isTrue);
-      final size = circleOf(tester).openness;
+      await tester.pump(const Duration(milliseconds: 2));
+      expect(find.text('Breathe in'), findsOneWidget);
 
-      // Part-way through the in-breath the drawn circle has not moved...
-      await tester.pump(const Duration(seconds: 2));
-      expect(circleOf(tester).still, isTrue);
-      expect(circleOf(tester).openness, size);
-
-      // ...but the instruction still follows the breath.
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.text('Hold'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.text('Breathe out'), findsOneWidget);
-
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
     });
 
-    testWidgets('it can still be started, run and stopped', (tester) async {
+    testWidgets('the orb holds still and the words carry the rhythm', (
+      tester,
+    ) async {
       await openMeditation(tester, reducedMotion: true);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
 
-      await tester.tap(start);
-      await tester.pump(const Duration(seconds: 20));
-      expect(stop, findsOneWidget);
+      expect(orbOf(tester).still, isTrue);
+      final size = orbOf(tester).openness;
 
-      await tester.tap(stop);
+      await tester.pump(const Duration(seconds: 2));
+      expect(orbOf(tester).openness, size);
+      expect(orbOf(tester).still, isTrue);
+
+      // The instruction still follows the breath.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Hold'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('Breathe out'), findsOneWidget);
+
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
-      expect(start, findsOneWidget);
+    });
+
+    testWidgets('the guidance stays put instead of fading', (tester) async {
+      await openMeditation(tester, reducedMotion: true);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
+
+      // Text appearing and disappearing is itself motion, and with a
+      // still orb the words are the only cue there is.
+      await tester.pump(const Duration(milliseconds: 3500));
+      expect(find.text('Breathe in'), findsOneWidget);
+      final opacity = tester.widget<Opacity>(
+        find.ancestor(
+          of: find.text('Breathe in'),
+          matching: find.byType(Opacity),
+        ),
+      );
+      expect(opacity.opacity, 1);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Balance still counts and still leans', (tester) async {
+      await openMeditation(tester, reducedMotion: true);
+      await choose(tester, 'Balance');
+      await beginAndSettle(tester);
+
+      expect(orbOf(tester).nostril, Nostril.left);
+
+      await tester.pump(const Duration(seconds: 4));
+      expect(orbOf(tester).nostril, Nostril.both);
+      expect(orbOf(tester).countdown, 4);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
     });
   });
 
   group('accessibility', () {
-    testWidgets('the phase is announced with its length', (tester) async {
+    testWidgets('the phase is announced, once, with its length', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       await openMeditation(tester);
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
 
-      await tester.tap(start);
-      await tester.pump();
       expect(find.bySemanticsLabel('Breathe in, 4 seconds'), findsOneWidget);
-
       await tester.pump(const Duration(seconds: 4));
-      expect(find.bySemanticsLabel('Hold, 2 seconds'), findsOneWidget);
+      expect(find.bySemanticsLabel('Hold, 4 seconds'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.bySemanticsLabel('Breathe out, 4 seconds'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.bySemanticsLabel('Breathe out, 6 seconds'), findsOneWidget);
-
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
       handle.dispose();
     });
 
-    testWidgets('the announcement is made once per phase, not per frame', (
+    testWidgets('the instruction changes once a phase, not once a frame', (
       tester,
     ) async {
       await openMeditation(tester);
-      await tester.tap(start);
-      await tester.pump();
+      await choose(tester, 'Focus');
+      await beginAndSettle(tester);
 
-      var builds = 0;
-      // Count how often the spoken node is rebuilt across a whole breath
-      // by watching the instruction text change identity.
+      var changes = 0;
       String? previous;
       for (var ms = 0; ms < 12000; ms += 100) {
-        final current = tester
-            .widget<Text>(
-              find.text(
-                find.text('Breathe in').evaluate().isNotEmpty
-                    ? 'Breathe in'
-                    : find.text('Hold').evaluate().isNotEmpty
-                    ? 'Hold'
-                    : 'Breathe out',
-              ),
-            )
-            .data;
-        if (current != previous) builds++;
-        previous = current;
+        final current = ['Breathe in', 'Hold', 'Breathe out'].firstWhere(
+          (text) => find.text(text).evaluate().isNotEmpty,
+          orElse: () => '',
+        );
+        if (current.isNotEmpty && current != previous) changes++;
+        previous = current.isEmpty ? previous : current;
         await tester.pump(const Duration(milliseconds: 100));
       }
 
-      // Three phases in a twelve-second breath, not a hundred and twenty.
-      expect(builds, 3);
+      // Three phases in a twelve-second square, not a hundred and twenty.
+      expect(changes, 3);
 
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
     });
 
-    testWidgets('the circle itself says nothing', (tester) async {
-      await openMeditation(tester);
-
-      // It is the same information as the words, drawn — so a screen
-      // reader gains nothing from it.
-      expect(
-        find.descendant(
-          of: find.byType(BreathingCircle),
-          matching: find.byType(ExcludeSemantics),
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the controls are comfortable to tap', (tester) async {
-      await openMeditation(tester);
-
-      expect(tester.getSize(start).height, greaterThanOrEqualTo(48));
-
-      await tester.tap(start);
-      await tester.pump();
-      expect(tester.getSize(stop).height, greaterThanOrEqualTo(48));
-
-      await tester.tap(stop);
-      await tester.pumpAndSettle();
-    });
-
-    testWidgets('doubling the text size does not break the screen', (
+    testWidgets('the orb is a labelled control, not a described picture', (
       tester,
     ) async {
+      final handle = tester.ensureSemantics();
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      // The painting says nothing; the node around it is the one thing
+      // the orb actually is — the way in and the way out.
+      expect(
+        find.descendant(of: orb, matching: find.byType(ExcludeSemantics)),
+        findsWidgets,
+      );
+      expect(begin, findsOneWidget);
+
+      await tester.tap(begin);
+      await tester.pump();
+      expect(endSession, findsOneWidget);
+      expect(begin, findsNothing);
+
+      await tester.tap(endSession);
+      await tester.pumpAndSettle();
+      handle.dispose();
+    });
+
+    testWidgets('the orb is a generous target, and so are the controls', (
+      tester,
+    ) async {
+      await openMeditation(tester);
+      await choose(tester, 'Focus');
+
+      expect(tester.getSize(begin).shortestSide, greaterThanOrEqualTo(48));
+      for (final control in [longer, shorter]) {
+        expect(tester.getSize(control).shortestSide, greaterThanOrEqualTo(48));
+      }
+    });
+
+    testWidgets('doubling the text size breaks nothing', (tester) async {
       await openMeditation(tester, textScale: 2);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Take a slow breath'), findsOneWidget);
+      for (final technique in MeditationTechniques.all) {
+        expect(practice(technique.name), findsOneWidget);
+      }
 
-      // The page scrolls at this size rather than overflowing, so the
-      // button has to be brought into view before it can be pressed.
-      await tester.ensureVisible(start);
-      await tester.pumpAndSettle();
-      await tester.tap(start);
-      // A bare pump first: a ticker's clock starts on its first frame, so
-      // jumping straight to five seconds would start the session there
-      // rather than five seconds into it.
+      await choose(tester, 'Balance');
+      expect(tester.takeException(), isNull);
+      expect(find.text('4 minutes'), findsOneWidget);
+
+      await tester.ensureVisible(begin);
       await tester.pump();
-      await tester.pump(const Duration(seconds: 5));
+      await tester.tap(begin);
+      await tester.pump();
+      await tester.pump(kSettlingPause);
+      await tester.pump(const Duration(seconds: 4));
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Hold'), findsOneWidget);
+      expect(find.text('Hold with both nostrils closed'), findsOneWidget);
 
-      // A plain pump, not pumpAndSettle: settling with a session running
-      // would run the whole two minutes out and finish it.
-      await tester.ensureVisible(stop);
-      await tester.pump();
-      await tester.tap(stop);
+      await tester.tap(endSession);
       await tester.pumpAndSettle();
-    });
-
-    testWidgets('the circle does not fill the screen', (tester) async {
-      await openMeditation(tester, surface: const Size(900, 2000));
-
-      final circle = tester.getSize(find.byType(CustomPaint).first);
-      expect(circle.width, lessThanOrEqualTo(kBreathingCircleMaxSize));
-      expect(circle.width, equals(circle.height));
-    });
-  });
-
-  group('the rhythm is not built into the screen', () {
-    testWidgets('a different pattern drives the same screen', (tester) async {
-      // The architectural requirement, tested directly: the screen knows
-      // nothing about four seconds. Given a different rhythm it follows
-      // that one, with no change to a single word of its own code.
-      const quickBreath = BreathingPattern(
-        name: 'test',
-        steps: [
-          BreathingStep(BreathingPhase.inhale, Duration(seconds: 1)),
-          BreathingStep(BreathingPhase.exhale, Duration(seconds: 1)),
-        ],
-      );
-
-      tester.view.physicalSize = const Size(800, 2000);
-      tester.view.devicePixelRatio = 2;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: environmentOverrides(),
-          // The real theme assembly, so the screen's palette tokens
-          // resolve exactly as they do in the app.
-          child: MaterialApp(
-            theme: AppTheme.fromPalette(SummerPalettes.day),
-            home: const MeditationScreen(pattern: quickBreath),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(start);
-      await tester.pump();
-      expect(find.text('Breathe in'), findsOneWidget);
-
-      // One second in, this pattern is already breathing out — and there
-      // is no hold in it at all.
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Breathe out'), findsOneWidget);
-      expect(find.text('Hold'), findsNothing);
-
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Breathe in'), findsOneWidget);
-
-      // And the spoken label follows the pattern's own timings.
-      final handle = tester.ensureSemantics();
-      expect(find.bySemanticsLabel('Breathe in, 1 seconds'), findsOneWidget);
-      handle.dispose();
-
-      await tester.tap(stop);
-      await tester.pumpAndSettle();
-    });
-  });
-
-  group('it wears the season like everything else', () {
-    testWidgets('no colour of its own', (tester) async {
-      await openMeditation(tester);
-
-      // The screen paints from palette tokens only; if it were holding a
-      // colour of its own, the summer palette would not reach it.
-      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-      expect(scaffold.backgroundColor, isNull);
     });
   });
 }

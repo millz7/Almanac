@@ -6,6 +6,7 @@ import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/season.dart';
 import 'package:almanac/core/features/feature_registry.dart';
+import 'package:almanac/core/widgets/widgets.dart';
 import 'package:almanac/dev/theme_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,9 +52,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Meditation is built, so this is the real screen rather than a
-      // placeholder.
-      expect(find.text('Take a slow breath'), findsOneWidget);
-      expect(find.widgetWithText(ElevatedButton, 'Start'), findsOneWidget);
+      // placeholder: four practices to choose between.
+      expect(find.text('Choose a practice'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceCard, 'Focus'), findsOneWidget);
     },
   );
 

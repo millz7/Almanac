@@ -13,9 +13,9 @@ Everything else is the user's choice. On first launch the app asks four
 short questions — a name, a hemisphere, whether to use location, and what
 they would like in their Almanac — and the bottom navigation is then built
 from the Environment plus whatever they picked. **Meditation** is built:
-two quiet minutes following a breathing circle. Yoga, Chakras, Cycle,
-Cookbook, Garden and Nature Log exist as destinations but are not
-implemented yet.
+four breathing practices, a glowing orb, and nothing else on screen once
+you begin. Yoga, Chakras, Cycle, Cookbook, Garden and Nature Log exist as
+destinations but are not implemented yet.
 
 ## Getting started
 
@@ -250,33 +250,71 @@ always `Chakras`.
 
 ## Meditation
 
-One screen, one button, and a circle to breathe with. No duration to
-pick, no sounds, no streaks and no statistics — press Start and take two
-minutes.
+Choose a practice, choose how long, tap the glowing orb. Everything else
+disappears, there is one quiet second, and then the orb starts to breathe
+with you. Bigger is in, still is held, smaller is out.
 
-- **The rhythm is data.** `BreathingPattern` holds an ordered list of
-  phases and their lengths, and `momentAt(elapsed)` is a pure function of
-  the time — so the drawn breath and the printed instruction come from
-  one source and cannot disagree. The screen knows nothing about four
-  seconds. One pattern ships: four in, two held, six out.
-- **A session is exactly ten breaths.** Two minutes divided by a
-  twelve-second cycle, so it ends at the end of an out-breath.
-- **One clock.** A single `AnimationController` spans the whole session.
-  It exists only while a session runs, and is stopped and reset the
-  moment one ends. There is no second timer to drift against.
-  `AnimationBehavior.preserve` matters here: left to its default a
-  controller shortens itself twentyfold when the device asks for reduced
-  motion, which is right for a transition and wrong for a clock.
+### The four practices
+
+| | Rhythm | |
+|---|---|---|
+| **Focus** | 4 in, 4 held, 4 out | square breathing |
+| **Sleep** | 4 in, 7 held, 8 out | a long out-breath |
+| **Balance** | 4 in, 4 held, 6 out — each side | alternate nostrils |
+| **Release Tension** | 4 in, 6 out | nose in, open mouth out |
+
+### The rhythm is data
+
+`BreathingStep` carries a phase, a length, an instruction, and — where a
+practice needs them — a nostril and a countdown. `BreathingPattern` is an
+ordered list of those, and `momentAt(elapsed)` is a pure function of the
+time, so the orb and the words come from one source and cannot disagree.
+
+The screen knows nothing about four seconds, or about squares, or about
+which side of the nose Balance is on. It reads a `BreathingMoment` and
+draws it. Adding a fifth practice is one entry in `MeditationTechniques`
+and no change to the screen — there is a test that proves it, driving the
+real screen with a pattern that ships nowhere.
+
+Balance is deliberately *not* reduced to inhale/hold/exhale: the six
+steps and their sides are the practice, so `Nostril` is part of the model
+rather than a phrase the UI has to parse.
+
+### One clock
+
+A single `AnimationController` spans the settling second *and* the
+session. Elapsed below one second is the pause; above it, subtract the
+pause and hand the rest to the pattern. It exists only while a session
+runs, and is stopped and reset the moment one ends.
+
+`AnimationBehavior.preserve` matters more than it looks: left to its
+default a controller shortens itself twentyfold when the device asks for
+reduced motion — right for a transition, wrong for a clock, and it would
+turn four minutes into twelve seconds.
+
+### The immersive state
+
+Once a session starts there is the orb, and a line of guidance below it
+that arrives with each breath and fades. No title, no controls, no
+progress, no remaining time — and no navigation bar either: a screen can
+ask the shell to step back through `immersiveModeProvider`.
+
+Tapping the orb ends the session. That is the whole of the exit: a
+permanent Stop button would be the second-biggest thing in a room meant
+to be empty. It is a labelled semantics button, so it is reachable
+without sight, and a hint says so during the settling second.
+
 - **Leaving ends it.** Backgrounding the app, or switching to another
-  part of the Almanac, stops the session and returns to the start. A
-  breathing session you cannot see is not happening. A notification shade
+  part of the Almanac, stops the session and returns to the setup. A
+  session you cannot see is not happening. A notification shade
   (`inactive`) does not count as leaving.
-- **Reduced motion.** The circle holds still and the words carry the
-  rhythm; the session still lasts its full two minutes.
-- **What a screen reader hears.** The circle says nothing — it is the
-  same information, drawn. The instruction is a live region announcing
-  "Breathe in, 4 seconds" once per phase, which is a cue to breathe by
-  rather than a stream of chatter.
+- **Reduced motion.** The orb holds still and the words stay put instead
+  of fading; the session still lasts its full chosen length.
+- **What a screen reader hears.** The orb's painting says nothing — it is
+  the same information, drawn. The guidance is a live region announcing
+  the step once, with its length where the length is the point: "Hold, 7
+  seconds", "Inhale through the left nostril". Balance's counted hold is
+  announced once and then counted silently, inside the orb.
 
 ## The Almanac panel
 
@@ -309,7 +347,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-556 tests. The ones worth knowing about:
+603 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -325,9 +363,12 @@ flutter test
   chosen label is narrower than the item drawn for it.
 - `onboarding_accessibility_test.dart` renders all four setup questions at
   1x, 1.5x and 2x text on a phone-sized viewport.
-- `breathing_pattern_test.dart` checks the rhythm as arithmetic: phase
-  order, boundaries, and that the breath never jumps by more than a
-  fiftieth across a whole cycle.
+- `techniques_test.dart` pins all four practices, including that none of
+  their descriptions claims to treat anything.
+- `breathing_pattern_test.dart` checks the rhythms as arithmetic: phase
+  order, Balance's six steps and its countdown, and that the breath never
+  jumps by more than a thirtieth across two whole cycles of any practice.
 - `meditation_screen_test.dart` drives whole sessions on the test clock —
-  start, stop, completion, backgrounding, tab switching, reduced motion —
-  and asserts nothing is left ticking afterwards.
+  the one-second settle to the millisecond, phase progression, the chosen
+  length, stopping, backgrounding, reduced motion — and asserts nothing
+  is left ticking afterwards.
