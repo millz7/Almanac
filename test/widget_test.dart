@@ -50,7 +50,10 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Meditation'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Coming soon'), findsOneWidget);
+      // Meditation is built, so this is the real screen rather than a
+      // placeholder.
+      expect(find.text('Take a slow breath'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Start'), findsOneWidget);
     },
   );
 

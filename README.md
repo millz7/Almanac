@@ -12,9 +12,10 @@ with a guess.
 Everything else is the user's choice. On first launch the app asks four
 short questions — a name, a hemisphere, whether to use location, and what
 they would like in their Almanac — and the bottom navigation is then built
-from the Environment plus whatever they picked. Meditation, Yoga, Chakras,
-Cycle, Cookbook, Garden and Nature Log exist as destinations; none of them
-is implemented yet.
+from the Environment plus whatever they picked. **Meditation** is built:
+two quiet minutes following a breathing circle. Yoga, Chakras, Cycle,
+Cookbook, Garden and Nature Log exist as destinations but are not
+implemented yet.
 
 ## Getting started
 
@@ -49,6 +50,8 @@ flutter run
   location and which features they keep.
 - `lib/features/placeholder/` — one screen, driven by a
   `FeatureDefinition`, standing in for every feature not yet built.
+  `lib/app/navigation/feature_screens.dart` is the one place that knows
+  which features have real screens; everything else gets the placeholder.
 - `lib/dev/` — development-only tooling, excluded from the production
   experience.
 
@@ -245,6 +248,36 @@ target to make room, and the bar grows taller for larger text rather than
 clipping it. The visible label may be `Chak`; the accessibility label is
 always `Chakras`.
 
+## Meditation
+
+One screen, one button, and a circle to breathe with. No duration to
+pick, no sounds, no streaks and no statistics — press Start and take two
+minutes.
+
+- **The rhythm is data.** `BreathingPattern` holds an ordered list of
+  phases and their lengths, and `momentAt(elapsed)` is a pure function of
+  the time — so the drawn breath and the printed instruction come from
+  one source and cannot disagree. The screen knows nothing about four
+  seconds. One pattern ships: four in, two held, six out.
+- **A session is exactly ten breaths.** Two minutes divided by a
+  twelve-second cycle, so it ends at the end of an out-breath.
+- **One clock.** A single `AnimationController` spans the whole session.
+  It exists only while a session runs, and is stopped and reset the
+  moment one ends. There is no second timer to drift against.
+  `AnimationBehavior.preserve` matters here: left to its default a
+  controller shortens itself twentyfold when the device asks for reduced
+  motion, which is right for a transition and wrong for a clock.
+- **Leaving ends it.** Backgrounding the app, or switching to another
+  part of the Almanac, stops the session and returns to the start. A
+  breathing session you cannot see is not happening. A notification shade
+  (`inactive`) does not count as leaving.
+- **Reduced motion.** The circle holds still and the words carry the
+  rhythm; the session still lasts its full two minutes.
+- **What a screen reader hears.** The circle says nothing — it is the
+  same information, drawn. The instruction is a live region announcing
+  "Breathe in, 4 seconds" once per phase, which is a cue to breathe by
+  rather than a stream of chatter.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -276,7 +309,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-509 tests. The ones worth knowing about:
+556 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -292,3 +325,9 @@ flutter test
   chosen label is narrower than the item drawn for it.
 - `onboarding_accessibility_test.dart` renders all four setup questions at
   1x, 1.5x and 2x text on a phone-sized viewport.
+- `breathing_pattern_test.dart` checks the rhythm as arithmetic: phase
+  order, boundaries, and that the breath never jumps by more than a
+  fiftieth across a whole cycle.
+- `meditation_screen_test.dart` drives whole sessions on the test clock —
+  start, stop, completion, backgrounding, tab switching, reduced motion —
+  and asserts nothing is left ticking afterwards.

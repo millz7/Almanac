@@ -5,14 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../core/features/feature_registry.dart';
 import '../core/settings/settings_providers.dart';
 import '../dev/theme_preview_screen.dart';
-import '../features/environment/presentation/environment_screen.dart';
 import '../features/onboarding/domain/onboarding_stage.dart';
 import '../features/onboarding/presentation/feature_selection_screen.dart';
 import '../features/onboarding/presentation/hemisphere_screen.dart';
 import '../features/onboarding/presentation/location_intro_screen.dart';
 import '../features/onboarding/presentation/name_screen.dart';
-import '../features/placeholder/presentation/feature_screen.dart';
 import 'app_shell.dart';
+import 'navigation/feature_screens.dart';
 
 /// Where the app lands once setup is done. Owned by the registry, so the
 /// route and the navigation entry cannot disagree.
@@ -110,9 +109,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               routes: [
                 GoRoute(
                   path: feature.route,
-                  builder: (_, _) => feature.isCore
-                      ? const EnvironmentScreen()
-                      : FeatureScreen(feature: feature),
+                  builder: (_, _) => screenForFeature(feature),
                 ),
               ],
             ),
