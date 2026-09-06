@@ -4,6 +4,7 @@ import '../../core/features/feature_registry.dart';
 import '../../features/environment/presentation/environment_screen.dart';
 import '../../features/meditation/presentation/meditation_screen.dart';
 import '../../features/placeholder/presentation/feature_screen.dart';
+import '../../features/yoga/presentation/yoga_screen.dart';
 
 /// The screen a feature opens.
 ///
@@ -18,7 +19,7 @@ import '../../features/placeholder/presentation/feature_screen.dart';
 Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.environment => const EnvironmentScreen(),
   FeatureId.meditation => const MeditationScreen(),
-  FeatureId.yoga ||
+  FeatureId.yoga => const YogaScreen(),
   FeatureId.chakras ||
   FeatureId.cycle ||
   FeatureId.cookbook ||

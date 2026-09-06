@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/almanac_button.dart';
-import '../../../app/navigation/immersion.dart';
+import '../../../app/navigation/immersive_session.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/meditation_technique.dart';
@@ -67,7 +67,9 @@ class MeditationScreen extends ConsumerStatefulWidget {
 class _MeditationScreenState extends ConsumerState<MeditationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _session;
-  late final AppLifecycleListener _lifecycle;
+
+  /// Backgrounding, tab-switching and the app's frame, shared with Yoga.
+  late final ImmersiveSession _immersion;
 
   /// The current step, republished only when it actually changes.
   ///
@@ -95,36 +97,26 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
       animationBehavior: AnimationBehavior.preserve,
     )..addListener(_onTick);
 
-    // Both, and deliberately not `onInactive`: hidden and paused mean the
-    // app is genuinely out of sight, whereas inactive is a notification
-    // shade or an incoming call, which should not throw away somebody's
-    // session. `_endSession` is idempotent.
-    _lifecycle = AppLifecycleListener(
-      onHide: _endSession,
-      onPause: _endSession,
-    );
+    _immersion = ImmersiveSession(ref: ref, onLeave: _endSession);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Switching to another part of the Almanac leaves this screen alive
-    // but mutes its ticker, which would otherwise freeze a session
-    // half-finished and resume it days later. Same rule as backgrounding.
-    if (!TickerMode.valuesOf(context).enabled) _endSession();
+    _immersion.checkVisibility(context);
   }
 
   @override
   void deactivate() {
     // Whatever the reason this screen is leaving the tree, the frame
     // comes back.
-    ref.read(immersiveModeProvider.notifier).exit();
+    _immersion.exit();
     super.deactivate();
   }
 
   @override
   void dispose() {
-    _lifecycle.dispose();
+    _immersion.dispose();
     _session.dispose();
     _step.dispose();
     super.dispose();
@@ -161,7 +153,7 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
 
     if (_session.isCompleted && _stage == MeditationStage.breathing) {
       _session.stop();
-      ref.read(immersiveModeProvider.notifier).exit();
+      _immersion.exit();
       setState(() => _stage = MeditationStage.finished);
     }
   }
@@ -189,7 +181,7 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
       ..duration = kSettlingPause + _sessionLength
       ..reset()
       ..forward();
-    ref.read(immersiveModeProvider.notifier).enter();
+    _immersion.enter();
     setState(() => _stage = MeditationStage.settling);
   }
 
@@ -203,7 +195,7 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
       ..stop()
       ..reset();
     _step.value = null;
-    ref.read(immersiveModeProvider.notifier).exit();
+    _immersion.exit();
     setState(() => _stage = MeditationStage.ready);
   }
 

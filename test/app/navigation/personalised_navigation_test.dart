@@ -191,9 +191,11 @@ void main() {
     testWidgets('returning to the Environment brings back the real screen', (
       tester,
     ) async {
-      await pumpApp(tester, features: {FeatureId.yoga});
+      // A feature that is still a placeholder, so "Coming soon" is the
+      // right thing to look for.
+      await pumpApp(tester, features: {FeatureId.chakras});
 
-      await tester.tap(find.bySemanticsLabel('Yoga'));
+      await tester.tap(find.bySemanticsLabel('Chakras'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
 
@@ -209,15 +211,15 @@ void main() {
     testWidgets('removing the feature you are standing in returns you home', (
       tester,
     ) async {
-      final container = await pumpApp(tester, features: {FeatureId.yoga});
+      final container = await pumpApp(tester, features: {FeatureId.chakras});
 
-      await tester.tap(find.bySemanticsLabel('Yoga'));
+      await tester.tap(find.bySemanticsLabel('Chakras'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
 
       await container
           .read(userSettingsProvider.notifier)
-          .setFeatureChosen(FeatureId.yoga, false);
+          .setFeatureChosen(FeatureId.chakras, false);
       await tester.pumpAndSettle();
 
       // Not stranded on a screen the navigation can no longer reach.

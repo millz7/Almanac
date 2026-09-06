@@ -14,8 +14,9 @@ short questions — a name, a hemisphere, whether to use location, and what
 they would like in their Almanac — and the bottom navigation is then built
 from the Environment plus whatever they picked. **Meditation** is built:
 four breathing practices, a glowing orb, and nothing else on screen once
-you begin. Yoga, Chakras, Cycle, Cookbook, Garden and Nature Log exist as
-destinations but are not implemented yet.
+you begin. **Yoga** is built too: three short practices, choose then
+prepare then move. Chakras, Cycle, Cookbook, Garden and Nature Log exist
+as destinations but are not implemented yet.
 
 ## Getting started
 
@@ -316,6 +317,83 @@ without sight, and a hint says so during the settling second.
   seconds", "Inhale through the left nostril". Balance's counted hold is
   announced once and then counted silently, inside the orb.
 
+## Yoga
+
+Choose → prepare → move. Three practices, a page each, and no library to
+browse.
+
+| | | |
+|---|---|---|
+| **Morning** | A gentle way to wake the body up. | ~5 minutes, 8 movements |
+| **Ground** | Slower shapes for feeling steady again. | ~6 minutes, 8 movements |
+| **Unwind** | Soft stretches for the end of the day. | ~5 minutes, 8 movements |
+
+Every movement is a familiar one — seated breathing, mountain, a gentle
+forward fold, cat cow, child's pose, a side stretch, a low lunge, a
+gentle twist, rest. Nothing upside down, nothing that needs flexibility
+or balance you might not have. There is no counting of anything: no
+calories, no heart rate, no streaks, no scores.
+
+### The sequence is data
+
+`YogaStep` carries a pose, a length, an instruction, the shape to draw,
+and — where they apply — a side and a breath. `YogaPractice` is an
+ordered list of those, and `momentAt(elapsed)` is a pure function of the
+time, exactly as `BreathingPattern.momentAt` is in Meditation. A
+`YogaMoment` answers everything the screen shows: which movement, what to
+do, which breath cue, how long is left, and "3 of 8".
+
+The breathing is Meditation's, not a second engine: the flowing steps
+carry a `BreathingPattern` built from the same `BreathingStep`, and the
+figure's `openness` is the same number that drives the orb. Steps that
+are simply held carry a one-line note instead, so nothing has to invent
+a rhythm for a pose that does not have one.
+
+`practices_test.dart` treats the content as data too, checking every
+practice for length, for step lengths a beginner can hold, for both sides
+of every sided pose, and for the absence of both clinical claims and gym
+vocabulary.
+
+### One clock, and the same immersion
+
+A single `AnimationController` spans the whole practice, with
+`AnimationBehavior.preserve` for the same reason as Meditation's. The
+figure, the pose name, the instruction, the breath cue, the step timer
+and the count through the sequence all come from its one value. No
+`Timer.periodic`, no second clock, nothing to drift.
+
+The words are driven off two `ValueNotifier`s rather than the raw
+animation, so the instruction changes once a *movement* and the countdown
+once a *second*, while only the flowing figures repaint per frame. That
+is also what keeps a screen reader from being told the same thing sixty
+times.
+
+Immersion itself is shared: the lifecycle rules Meditation established —
+enter and leave `immersiveModeProvider`, and *end* on backgrounding or a
+tab switch, because a practice you cannot see is not happening — now live
+in `ImmersiveSession`, which both screens use. Meditation was refactored
+onto it rather than Yoga growing its own copy.
+
+### While you are moving
+
+Unlike Meditation, Yoga has to speak: you cannot follow a movement you
+have not been told. So the practice screen keeps the pose name, one short
+instruction, the breath cue where there is one, the seconds left in this
+movement and "3 of 8" — all of it below the figure and quieter than it.
+One `End practice` control, and nothing else. No pause, no skip, no
+previous or next, and — everywhere in Yoga — no sound of any kind.
+
+- **The figures are drawn.** `PoseFigure` paints each shape with Flutter
+  primitives on a 100×100 grid, mirrored for the left side. No
+  photography, no downloads, no external assets, and it says nothing to a
+  screen reader: it is the same information, drawn.
+- **Reduced motion.** The figures hold still and everything else works
+  exactly as before, including the breath cue changing. It does not
+  shorten the practice and does not introduce a second clock.
+- **What a screen reader hears.** The movement and its instruction as one
+  announcement — "Cat cow. On your hands and knees, slowly round and
+  lengthen your spine." — on each new movement, not each frame.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -347,7 +425,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-603 tests. The ones worth knowing about:
+669 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -372,3 +450,11 @@ flutter test
   the one-second settle to the millisecond, phase progression, the chosen
   length, stopping, backgrounding, reduced motion — and asserts nothing
   is left ticking afterwards.
+- `yoga_practice_test.dart` walks every practice second by second: step
+  boundaries to the second, the countdown, the breath cue measured from
+  the start of its own step, and the same code driving a practice that
+  ships nowhere.
+- `yoga_screen_test.dart` runs whole practices on the test clock —
+  progression, the step timer, completion, stopping, backgrounding, a tab
+  switch, reduced motion, double text size — and asserts nothing is left
+  ticking afterwards.
