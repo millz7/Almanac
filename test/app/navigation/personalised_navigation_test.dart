@@ -156,10 +156,10 @@ void main() {
     testWidgets('tapping a feature opens that feature', (tester) async {
       await pumpApp(
         tester,
-        features: {FeatureId.meditation, FeatureId.cookbook},
+        features: {FeatureId.meditation, FeatureId.natureLog},
       );
 
-      await tester.tap(find.bySemanticsLabel('Cookbook'));
+      await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
 
       expect(find.text('Coming soon'), findsOneWidget);
@@ -172,11 +172,11 @@ void main() {
     });
 
     testWidgets('each one shows its own name and message', (tester) async {
-      await pumpApp(tester, features: {FeatureId.garden, FeatureId.cookbook});
+      await pumpApp(tester, features: {FeatureId.garden, FeatureId.natureLog});
 
       for (final feature in [
         FeatureRegistry.byId(FeatureId.garden),
-        FeatureRegistry.byId(FeatureId.cookbook),
+        FeatureRegistry.byId(FeatureId.natureLog),
       ]) {
         await tester.tap(find.bySemanticsLabel(feature.name));
         await tester.pumpAndSettle();
@@ -193,9 +193,9 @@ void main() {
     ) async {
       // A feature that is still a placeholder, so "Coming soon" is the
       // right thing to look for.
-      await pumpApp(tester, features: {FeatureId.cookbook});
+      await pumpApp(tester, features: {FeatureId.natureLog});
 
-      await tester.tap(find.bySemanticsLabel('Cookbook'));
+      await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
 
@@ -211,15 +211,15 @@ void main() {
     testWidgets('removing the feature you are standing in returns you home', (
       tester,
     ) async {
-      final container = await pumpApp(tester, features: {FeatureId.cookbook});
+      final container = await pumpApp(tester, features: {FeatureId.natureLog});
 
-      await tester.tap(find.bySemanticsLabel('Cookbook'));
+      await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
 
       await container
           .read(userSettingsProvider.notifier)
-          .setFeatureChosen(FeatureId.cookbook, false);
+          .setFeatureChosen(FeatureId.natureLog, false);
       await tester.pumpAndSettle();
 
       // Not stranded on a screen the navigation can no longer reach.
@@ -257,13 +257,13 @@ void main() {
 
       await container
           .read(userSettingsProvider.notifier)
-          .setFeatureChosen(FeatureId.cookbook, true);
+          .setFeatureChosen(FeatureId.natureLog, true);
       await tester.pumpAndSettle();
 
-      expect(destinationsOf(tester), ['Environment', 'Cookbook']);
+      expect(destinationsOf(tester), ['Environment', 'Nature Log']);
 
       // No restart needed: the route was always registered.
-      await tester.tap(find.bySemanticsLabel('Cookbook'));
+      await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
     });
@@ -271,20 +271,20 @@ void main() {
     testWidgets('a feature switched off and on again still works', (
       tester,
     ) async {
-      final container = await pumpApp(tester, features: {FeatureId.cookbook});
+      final container = await pumpApp(tester, features: {FeatureId.natureLog});
       final settings = container.read(userSettingsProvider.notifier);
 
-      await tester.tap(find.bySemanticsLabel('Cookbook'));
+      await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
 
-      await settings.setFeatureChosen(FeatureId.cookbook, false);
+      await settings.setFeatureChosen(FeatureId.natureLog, false);
       await tester.pumpAndSettle();
       expect(destinationsOf(tester), ['Environment']);
 
-      await settings.setFeatureChosen(FeatureId.cookbook, true);
+      await settings.setFeatureChosen(FeatureId.natureLog, true);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Cookbook'));
+      await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
     });

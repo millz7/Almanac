@@ -17,8 +17,10 @@ four breathing practices, a glowing orb, and nothing else on screen once
 you begin. **Yoga** is built too: three short practices, choose then
 prepare then move. **Chakras** is a quiet visual pause — seven traditional
 centres down an abstract body line, one at a time. **Cycle** records one
-thing, the first day of a period, and counts quietly from it. Cookbook,
-Garden and Nature Log exist as destinations but are not implemented yet.
+thing, the first day of a period, and counts quietly from it.
+**Cookbook** is a small seasonal cookbook — sixteen recipes, four to a
+season. Garden and Nature Log exist as destinations but are not
+implemented yet.
 
 ## Getting started
 
@@ -590,6 +592,109 @@ recorded cycle dates will be removed from this device." — **Delete** /
 **Keep**. Confirming clears memory and storage together and lands back on
 the first-use screen, which the tests check by reopening the store.
 
+## Cookbook
+
+What could I make with the season I'm in? Four collections, four recipes
+each, bundled with the app. No search, no filters, no favourites, no
+network, no account, no storage of any kind — it does not even record
+which recipes were looked at.
+
+| | | |
+|---|---|---|
+| **Spring** | Pea and mint soup · Spring greens frittata · Lemon and herb roast chicken · Strawberry and rhubarb crumble |
+| **Summer** | Tomato and basil pasta · Grilled summer vegetables · Sweetcorn and chickpea salad · Roasted stone fruit with yoghurt |
+| **Autumn** | Pumpkin soup · Roasted root vegetables with lentils · Mushroom and barley risotto · Apple and oat bake |
+| **Winter** | Leek and potato soup · Slow vegetable and bean stew · Kumara and chickpea curry · Warm pear and oat pudding |
+
+### The season comes from the Environment
+
+The Cookbook asks `currentSeasonProvider` which season the user is
+actually in — real astronomy, their own hemisphere — and marks that one
+**"Your season"**. There is no second season calculation anywhere in the
+feature and no northern-hemisphere default: the same instant in January
+opens on winter in London and on summer in Auckland, and there is a test
+that checks exactly that.
+
+Browsing another season is only browsing. It changes what the screen
+lists and nothing else: the marker stays where it is, nothing is written
+down, and the Environment is untouched.
+
+### What it does not claim
+
+The app knows the season. It does not know what is growing near anybody,
+what the shops have, or what the weather did to the crop this year. So a
+collection is *"A seasonal collection for winter. Recipes inspired by
+winter ingredients, wherever you are."* — never "in season near you".
+`recipe_content_test.dart` checks for that phrasing and for its absence.
+
+That test also reads every recipe and every line of copy against three
+lists: health claims (detox, immunity, anti-inflammatory, healing…),
+counting language (calories, macros, low-fat…), and food moralising
+(guilt-free, cheat, clean eating, healthy/unhealthy). And it checks the
+ingredients themselves: no alcohol, no peanuts, nothing needing equipment
+an ordinary kitchen does not have — matching whole words, so "crumbled"
+is not rum and an eggplant is not an egg.
+
+### Recipes as data
+
+`Ingredient` is structured — a quantity, an optional unit, a name — and
+renders itself: "1 tbsp olive oil", "500 g pumpkin", "2 eggs",
+"Salt and pepper, to taste". Halves come out as halves (`1/2 tsp`), not
+as `0.5`. The rule the tests hold is that an ingredient either says how
+much or says the cook decides; never nothing at all.
+
+Times are `Duration`s, never strings, so a card can say "About 45
+minutes" and the page "15 minutes" and "30 minutes" without the two ever
+disagreeing. Method steps are stored as an ordered list of instructions
+and numbered from that order — `MethodStep` is a derived view, so the
+numbers cannot drift out of step with the list. Quantities are fixed:
+there is no serving multiplier in this version.
+
+Dietary tags are deliberately only **Vegetarian** and **Vegan**. "Gluten
+free" and "dairy free" are claims about safety this app is in no position
+to make, so the ingredient list is the whole of what Cookbook says about
+what is in a dish. A test cross-checks each tag against the ingredients.
+
+### Drawn, not photographed
+
+Every card carries a small botanical sprig painted with Flutter
+primitives: spring puts out new leaves and a bud, summer is broad-leaved
+with something round ripening, autumn has a leaf on its way down, winter
+is a bare twig with buds waiting. The four recipes in a collection lean
+slightly differently, so a page of cards is not stamped. No photographs,
+no assets, no network images.
+
+Cards are the colour of their season even when it is not that season.
+`season_illustration.dart` adds two illustration tokens to the theme —
+`seasonWash` for the card ground and `seasonInk` for the sprig — both
+derived from the same eight designed palettes and taken at the *active*
+palette's time of day, so a winter card in midsummer is still winter but
+is lit like the page it sits on. The wash backs its tint off in steps
+until body text on it clears 4.5:1, and in the worst case is simply the
+ordinary card colour; the ink is pushed to 3:1 against whatever wash it
+lands on. `season_illustration_test.dart` holds both floors across all
+eight palettes and all four seasons. There are no hex values in any
+Cookbook widget.
+
+The recipe page is calmer: a small sprig, then the description, then the
+times and servings, then ingredients, then method. Nothing to scroll past
+to reach the cooking.
+
+### Accessibility
+
+A card is one button saying everything it shows — "Pumpkin soup. Autumn
+recipe. A simple warming soup, smooth and golden." Season chips carry a
+real selected state plus a tick and a border, and the user's own season
+says "Your season" in words, so nothing depends on noticing a tint. Each
+method step is its own announcement ("Step 3. Add the pumpkin and the
+stock."), and prep, cook and servings have spoken labels rather than bare
+numbers. Recipe names wrap rather than truncate at 2× text. The sprigs
+say nothing.
+
+The one animation is a one-shot growth of the sprigs when a collection
+appears; reduced motion draws them already grown. No ticker, no session,
+no immersion.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -621,7 +726,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-948 tests. The ones worth knowing about:
+1,076 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -675,3 +780,12 @@ flutter test
 - `cycle_screen_test.dart` records, edits and deletes dates through the
   real screens, and checks that an estimate never looks or sounds like a
   recorded date.
+- `recipe_content_test.dart` reads all sixteen recipes: four to a season,
+  stable ids, real quantities and units, numbered method steps, and no
+  alcohol, peanuts, health claims, calorie language or diet talk.
+- `season_illustration_test.dart` checks every recipe-card colour in
+  every palette: body text legible on the wash, the sprig legible on the
+  card, and the four seasons still distinguishable.
+- `cookbook_screen_test.dart` opens all sixteen recipes through the real
+  screens and checks that the "Your season" marker follows the
+  hemisphere rather than the month.

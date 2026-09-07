@@ -197,6 +197,25 @@ final resolvedHemisphereProvider = Provider<ResolvedHemisphere>((ref) {
   );
 });
 
+/// The season the user is in, right now.
+///
+/// Prefers the fully resolved environment. Sunrise resolution is
+/// asynchronous, so before that has arrived this works the season out
+/// directly from the clock and the hemisphere already known — which
+/// means a screen never has to flash an arbitrary season for a frame,
+/// and never has to reach for a northern-hemisphere default.
+///
+/// Features that want to know the season read this. Nothing outside
+/// `core/environment/` should be calculating one.
+final currentSeasonProvider = Provider<Season>((ref) {
+  final environment = ref.watch(naturalEnvironmentProvider).value;
+  if (environment != null) return environment.season.season;
+
+  final now = ref.watch(clockProvider)();
+  final hemisphere = ref.watch(resolvedHemisphereProvider).hemisphere;
+  return ref.watch(seasonServiceProvider).seasonAt(now, hemisphere).season;
+});
+
 /// Whether the environment schedules its own refreshes (see
 /// [NaturalEnvironmentNotifier._scheduleNextRefresh]).
 ///

@@ -27,23 +27,13 @@ final activePaletteProvider = Provider<SeasonalPalette>((ref) {
     );
   }
 
+  // Sunrise/sunset resolution is asynchronous, so for the first frame
+  // the season comes from the clock and the known hemisphere — see
+  // [currentSeasonProvider] — and the daylight from full day, rather
+  // than flashing an arbitrary palette.
   final environment = ref.watch(naturalEnvironmentProvider).value;
-  if (environment != null) {
-    return SeasonalPalettes.resolve(
-      season: environment.season.season,
-      daylight: environment.dayNight.daylight,
-    );
-  }
-
-  // Sunrise/sunset resolution is asynchronous. For the first frame, show
-  // the correct season for the hemisphere already known — the user's own
-  // choice whenever they have made one — rather than flashing an
-  // arbitrary palette.
-  final now = ref.watch(clockProvider)();
-  final hemisphere = ref.watch(resolvedHemisphereProvider).hemisphere;
-  final season = ref
-      .watch(seasonServiceProvider)
-      .seasonAt(now, hemisphere)
-      .season;
-  return SeasonalPalettes.resolve(season: season, daylight: 1);
+  return SeasonalPalettes.resolve(
+    season: ref.watch(currentSeasonProvider),
+    daylight: environment?.dayNight.daylight ?? 1,
+  );
 });
