@@ -414,8 +414,6 @@ void main() {
     });
 
     testWidgets('a link goes to that feature', (tester) async {
-      // A feature that is still a placeholder, so "Coming soon" is the
-      // right thing to look for.
       await openToday(
         tester,
         overrides: environmentOverrides(features: const {FeatureId.natureLog}),
@@ -429,7 +427,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Coming soon'), findsOneWidget);
+      // The link landed on the Nature Log's own screen.
+      expect(find.text('Around now'), findsWidgets);
     });
 
     testWidgets('the Almanac is one tap away from the top right', (

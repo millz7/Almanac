@@ -134,32 +134,35 @@ void main() {
     const spring = MonthWindow(9, 11);
 
     test('the temperate middle is the baseline', () {
-      expect(spring.forRegion(GardeningRegion.nzCentral), spring);
+      expect(spring.shifted(GardeningRegion.nzCentral.monthOffset), spring);
       expect(GardeningRegion.nzCentral.monthOffset, 0);
     });
 
     test('the warm north runs a month earlier', () {
       expect(
-        spring.forRegion(GardeningRegion.nzNorthern),
+        spring.shifted(GardeningRegion.nzNorthern.monthOffset),
         const MonthWindow(8, 10),
       );
     });
 
     test('the cooler south runs a month later', () {
       expect(
-        spring.forRegion(GardeningRegion.nzSouthern),
+        spring.shifted(GardeningRegion.nzSouthern.monthOffset),
         const MonthWindow(10, 12),
       );
     });
 
     test('the northern hemisphere is half a year across', () {
       expect(
-        spring.forRegion(GardeningRegion.genericNorthern),
+        spring.shifted(GardeningRegion.genericNorthern.monthOffset),
         const MonthWindow(3, 5),
       );
       // A southern December is a northern June.
       expect(
-        const MonthWindow(12, 1).forRegion(GardeningRegion.genericNorthern),
+        const MonthWindow(
+          12,
+          1,
+        ).shifted(GardeningRegion.genericNorthern.monthOffset),
         const MonthWindow(6, 7),
       );
     });
@@ -173,7 +176,7 @@ void main() {
       expect(summer.contains(1), isTrue);
       expect(summer.contains(3), isFalse);
       expect(
-        summer.forRegion(GardeningRegion.nzSouthern),
+        summer.shifted(GardeningRegion.nzSouthern.monthOffset),
         const MonthWindow(12, 3),
       );
     });

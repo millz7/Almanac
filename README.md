@@ -21,8 +21,9 @@ thing, the first day of a period, and counts quietly from it.
 **Cookbook** is a small seasonal cookbook — sixteen recipes, four to a
 season. **Garden** is a gardening almanac: what is worth sowing,
 planting, tending, harvesting or pruning where you are, now, and a record
-of what you actually grow. Nature Log exists as a destination but is not
-implemented yet.
+of what you actually grow. **Nature Log** is the last of them: a quiet
+personal record of what you have noticed, beside a modest offline guide
+to what is often about at this time of year.
 
 ## Getting started
 
@@ -55,10 +56,14 @@ flutter run
   `environment/presentation/environment_text.dart`.
 - `lib/features/almanac/` — the user's own panel: name, hemisphere,
   location and which features they keep.
+- `lib/core/time/` — the shared date seam every feature reads:
+  `CalendarDate`, `MonthWindow`, the words for a date, and
+  `todayProvider`. One date system, not one per feature.
 - `lib/features/placeholder/` — one screen, driven by a
-  `FeatureDefinition`, standing in for every feature not yet built.
-  `lib/app/navigation/feature_screens.dart` is the one place that knows
-  which features have real screens; everything else gets the placeholder.
+  `FeatureDefinition`, for a feature not yet built. Every feature in the
+  registry now has a real screen, so `feature_screens.dart` maps all
+  eight exhaustively and nothing reaches the placeholder; it is kept
+  because the next feature added should not need a stub written for it.
 - `lib/dev/` — development-only tooling, excluded from the production
   experience.
 
@@ -880,6 +885,140 @@ control at the far end of a long list is a control nobody can reach — and
 every target clears 48 dp. Plant names wrap rather than truncate at 2×
 text.
 
+## Nature Log
+
+What have I noticed around me, and what is happening in nature at this
+place and time of year? Two routes and a way in: **Around now**, **My
+observations**, and **Record something**.
+
+The two halves never blur. *Around now* is the guide talking: what the
+Nature Book says is often about this month, where the book has coverage.
+*My observations* is what the user actually saw. A suggestion is never
+counted as a sighting, and nothing in the log is ever inferred.
+
+It is not a social network, a species list to complete, a citizen-science
+upload, or an identifier. There is no camera, no photo recognition, no
+birdsong recognition, no map, no geotag, no sharing and no rarity score.
+
+### The coverage model, and why it is two states
+
+Gardening bands are about climate: frost dates and season length, and
+they shift a planting window by a month. What lives where is a different
+and much harder question — kererū are nationwide, pōhutukawa is naturally
+northern, and the line between them is not a latitude. So Nature Log
+deliberately does **not** reuse `GardeningRegion`. It has its own
+`NatureCoverage`, and that enum has exactly two values:
+
+```
+newZealand    'New Zealand guide'
+unsupported   'No regional guide yet'
+```
+
+The bundled content is the common ground — species most people anywhere
+in New Zealand can meet — so the honest model is "the guide covers this,
+or it does not". Inventing ecological subregions from a coarse position
+would be inventing precision.
+
+`NatureGuide.resolve` reads the environment the rest of the app already
+worked out. A shared position inside a generous box around New Zealand
+(including Stewart Island and the Chathams) gets the guide, sourced from
+`location`. A position outside it gets no guide, because the book has no
+content for there. With no position at all the hemisphere is the only
+signal: the southern hemisphere is offered the guide **marked
+unconfirmed**, and says so on screen; the northern hemisphere is offered
+nothing, since New Zealand species in a Vermont spring would be
+nonsense.
+
+Either way the log works. Coverage gates suggestions, never the user's
+own record — somebody in London can record a robin, and the Nature Book
+is still there to record from.
+
+### The Nature Book
+
+Fifty entries on five shelves: 16 birds, 15 plants, 11 insects, 5
+fungi and 3 others (a skink, an eel and a spider — a spider is not an
+insect, and nobody noticing one wants to be told so). Each entry has a
+primary name, an optional alternate name, an optional scientific name, a
+short description and one or two seasonal notes. The primary name is the
+Māori one where there is one, and the model does not force an English
+name to exist: "Pīwakawaka · Fantail", but also just "Tūī".
+
+Seasonal notes are conservative by construction. A `NatureNote` carries a
+`NatureNoteKind` — *Often flowering*, *Often fruiting*, *Often arriving*,
+*Often more active*, *Worth listening for*, *Often appearing* — and a
+`MonthWindow` that may wrap the year. The app knows the month and,
+broadly, the country. It has not seen the tree, the weather or the bird.
+So a note says what *often* happens around a time of year, and
+`nature_content_test.dart` fails on "you will see", "guaranteed" or
+anything else that turns an invitation into a promise.
+
+The fungi shelf says what it is not, on every page it appears on: "This
+is a guide to noticing, not to foraging. It says nothing about which
+fungi are safe." No entry mentions edibility, toxicity, picking or
+cooking, and there is a test for each of those words.
+
+### Observations
+
+```
+NatureObservation   instanceId, date, category, label, order,
+                    itemId?, note?, placeLabel?
+```
+
+`label` is always present, even for a book entry, and that is the
+migration policy: the display name is written down at the moment of
+saving. An observation of an entry this version of the app has never
+heard of still reads as what the user saw rather than as a missing row,
+so a Nature Book that changes underneath the log — or a log written by a
+later version and read by an earlier one — costs nothing. An unknown
+`itemId` is kept, not dropped.
+
+The only thing recorded automatically is the calendar day, from the same
+`todayProvider` Cycle and Garden read. A place is optional, typed by the
+user in their own words, and never geocoded. **No coordinates are stored,
+ever** — the store is grepped for `latitude`, `longitude` and
+`GeoLocation` with its own comments stripped first, and a test records an
+observation with a live Wellington fix and then reads the stored bytes.
+
+Storage is a dedicated `NatureLogStore` behind its own
+`natureLog.observations` key — never `UserSettings` — one line of JSON
+per observation. JSON rather than the Garden's pipe-separated line
+because these records hold free text: a note reading "on the fence | by
+the shed" has to survive being written down. Still one line each, so a
+line that will not parse is dropped on its own and costs nothing but
+itself. "Clear my Nature Log" removes the key.
+
+### No gamification
+
+There are no streaks, badges, points, levels, challenges, goals,
+rankings or celebrations, and nothing says "complete your log". The one
+count anywhere is a single line — "5 things noticed this spring." — which
+disappears at zero and is not a total anybody is asked to beat. A
+free-text observation and a book one look identical in the list, because
+they are worth the same.
+
+### Drawn, not photographed
+
+Seven painted forms — bird, leaf sprig, flower, insect, butterfly,
+fungus and a fallback — with a small deterministic variation per entry
+taken from its id, so the same entry always looks the same and a page is
+not stamped. Nobody identifies a tūī from a forty-pixel drawing: the
+**name** does that, and the name is always there in text. The marks are
+`ExcludeSemantics`.
+
+Nature moves; the interface stays still. There are no fluttering wings
+and no drifting leaves. The one movement is a single settle when a list
+first appears, reduced motion skips even that, and the screen tests
+assert nothing is left ticking afterwards.
+
+### Accessibility
+
+A route card is one button: "Around now. What the guide says may be worth
+noticing." A book entry is "Pīwakawaka, Fantail. Bird." A suggestion adds
+its reason: "Tūī. Bird. Often busy around flowering kōwhai in spring." An
+observation is "A moth. Insect. Recorded 15 October." The way back sits
+*above* a page's list rather than below it, every target clears 48 dp,
+and names wrap rather than truncate at 2× text.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -911,7 +1050,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,211 tests. The ones worth knowing about:
+1,315 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -990,3 +1129,22 @@ flutter test
 - `garden_store_test.dart` drives the real store through a restart, drops
   malformed lines one at a time, preserves ids it does not recognise, and
   proves no coordinate is written.
+- `nature_content_test.dart` reads all 50 Nature Book entries and every
+  fixed string the feature can say: Māori-first naming, real month
+  windows, no certainty language, no foraging language on the fungi
+  shelf, no score-keeping, and no editorialising about introduced
+  species.
+- `nature_log_environment_test.dart` proves the shared seams are shared —
+  `todayProvider` is the same provider object Cycle and Garden read —
+  checks coverage for Auckland, Dunedin, the Chathams, London and Sydney,
+  that opening the feature asks for no permission, that a live position
+  still writes no coordinate, and that the feature calculates no date,
+  season, hemisphere or position of its own.
+- `nature_log_store_test.dart` drives the real store through a restart,
+  drops nine kinds of malformed line one at a time, keeps an item id from
+  a later version, and checks that free text with quotes, pipes and
+  newlines survives a round trip.
+- `nature_log_screen_test.dart` records from the book and in the user's
+  own words through the real screens, edits, removes, cancels a removal,
+  clears the log, and checks the empty state, the unsupported-region
+  fallback, the semantics, 48 dp targets, 2× text and reduced motion.

@@ -1,7 +1,9 @@
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
+import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/settings/settings_providers.dart';
+import 'package:almanac/features/placeholder/presentation/feature_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -162,7 +164,7 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.text('Around now'), findsWidgets);
       expect(barOf(tester).selectedIndex, 2);
 
       await tester.tap(find.bySemanticsLabel('Meditation'));
@@ -171,37 +173,48 @@ void main() {
       expect(barOf(tester).selectedIndex, 1);
     });
 
-    testWidgets('a feature not yet built shows its own name and message', (
-      tester,
-    ) async {
-      await pumpApp(tester, features: {FeatureId.natureLog});
+    testWidgets('a feature not yet built would show its own name and '
+        'message', (tester) async {
+      // Every feature in the registry is now built, so the placeholder
+      // is checked directly rather than through the navigation. It is
+      // kept for the next feature that has to announce itself before it
+      // exists.
       final feature = FeatureRegistry.byId(FeatureId.natureLog);
 
-      await tester.tap(find.bySemanticsLabel(feature.name));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: environmentOverrides(),
+          child: MaterialApp(
+            // The app's own theme, because every screen in it expects a
+            // SeasonalPalette to be there.
+            theme: AppTheme.fromPalette(SeasonalPalettes.fallback),
+            home: FeatureScreen(feature: feature),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Its own heading, and its own sentence — obvious which feature
       // this is, without pretending to be the feature.
       expect(find.text(feature.name), findsWidgets);
       expect(find.text(feature.placeholderMessage), findsOneWidget);
+      expect(find.text('Coming soon'), findsOneWidget);
     });
 
     testWidgets('returning to the Environment brings back the real screen', (
       tester,
     ) async {
-      // A feature that is still a placeholder, so "Coming soon" is the
-      // right thing to look for.
       await pumpApp(tester, features: {FeatureId.natureLog});
 
       await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
-      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.text('Around now'), findsWidgets);
 
       await tester.tap(find.bySemanticsLabel('Environment'));
       await tester.pumpAndSettle();
 
       expect(find.text('Tuesday 15 July'), findsOneWidget);
-      expect(find.text('Coming soon'), findsNothing);
+      expect(find.text('Around now'), findsNothing);
     });
   });
 
@@ -213,7 +226,7 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
-      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.text('Around now'), findsWidgets);
 
       await container
           .read(userSettingsProvider.notifier)
@@ -263,7 +276,7 @@ void main() {
       // No restart needed: the route was always registered.
       await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
-      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.text('Around now'), findsWidgets);
     });
 
     testWidgets('a feature switched off and on again still works', (
@@ -284,7 +297,7 @@ void main() {
 
       await tester.tap(find.bySemanticsLabel('Nature Log'));
       await tester.pumpAndSettle();
-      expect(find.text('Coming soon'), findsOneWidget);
+      expect(find.text('Around now'), findsWidgets);
     });
   });
 

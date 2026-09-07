@@ -6,8 +6,8 @@ import '../../features/cookbook/presentation/cookbook_screen.dart';
 import '../../features/cycle/presentation/cycle_screen.dart';
 import '../../features/environment/presentation/environment_screen.dart';
 import '../../features/garden/presentation/garden_screen.dart';
+import '../../features/nature_log/presentation/nature_log_screen.dart';
 import '../../features/meditation/presentation/meditation_screen.dart';
-import '../../features/placeholder/presentation/feature_screen.dart';
 import '../../features/yoga/presentation/yoga_screen.dart';
 
 /// The screen a feature opens.
@@ -17,9 +17,12 @@ import '../../features/yoga/presentation/yoga_screen.dart';
 /// get it. This is the one place that knows which features have actually
 /// been built.
 ///
-/// Anything not named below gets the placeholder, which is the right
-/// default: adding a feature to the registry gives it a proper screen
-/// saying what it will be, and building it for real is one line here.
+/// Every feature in the registry is now built, so this switch names them
+/// all and has no default. That is deliberate: adding a `FeatureId`
+/// should stop the compiler here and make somebody choose a screen,
+/// rather than quietly falling through to a placeholder. The placeholder
+/// screen itself is kept — see `features/placeholder/` — for the next
+/// feature that needs to announce itself before it exists.
 Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.environment => const EnvironmentScreen(),
   FeatureId.meditation => const MeditationScreen(),
@@ -28,5 +31,5 @@ Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.cycle => const CycleScreen(),
   FeatureId.cookbook => const CookbookScreen(),
   FeatureId.garden => const GardenScreen(),
-  FeatureId.natureLog => FeatureScreen(feature: feature),
+  FeatureId.natureLog => const NatureLogScreen(),
 };

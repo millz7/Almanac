@@ -1,60 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/time/month_window.dart';
 import 'gardening_region.dart';
 
-/// A run of calendar months, inclusive, which may wrap the new year.
-///
-/// `MonthWindow(9, 3)` is September to March — the shape most sowing
-/// windows have in the southern hemisphere, and the reason this is a
-/// type rather than a pair of ints.
-@immutable
-class MonthWindow {
-  const MonthWindow(this.from, this.to)
-    : assert(from >= 1 && from <= 12, 'from is a month'),
-      assert(to >= 1 && to <= 12, 'to is a month');
-
-  /// A single month.
-  const MonthWindow.only(int month) : from = month, to = month;
-
-  /// The whole year, for advice that is not seasonal.
-  static const year = MonthWindow(1, 12);
-
-  final int from;
-  final int to;
-
-  /// Whether the window runs through the new year.
-  bool get wraps => to < from;
-
-  /// How many months it covers.
-  int get length => wraps ? (12 - from + 1) + to : to - from + 1;
-
-  bool contains(int month) =>
-      wraps ? month >= from || month <= to : month >= from && month <= to;
-
-  /// The same window moved by [months], wrapping the year.
-  MonthWindow shifted(int months) =>
-      MonthWindow(_wrapMonth(from + months), _wrapMonth(to + months));
-
-  /// The window as this region sees it.
-  ///
-  /// Every rule in the plant book is written for temperate New Zealand;
-  /// each region says how far it sits from that baseline. See
-  /// [GardeningRegion.monthOffset].
-  MonthWindow forRegion(GardeningRegion region) =>
-      region.monthOffset == 0 ? this : shifted(region.monthOffset);
-
-  static int _wrapMonth(int month) => ((month - 1) % 12 + 12) % 12 + 1;
-
-  @override
-  bool operator ==(Object other) =>
-      other is MonthWindow && other.from == from && other.to == to;
-
-  @override
-  int get hashCode => Object.hash(from, to);
-
-  @override
-  String toString() => from == to ? '$from' : '$from-$to';
-}
+export '../../../core/time/month_window.dart' show MonthWindow;
 
 /// The five things a gardener does that this feature knows about.
 enum GardenAction {
@@ -278,8 +227,12 @@ class GardeningRule {
   bool appliesIn(GardeningRegion region) => regions.contains(region);
 
   /// The window as [region] sees it.
+  ///
+  /// Every rule in the plant book is written for temperate New Zealand;
+  /// each region says how far it sits from that baseline. See
+  /// [GardeningRegion.monthOffset].
   MonthWindow windowIn(GardeningRegion region) =>
-      shiftsWithRegion ? window.forRegion(region) : window;
+      shiftsWithRegion ? window.shifted(region.monthOffset) : window;
 
   bool isRelevantIn(GardeningRegion region, int month) =>
       appliesIn(region) && windowIn(region).contains(month);
