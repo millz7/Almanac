@@ -19,7 +19,9 @@ prepare then move. **Chakras** is a quiet visual pause — seven traditional
 centres down an abstract body line, one at a time. **Cycle** records one
 thing, the first day of a period, and counts quietly from it.
 **Cookbook** is a small seasonal cookbook — sixteen recipes, four to a
-season. Garden and Nature Log exist as destinations but are not
+season. **Garden** is a gardening almanac: what is worth sowing,
+planting, tending, harvesting or pruning where you are, now, and a record
+of what you actually grow. Nature Log exists as a destination but is not
 implemented yet.
 
 ## Getting started
@@ -709,6 +711,175 @@ The one animation is a one-shot growth of the sprigs when a collection
 appears; reduced motion draws them already grown. No ticker, no session,
 no immersion.
 
+## Garden
+
+Given where I am, what time of year it is, and what I actually have
+growing — what is worth doing now? Six chapters: **Sow · Plant · Tend ·
+Harvest · Prune · My Garden**.
+
+### The layering, which is the whole design
+
+```
+Environment            location, hemisphere, astronomical season, today
+        ↓
+GardeningGuide         a broad climate band — never a claim about a garden
+        ↓
++ the plant book       static rules: month windows, methods, cautions
+        ↓
+GENERAL guide          Sow · Plant          — discovery, the whole book
+        +
+My Garden              what the user actually grows
+        ↓
+PERSONALISED guide     Tend · Harvest · Prune
+```
+
+That split is the feature. `generalGuideFor(guide, today)` never looks at
+My Garden; `personalGuideFor(guide, today, garden)` cannot produce
+anything that is not in it. Tomatoes are generally harvestable in
+February — and if you do not grow tomatoes, Harvest does not mention
+them. Both are pure functions of their arguments, which is what lets the
+tests walk a year a month at a time.
+
+Garden calculates no season, no hemisphere and no date of its own: it
+reads `currentSeasonProvider`, `locationStateProvider`,
+`resolvedHemisphereProvider` and `todayProvider`, the same values the
+Environment screen shows. There is a test that greps the whole feature
+for `DateTime.now`, `seasonAt(`, `ofLatitude` and `Geolocator` and fails
+if any of them appear.
+
+### Gardening regions
+
+Latitude and longitude are not a gardening recommendation, so an explicit
+band sits in between. Inside New Zealand's bounding box, coarse location
+gives one of three, split at 38°S and 42°S:
+
+| Band | Roughly | Offset |
+|---|---|---|
+| **Warm northern New Zealand** | Northland, Auckland, Coromandel, Bay of Plenty | a month earlier |
+| **Temperate New Zealand** | Waikato to Wellington, Nelson, Marlborough | the baseline |
+| **Cooler southern New Zealand** | most of the South Island | a month later |
+| **General Southern / Northern Hemisphere guide** | no location shared | baseline / half a year across |
+
+Every window in the plant book is written once, for the temperate middle,
+and each band says how far it sits from that — which is how New Zealand
+gardening advice is actually phrased ("a month earlier in the far north").
+Rules anchored to the calendar rather than the season opt out: garlic goes
+in around the shortest day wherever you are.
+
+**What is deliberately missing.** NZ guides usually add an inland/cold
+band for Central Otago and the high country. That band is defined by
+elevation and shelter, not latitude — Alexandra and Dunedin share a
+latitude and garden a month apart — and the app has coarse location and no
+elevation. Inventing it would be inventing precision, so it is left out
+and the cool-south guidance is written conservatively. Hamilton falling in
+the warm band is the same limitation, and there is a test that says so out
+loud rather than pretending otherwise.
+
+Outside New Zealand there is no regional model yet, so a shared location
+degrades honestly to the generic guide for that hemisphere.
+
+### When location is off
+
+Garden works. It uses the hemisphere the user chose, names it — "General
+Southern Hemisphere guide" — and adds "Location is off, so these
+suggestions are broader." It never asks for permission on arrival, and
+there is a test asserting the location service is not called. No new
+permission was added: coarse location only, as before.
+
+Every page carries the honest limit: *"Based on your general area and the
+time of year. Local conditions can shift planting and harvest times."*
+
+### The plant book
+
+57 plants — 24 vegetables, 13 fruit, 10 herbs, 10 flowers — carrying 166
+structured rules between them. Static, bundled, offline; no plant API and
+nothing to fetch.
+
+A rule is data, not a sentence: an action, a month window, a region set, a
+sowing method, the establishment state a plant must have reached, a broad
+minimum age, and a caution. `GardeningRule.sow` requires a method;
+`GardeningRule.tend` requires both an action and a state;
+`GardeningRule.prune` requires a caution — the constructors make the
+invariants unforgettable, and there are tests for each.
+
+**Where the windows come from.** Each plant's months are the common ground
+between the standard New Zealand home-gardening references — seed-packet
+sowing charts, the month-by-month calendars the seed companies publish and
+the regional planting guides — reconciled conservatively: where sources
+disagreed the narrower window was kept, and a marginal month was left out.
+They are broad on purpose. Nothing here is a day-level claim.
+
+Pruning is the part of the dataset where bad timing does lasting damage,
+so the tests pin the ones that matter: stone fruit are pruned in the warm
+months and **not** in winter (silver leaf), pip fruit are pruned in
+winter, lavender is never cut into old wood, and every pruning rule
+carries a qualification.
+
+### My Garden
+
+A practical plant collection, not a virtual scene. Add from Sow — which
+records the plant, today's date and "sown" without asking anything — or
+add something already growing, which asks the one useful question: *"How
+is it in your garden?"* Recently sown, seedling, or established. A date is
+optional and **unknown stays unknown**; nothing is filled in with a guess.
+
+One entry per plant type in this version. The model carries an
+`instanceId` anyway, so allowing several later is a UI change rather than
+a file-format change.
+
+**Nothing derived is stored.** "Harvest now" is never persisted: it is
+recomputed from the plant, the date and the band every time it is asked,
+so the recommendations change as the year does. Persistence lives in a
+dedicated `GardenStore` behind its own `garden.plants` key — never in
+`UserSettings` — with one line per plant
+(`plantId|added|state|sown|planted`) so a corrupt line costs its own entry
+and nothing more. **No coordinates are ever stored**, and there is a test
+that reads the data layer to prove it.
+
+An id this version has never heard of is **kept in storage and left out of
+what is shown**, so a garden written by a later version survives a
+downgrade instead of being quietly deleted.
+
+### Recommendations, not commands
+
+"Can be sown now." "May be ready to harvest." "Typically pruned around
+this time." Never "your tomatoes are ready" — the app cannot see the
+plant. Each personalised item says why it is there in plain words:
+*"Relevant now because: February · sown 19 weeks ago"*, or *"February ·
+established in your garden"* when no date was recorded. A minimum age is
+applied only when the user actually recorded a sowing date; with no date,
+the calendar window carries the recommendation on its own rather than the
+app pretending to know.
+
+No points, streaks, levels, badges, achievements, rewards or completion
+percentages. `plant_book_test.dart` reads every sentence the feature can
+show against a list of promises ("guaranteed", "will grow", "perfect
+conditions", "must") and a list of game words.
+
+### Drawn, not photographed
+
+Ten forms — leafy green, root, climber, fruiting, bulb, herb sprig, shrub,
+tree, flower, vine — painted with Flutter primitives, with a small
+deterministic variation per species so a page is not stamped. Sixty
+hand-drawn portraits would be a painter layer bigger than the feature and
+still would not be how anybody identifies a plant: the **name** does that,
+and the name is always there in text. The marks are `ExcludeSemantics`.
+
+One one-shot growth animation when a list appears; reduced motion draws
+the marks already grown. No ticker, no `Timer.periodic`, no immersive
+mode, no session.
+
+### Accessibility
+
+A chapter card is one button: "Harvest. What in your garden may be ready."
+A plant in the book is "Pea. Vegetable. Sow outdoors." A My Garden entry
+is "Apple. Established." A suggestion is "Tomato. Vegetable. May be ready
+to harvest." Nothing depends on colour, an icon, a drawing or a season
+tint. The way back sits *above* a chapter's list rather than below it — a
+control at the far end of a long list is a control nobody can reach — and
+every target clears 48 dp. Plant names wrap rather than truncate at 2×
+text.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -740,7 +911,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,086 tests. The ones worth knowing about:
+1,211 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -806,3 +977,16 @@ flutter test
 - `cookbook_screen_test.dart` opens all sixteen recipes through the real
   screens and checks that the "Your season" marker follows the
   hemisphere rather than the month.
+- `garden_guide_test.dart` is the personalisation proof: tomatoes are not
+  in Harvest until they are in My Garden, they leave when the month
+  moves, and they stay in the garden either way. Same for Tend and
+  Prune.
+- `garden_environment_test.dart` checks Garden agrees with the
+  Environment — hemisphere, season, date and band — that it never asks
+  for location, and that it calculates none of those itself.
+- `plant_book_test.dart` checks all 57 plants and 166 rules, including
+  that stone fruit are not pruned in winter and that every pruning rule
+  carries a caution.
+- `garden_store_test.dart` drives the real store through a restart, drops
+  malformed lines one at a time, preserves ids it does not recognise, and
+  proves no coordinate is written.

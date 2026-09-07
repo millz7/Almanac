@@ -414,15 +414,17 @@ void main() {
     });
 
     testWidgets('a link goes to that feature', (tester) async {
+      // A feature that is still a placeholder, so "Coming soon" is the
+      // right thing to look for.
       await openToday(
         tester,
-        overrides: environmentOverrides(features: const {FeatureId.garden}),
+        overrides: environmentOverrides(features: const {FeatureId.natureLog}),
       );
 
       await tester.tap(
         find.descendant(
           of: find.byType(ExploreLinks),
-          matching: find.text('Garden'),
+          matching: find.text('Nature Log'),
         ),
       );
       await tester.pumpAndSettle();

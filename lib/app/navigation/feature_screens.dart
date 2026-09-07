@@ -5,6 +5,7 @@ import '../../features/chakras/presentation/chakras_screen.dart';
 import '../../features/cookbook/presentation/cookbook_screen.dart';
 import '../../features/cycle/presentation/cycle_screen.dart';
 import '../../features/environment/presentation/environment_screen.dart';
+import '../../features/garden/presentation/garden_screen.dart';
 import '../../features/meditation/presentation/meditation_screen.dart';
 import '../../features/placeholder/presentation/feature_screen.dart';
 import '../../features/yoga/presentation/yoga_screen.dart';
@@ -26,5 +27,6 @@ Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.chakras => const ChakrasScreen(),
   FeatureId.cycle => const CycleScreen(),
   FeatureId.cookbook => const CookbookScreen(),
-  FeatureId.garden || FeatureId.natureLog => FeatureScreen(feature: feature),
+  FeatureId.garden => const GardenScreen(),
+  FeatureId.natureLog => FeatureScreen(feature: feature),
 };

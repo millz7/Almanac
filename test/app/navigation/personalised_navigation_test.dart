@@ -171,21 +171,19 @@ void main() {
       expect(barOf(tester).selectedIndex, 1);
     });
 
-    testWidgets('each one shows its own name and message', (tester) async {
-      await pumpApp(tester, features: {FeatureId.garden, FeatureId.natureLog});
+    testWidgets('a feature not yet built shows its own name and message', (
+      tester,
+    ) async {
+      await pumpApp(tester, features: {FeatureId.natureLog});
+      final feature = FeatureRegistry.byId(FeatureId.natureLog);
 
-      for (final feature in [
-        FeatureRegistry.byId(FeatureId.garden),
-        FeatureRegistry.byId(FeatureId.natureLog),
-      ]) {
-        await tester.tap(find.bySemanticsLabel(feature.name));
-        await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsLabel(feature.name));
+      await tester.pumpAndSettle();
 
-        // Its own heading, and its own sentence — obvious which feature
-        // this is, without pretending to be the feature.
-        expect(find.text(feature.name), findsWidgets);
-        expect(find.text(feature.placeholderMessage), findsOneWidget);
-      }
+      // Its own heading, and its own sentence — obvious which feature
+      // this is, without pretending to be the feature.
+      expect(find.text(feature.name), findsWidgets);
+      expect(find.text(feature.placeholderMessage), findsOneWidget);
     });
 
     testWidgets('returning to the Environment brings back the real screen', (

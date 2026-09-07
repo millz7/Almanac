@@ -10,6 +10,7 @@ import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
 import 'package:almanac/core/settings/user_settings.dart';
 import 'package:almanac/features/cycle/application/cycle_providers.dart';
+import 'package:almanac/features/garden/application/garden_providers.dart';
 import 'package:flutter_riverpod/misc.dart';
 
 import 'fake_environment_services.dart';
@@ -36,6 +37,7 @@ List<Override> environmentOverrides({
   LocationState? locationState,
   SettingsStore? settingsStore,
   CycleStore? cycleStore,
+  GardenStore? gardenStore,
   Hemisphere? hemisphere = Hemisphere.northern,
   bool locationIntroSeen = true,
   bool refreshEnabled = false,
@@ -75,6 +77,9 @@ List<Override> environmentOverrides({
     // Cycle keeps its data in its own store, so tests get their own
     // empty one rather than the device's preferences.
     cycleStoreProvider.overrideWithValue(cycleStore ?? InMemoryCycleStore()),
+    // My Garden likewise keeps its own store, so tests get their own
+    // empty one rather than the device's preferences.
+    gardenStoreProvider.overrideWithValue(gardenStore ?? InMemoryGardenStore()),
     clockProvider.overrideWithValue(() => instant),
     initialTimeZoneProvider.overrideWithValue(zone),
     timeZoneServiceProvider.overrideWithValue(FixedTimeZoneService(zone)),

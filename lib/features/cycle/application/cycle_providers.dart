@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/environment/environment_providers.dart';
 import '../../../core/time/calendar_date.dart';
+import '../../../core/time/clock_providers.dart';
 import '../data/cycle_store.dart';
 import '../data/shared_preferences_cycle_store.dart';
 import '../domain/cycle_calculator.dart';
 
+export '../../../core/time/clock_providers.dart' show todayProvider;
 export '../data/cycle_store.dart';
 export '../domain/cycle_calculator.dart';
 
@@ -13,16 +14,6 @@ export '../domain/cycle_calculator.dart';
 /// preferences-backed store, opened lazily on first use.
 final cycleStoreProvider = Provider<CycleStore>(
   (ref) => SharedPreferencesCycleStore(),
-);
-
-/// Today, as a calendar date.
-///
-/// The single place the clock becomes a date. Everything below this line
-/// is arithmetic on dates, so nothing deeper in the feature ever reads
-/// `DateTime.now()` — which is what lets a test walk a cycle a day at a
-/// time.
-final todayProvider = Provider<CalendarDate>(
-  (ref) => CalendarDate.from(ref.watch(clockProvider)().toLocal()),
 );
 
 /// The user's recorded cycle dates and their chosen estimate length.
