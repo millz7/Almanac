@@ -2,11 +2,7 @@ import 'package:almanac/features/cookbook/domain/recipe_catalogue.dart';
 import 'package:almanac/features/cookbook/presentation/cookbook_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Whole words only. "eggplant" is not an egg and "crumbled" is not rum:
-/// a plain substring search finds both, and would quietly make these
-/// checks lie.
-bool mentions(String text, String word) =>
-    RegExp('\\b${RegExp.escape(word)}\\b', caseSensitive: false).hasMatch(text);
+import '../../support/culinary_words.dart';
 
 void main() {
   group('the collection', () {
@@ -193,60 +189,41 @@ void main() {
     });
 
     test('the tags match what is actually in it', () {
-      const animal = [
-        'chicken',
-        'beef',
-        'lamb',
-        'pork',
-        'bacon',
-        'fish',
-        'anchovy',
-        'butter',
-        'milk',
-        'cream',
-        'yoghurt',
-        'cheese',
-        'feta',
-        'parmesan',
-        'egg',
-        'honey',
-      ];
-      const notVegetarian = [
-        'chicken',
-        'beef',
-        'lamb',
-        'pork',
-        'bacon',
-        'fish',
-      ];
-
       for (final recipe in RecipeCatalogue.all) {
-        final list = recipe.ingredients
-            .map((i) => i.name.toLowerCase())
-            .join(' ')
-            // Coconut milk is not dairy, and this is a check about what
-            // is in a dish rather than about which words appear in it.
-            .replaceAll('coconut milk', 'coconut')
-            .replaceAll('coconut cream', 'coconut');
+        final list = recipe.ingredients.map((i) => i.name).join(', ');
 
         if (recipe.tags.contains(DietaryTag.vegan)) {
-          for (final word in animal) {
-            expect(
-              mentions(list, word),
-              isFalse,
-              reason: '${recipe.id} is tagged vegan but lists $word',
-            );
-          }
+          expect(
+            animalProductsIn(list),
+            isEmpty,
+            reason: '${recipe.id} is tagged vegan',
+          );
         }
         if (recipe.tags.contains(DietaryTag.vegetarian)) {
-          for (final word in notVegetarian) {
-            expect(
-              mentions(list, word),
-              isFalse,
-              reason: '${recipe.id} is tagged vegetarian but lists $word',
-            );
-          }
+          expect(
+            meatOrFishIn(list),
+            isEmpty,
+            reason: '${recipe.id} is tagged vegetarian',
+          );
         }
+      }
+    });
+
+    test('a recipe with animal products is not tagged vegan', () {
+      // The other direction: the tags have to be complete as well as
+      // true. Anything with no animal product in it and no tag would be
+      // a missed vegan.
+      for (final recipe in RecipeCatalogue.all) {
+        final list = recipe.ingredients.map((i) => i.name).join(', ');
+        final animal = animalProductsIn(list);
+
+        expect(
+          recipe.tags.contains(DietaryTag.vegan),
+          animal.isEmpty,
+          reason: animal.isEmpty
+              ? '${recipe.id} has no animal products but is not tagged vegan'
+              : '${recipe.id} is tagged vegan but lists ${animal.join(', ')}',
+        );
       }
     });
   });
@@ -264,39 +241,18 @@ void main() {
     ];
 
     test('no alcohol', () {
-      const alcohol = [
-        'wine',
-        'beer',
-        'cider',
-        'brandy',
-        'rum',
-        'vodka',
-        'whisky',
-        'whiskey',
-        'sherry',
-        'vermouth',
-        'liqueur',
-        'sake',
-        'stout',
-        'lager',
-      ];
-
       for (final line in everyLine()) {
-        for (final word in alcohol) {
-          expect(
-            mentions(line, word),
-            isFalse,
-            reason: '"$line" contains "$word"',
-          );
-        }
+        expect(alcoholIn(line), isEmpty, reason: '"$line" names a drink');
       }
     });
 
     test('no peanuts', () {
       for (final line in everyLine()) {
-        expect(mentions(line, 'peanut'), isFalse, reason: line);
-        expect(mentions(line, 'peanuts'), isFalse, reason: line);
-        expect(mentions(line, 'groundnut'), isFalse, reason: line);
+        expect(
+          phrasesIn(line, ['peanut', 'peanuts', 'groundnut', 'groundnuts']),
+          isEmpty,
+          reason: line,
+        );
       }
     });
 
@@ -333,54 +289,74 @@ void main() {
         'anti-inflammatory',
         'inflammation',
         'hormone',
+        'hormones',
         'healing',
         'heals',
         'immunity',
         'immune',
         'boost',
+        'boosts',
+        'boosting',
+        'superfoods',
+        'nutrient-dense',
+        // Whole words, so a future recipe may still describe a cured
+        // ham or a manicured herb garden.
         'cure',
+        'cures',
         'treatment',
         'disease',
         'prevention',
         'superfood',
-        'nutrient-dense',
         'metabolism',
         'gut health',
-        'wellness benefit',
       ];
 
       for (final said in CookbookText.everythingSaid) {
-        for (final claim in claims) {
-          expect(
-            said.toLowerCase().contains(claim),
-            isFalse,
-            reason: '"$said" contains "$claim"',
-          );
-        }
+        expect(
+          phrasesIn(said, claims),
+          isEmpty,
+          reason: '"$said" makes a health claim',
+        );
       }
     });
 
     test('counts nothing', () {
       const counting = [
         'calorie',
+        'calories',
         'kcal',
-        'macro',
-        'protein per',
-        'carb',
-        'low fat',
-        'low-fat',
-        'fat free',
-        'sugar free',
         'kilojoule',
-        'portion control',
+        'kilojoules',
+        'macro',
+        'macros',
+        // Whole words, so carbonara is safe and a carb count is not.
+        'carb',
+        'carbs',
+        'low-fat',
+        'fat-free',
+        'sugar-free',
       ];
 
       for (final said in CookbookText.everythingSaid) {
-        for (final word in counting) {
+        expect(
+          phrasesIn(said, counting),
+          isEmpty,
+          reason: '"$said" counts something',
+        );
+      }
+      // The multi-word ones, which a word list cannot hold.
+      for (final said in CookbookText.everythingSaid) {
+        for (final phrase in [
+          'low fat',
+          'fat free',
+          'sugar free',
+          'protein per',
+          'portion control',
+        ]) {
           expect(
-            said.toLowerCase().contains(word),
+            said.toLowerCase().contains(phrase),
             isFalse,
-            reason: '"$said" contains "$word"',
+            reason: '"$said" contains "$phrase"',
           );
         }
       }
@@ -391,25 +367,36 @@ void main() {
         'guilt',
         'guilt-free',
         'cheat',
-        'clean eating',
+        'cheating',
         'naughty',
         'sinful',
         'indulgent',
-        'bad for you',
-        'good for you',
         'healthy',
         'unhealthy',
         'skinny',
         'slimming',
-        'diet ',
+        // Whole word, so "dietary" is not caught by "diet".
+        'diet',
       ];
 
       for (final said in CookbookText.everythingSaid) {
-        for (final word in moralising) {
+        expect(
+          phrasesIn(said, moralising),
+          isEmpty,
+          reason: '"$said" moralises',
+        );
+      }
+      for (final said in CookbookText.everythingSaid) {
+        for (final phrase in [
+          'clean eating',
+          'good for you',
+          'bad for you',
+          'wellness benefit',
+        ]) {
           expect(
-            said.toLowerCase().contains(word),
+            said.toLowerCase().contains(phrase),
             isFalse,
-            reason: '"$said" contains "$word"',
+            reason: '"$said" contains "$phrase"',
           );
         }
       }
@@ -437,6 +424,127 @@ void main() {
           expect(lower.contains(claim), isFalse, reason: '"$said"');
         }
       }
+    });
+  });
+
+  group('the content checks themselves', () {
+    // These checks exist to keep genuinely unsuitable things out of the
+    // recipes. A word list alone cannot do that: it rejects real
+    // ingredients whose names merely contain an awkward word, and the
+    // rejections look authoritative. Both directions are pinned here.
+
+    group('a vinegar is not a drink', () {
+      test('wine vinegars pass', () {
+        for (final ingredient in [
+          '1 tbsp red wine vinegar',
+          '2 tsp white wine vinegar',
+          '1 tbsp rice wine vinegar',
+          '1 tbsp wine vinegar',
+          '1 tbsp cider vinegar',
+          '1 tbsp sherry vinegar',
+          '1 tsp malt vinegar',
+          '1 tbsp balsamic vinegar',
+        ]) {
+          expect(alcoholIn(ingredient), isEmpty, reason: ingredient);
+        }
+      });
+
+      test('and the vinegar in the book is the one that was meant', () {
+        final vegetables = RecipeCatalogue.byId(
+          'summer-grilled-summer-vegetables',
+        );
+        expect(
+          vegetables.ingredients.map((i) => i.line),
+          contains('1 tbsp red wine vinegar'),
+        );
+      });
+
+      test('but a real drink is still caught', () {
+        expect(alcoholIn('150 ml white wine'), contains('wine'));
+        expect(alcoholIn('a splash of red wine'), contains('wine'));
+        expect(alcoholIn('50 ml brandy'), contains('brandy'));
+        expect(alcoholIn('2 tbsp dark rum'), contains('rum'));
+        expect(alcoholIn('330 ml beer'), contains('beer'));
+        expect(alcoholIn('100 ml dry sherry'), contains('sherry'));
+        expect(alcoholIn('1 tbsp orange liqueur'), contains('liqueur'));
+        expect(alcoholIn('Deglaze the pan with white wine.'), isNotEmpty);
+        expect(alcoholIn('50 ml vodka'), contains('vodka'));
+        expect(alcoholIn('2 tbsp whisky'), contains('whisky'));
+      });
+    });
+
+    group('a butter bean is a bean', () {
+      test('butter beans are vegan', () {
+        for (final ingredient in [
+          '800 g tins cannellini or butter beans, drained',
+          '400 g butter beans',
+          '1 tin butter bean',
+        ]) {
+          expect(animalProductsIn(ingredient), isEmpty, reason: ingredient);
+        }
+      });
+
+      test('and the stew lists them again', () {
+        final stew = RecipeCatalogue.byId('winter-vegetable-and-bean-stew');
+        expect(
+          stew.ingredients.map((i) => i.line),
+          contains('800 g tins cannellini or butter beans, drained'),
+        );
+        expect(stew.tags, contains(DietaryTag.vegan));
+      });
+
+      test('other plant foods named after animal ones are fine too', () {
+        for (final ingredient in [
+          '400 ml tin coconut milk',
+          '200 ml coconut cream',
+          '250 ml oat milk',
+          '2 tbsp almond butter',
+          '1 eggplant, sliced into rounds',
+          '1 tsp cream of tartar',
+          '1 butternut squash',
+        ]) {
+          expect(animalProductsIn(ingredient), isEmpty, reason: ingredient);
+        }
+      });
+
+      test('but real dairy, eggs and meat are still caught', () {
+        expect(animalProductsIn('100 g butter, softened'), contains('butter'));
+        expect(animalProductsIn('100 ml milk'), contains('milk'));
+        expect(animalProductsIn('200 ml cream'), contains('cream'));
+        expect(animalProductsIn('250 ml buttermilk'), contains('buttermilk'));
+        expect(animalProductsIn('80 g feta, crumbled'), contains('feta'));
+        expect(animalProductsIn('8 eggs'), contains('eggs'));
+        expect(animalProductsIn('2 tbsp honey'), contains('honey'));
+        expect(animalProductsIn('1.5 kg whole chicken'), contains('chicken'));
+        expect(meatOrFishIn('4 fillets salmon'), contains('salmon'));
+        expect(meatOrFishIn('200 g bacon'), contains('bacon'));
+        // Vegetarian is about meat and fish, not about dairy.
+        expect(meatOrFishIn('100 g butter, softened'), isEmpty);
+      });
+    });
+
+    group('whole words, not spellings', () {
+      test('a coincidence of letters is not an ingredient', () {
+        expect(alcoholIn('80 g feta, crumbled'), isEmpty);
+        expect(alcoholIn('1 tsp ground cumin'), isEmpty);
+        expect(animalProductsIn('1 eggplant'), isEmpty);
+        expect(animalProductsIn('2 courgettes'), isEmpty);
+        expect(phrasesIn('Cook the carbonara.', ['carb']), isEmpty);
+        expect(phrasesIn('Serve with cured ham.', ['cure']), isEmpty);
+        expect(phrasesIn('Dietary notes.', ['diet']), isEmpty);
+      });
+
+      test('and the word itself still is', () {
+        expect(phrasesIn('30 g carbs', ['carbs']), contains('carbs'));
+        expect(
+          phrasesIn('It will cure what ails you.', ['cure']),
+          contains('cure'),
+        );
+        expect(
+          phrasesIn('A diet you can stick to.', ['diet']),
+          contains('diet'),
+        );
+      });
     });
   });
 

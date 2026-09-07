@@ -51,7 +51,7 @@ abstract final class WinterRecipes {
       Ingredient(1, 'tsp', 'smoked paprika'),
       Ingredient(1, 'tsp', 'dried oregano'),
       Ingredient(400, 'g', 'tin chopped tomatoes'),
-      Ingredient(800, 'g', 'tins cannellini beans, drained'),
+      Ingredient(800, 'g', 'tins cannellini or butter beans, drained'),
       Ingredient(600, 'ml', 'vegetable stock'),
       Ingredient(150, 'g', 'silverbeet, shredded'),
       Ingredient.toTaste('Salt and pepper'),

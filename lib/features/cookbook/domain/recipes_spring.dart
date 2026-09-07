@@ -11,7 +11,7 @@ abstract final class SpringRecipes {
     prepTime: Duration(minutes: 10),
     cookTime: Duration(minutes: 20),
     servings: 4,
-    tags: [DietaryTag.vegetarian],
+    tags: [DietaryTag.vegan, DietaryTag.vegetarian],
     ingredients: [
       Ingredient(1, 'tbsp', 'olive oil'),
       Ingredient.count(1, 'onion, chopped'),

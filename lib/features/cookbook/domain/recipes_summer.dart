@@ -49,7 +49,7 @@ abstract final class SummerRecipes {
       Ingredient.count(2, 'capsicums, cut into wide strips'),
       Ingredient.count(1, 'eggplant, sliced into rounds'),
       Ingredient(3, 'tbsp', 'olive oil'),
-      Ingredient(1, 'tbsp', 'balsamic vinegar'),
+      Ingredient(1, 'tbsp', 'red wine vinegar'),
       Ingredient(1, 'small handful', 'parsley, chopped'),
       Ingredient.toTaste('Salt and pepper'),
     ],

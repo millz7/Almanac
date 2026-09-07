@@ -632,8 +632,20 @@ lists: health claims (detox, immunity, anti-inflammatory, healing…),
 counting language (calories, macros, low-fat…), and food moralising
 (guilt-free, cheat, clean eating, healthy/unhealthy). And it checks the
 ingredients themselves: no alcohol, no peanuts, nothing needing equipment
-an ordinary kitchen does not have — matching whole words, so "crumbled"
-is not rum and an eggplant is not an egg.
+an ordinary kitchen does not have.
+
+Those checks are **ingredient-aware, not word-blind** — see
+`test/support/culinary_words.dart`. A word list on its own rejects real
+food whose name merely contains an awkward word, and the rejections look
+authoritative. So each check rewrites the compounds a cook would
+recognise before it looks for anything: **red wine vinegar** is vinegar
+(the alcohol is fermented away), **butter beans** are lima beans,
+**coconut milk** is not dairy, an **eggplant** is not an egg, **cream of
+tartar** is a raising agent, and **crumbled** feta contains no rum. Then
+it matches whole words only, so a future recipe may describe a cured ham
+without tripping "cure" and a carbonara without tripping "carb". A real
+bottle of wine, a real block of butter and a real jug of buttermilk are
+all still caught, and there are tests in both directions.
 
 ### Recipes as data
 
@@ -653,7 +665,9 @@ there is no serving multiplier in this version.
 Dietary tags are deliberately only **Vegetarian** and **Vegan**. "Gluten
 free" and "dairy free" are claims about safety this app is in no position
 to make, so the ingredient list is the whole of what Cookbook says about
-what is in a dish. A test cross-checks each tag against the ingredients.
+what is in a dish. A test cross-checks each tag against the ingredients
+in both directions: a tagged recipe must contain nothing that
+contradicts it, and an untagged one must contain something that does.
 
 ### Drawn, not photographed
 
@@ -726,7 +740,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,076 tests. The ones worth knowing about:
+1,086 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -782,7 +796,10 @@ flutter test
   recorded date.
 - `recipe_content_test.dart` reads all sixteen recipes: four to a season,
   stable ids, real quantities and units, numbered method steps, and no
-  alcohol, peanuts, health claims, calorie language or diet talk.
+  alcohol, peanuts, health claims, calorie language or diet talk — with
+  its own regression group pinning both sides of every borderline case
+  (red wine vinegar passes, white wine does not; butter beans pass,
+  buttermilk does not).
 - `season_illustration_test.dart` checks every recipe-card colour in
   every palette: body text legible on the wash, the sprig legible on the
   card, and the four seasons still distinguishable.
