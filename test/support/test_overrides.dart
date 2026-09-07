@@ -9,6 +9,7 @@ import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
 import 'package:almanac/core/settings/user_settings.dart';
+import 'package:almanac/features/cycle/application/cycle_providers.dart';
 import 'package:flutter_riverpod/misc.dart';
 
 import 'fake_environment_services.dart';
@@ -34,6 +35,7 @@ List<Override> environmentOverrides({
   LocationService? locationService,
   LocationState? locationState,
   SettingsStore? settingsStore,
+  CycleStore? cycleStore,
   Hemisphere? hemisphere = Hemisphere.northern,
   bool locationIntroSeen = true,
   bool refreshEnabled = false,
@@ -70,6 +72,9 @@ List<Override> environmentOverrides({
     // No background refresh timer, so no timers outlive the test.
     environmentRefreshEnabledProvider.overrideWithValue(refreshEnabled),
     settingsStoreProvider.overrideWithValue(store),
+    // Cycle keeps its data in its own store, so tests get their own
+    // empty one rather than the device's preferences.
+    cycleStoreProvider.overrideWithValue(cycleStore ?? InMemoryCycleStore()),
     clockProvider.overrideWithValue(() => instant),
     initialTimeZoneProvider.overrideWithValue(zone),
     timeZoneServiceProvider.overrideWithValue(FixedTimeZoneService(zone)),

@@ -16,7 +16,8 @@ from the Environment plus whatever they picked. **Meditation** is built:
 four breathing practices, a glowing orb, and nothing else on screen once
 you begin. **Yoga** is built too: three short practices, choose then
 prepare then move. **Chakras** is a quiet visual pause — seven traditional
-centres down an abstract body line, one at a time. Cycle, Cookbook,
+centres down an abstract body line, one at a time. **Cycle** records one
+thing, the first day of a period, and counts quietly from it. Cookbook,
 Garden and Nature Log exist as destinations but are not implemented yet.
 
 ## Getting started
@@ -478,6 +479,117 @@ is a decision that deserves its own step. What is true either way is the
 part that matters: nothing written here leaves the device. No account, no
 sync, no network, no analytics, and no new permissions.
 
+## Cycle
+
+Notice where you are in your cycle. It records one thing — the first day
+of a period — and does arithmetic on it. The biggest thing on the screen
+is **Cycle day 12**, not a chart.
+
+### What it does not do
+
+No fertility prediction, no probability of anything, no ovulation
+diagnosis, no pregnancy, no contraception, no symptom tracker, no mood
+log, no score, no streak, no notifications, no export, no sharing. It
+makes no medical claim and never says a calculated date is certain.
+
+`cycle_content_test.dart` reads every string the feature can show against
+a list of clinical words and a list of gamified ones, and separately
+against a list of over-claims ("you are ovulating", "guaranteed",
+"accurate"). `cycle_calculator_test.dart` greps the domain itself for
+anything that computes fertility, conception or pregnancy.
+
+### Privacy, which is the whole architecture here
+
+Cycle dates are the most sensitive thing the app holds, so they get their
+own everything: their own store (`CycleStore`), their own two preference
+keys under a `cycle.` prefix, their own serialisation, and their own
+`deleteAll` that removes both keys so nothing is left to say anybody ever
+used the feature. **They are never put in `UserSettings`.** The store is
+opened on first use rather than at startup, so somebody who never opens
+Cycle never has their cycle dates read into memory.
+
+`CycleData.toString()` reports *how many* dates it holds and never which —
+a `toString` is exactly how sensitive data ends up in a crash report — and
+there is a test asserting no `debugPrint` in the feature interpolates
+anything but a type name. Nothing about a cycle is shown anywhere else in
+the app, and there is a test for that too.
+
+Local only: no account, no cloud, no sync, no network, no analytics, no
+external API, no location, no microphone, no camera, no background work
+and no new permissions.
+
+### Dates are dates, not instants
+
+`CalendarDate` is a year, a month and a day, with no time and no zone. A
+period began on the fifteenth of July wherever the phone happens to be,
+and storing that as an instant is how a date ends up shifting to the day
+before because somebody flew west or the clocks went back. Its arithmetic
+goes through UTC internally, so adding a day is always exactly a day —
+there is a test that walks it across both British daylight-saving
+changes. Stored as `YYYY-MM-DD`; an unreadable stored value is dropped
+rather than crashing the feature.
+
+### The estimate, and the model
+
+Everything past the recorded date is an estimate and is labelled as one.
+The basis is stated on the screen — "Using a 28-day estimate" — and the
+length is the user's own choice, 21 to 40 days, on a `+`/`−` stepper like
+Meditation's duration. Changing it changes estimates only; the recorded
+dates are passed through untouched, and the note under the stepper says
+so.
+
+The phase model is deliberately simple arithmetic, documented in full on
+`phaseSpansFor`:
+
+| Phase | 28-day cycle | Rule |
+|---|---|---|
+| Menstrual | days 1–5 | always, since bleeding length is not recorded |
+| Follicular | days 6–13 | whatever is left before the window |
+| Ovulatory | days 14–16 | three days from `length − 14` |
+| Luteal | days 17–28 | the day after the window, to the end |
+
+A window rather than a claimed day, because a single day would be a claim
+this app cannot make. A day past the end of the estimate stays luteal and
+says "This cycle is longer than the estimate so far. That is simply what
+has been recorded." At the extremes of the allowed range the wording gets
+more cautious still.
+
+Every phase is announced as "Approximate follicular phase", and each
+carries one reflective line — "Something is beginning to build." —
+followed always by **"Your experience may be different."**
+
+### Pure, and injected with today
+
+`cycleMomentAt({today, data})` is a pure function: no clock, no random, no
+side effects, no logging. `todayProvider` is the single place the clock
+becomes a date, which is what lets a test walk a whole cycle a day at a
+time and check every boundary. Observed cycle lengths are shown as
+history — "Recorded cycle length: 28 days" — and never silently become the
+estimate.
+
+### The calendar
+
+A hand-built seven-column grid, no calendar package. Recorded dates are
+drawn as a filled disc; estimated ones as a ring of twelve short dashes —
+a different *shape*, not a different colour — and each cell's semantics
+says "Recorded period start" or "Estimated period start" in words. A
+legend names both. With one date recorded there is no history to estimate,
+so none is invented: estimates only ever run forwards. Tapping a recorded
+date offers edit or delete; an estimate cannot be tapped, because there is
+nothing there to change. The picker's `lastDate` is today, so a future
+date cannot be chosen at all — and the controller refuses one anyway.
+
+At a large text size the grid grows with the text and scrolls sideways
+rather than squeezing the numbers, which is the same rule the navigation
+bar has followed since Step 6.
+
+### Deleting means deleting
+
+Both deletions confirm first. "Delete your cycle history?" — "Your
+recorded cycle dates will be removed from this device." — **Delete** /
+**Keep**. Confirming clears memory and storage together and lands back on
+the first-use screen, which the tests check by reopening the store.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -509,7 +621,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-845 tests. The ones worth knowing about:
+948 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -551,3 +663,15 @@ flutter test
 - `chakras_screen_test.dart` opens each of the seven in turn, writes and
   discards reflections, and checks the touch targets, the semantics, 2x
   text and that nothing is animating once the screen has arrived.
+- `calendar_date_test.dart` checks date arithmetic across month, year and
+  leap-year boundaries, and across both British daylight-saving changes.
+- `cycle_calculator_test.dart` walks a whole cycle a day at a time, pins
+  every phase boundary at 21, 28 and 40 days, and greps the domain for
+  anything that predicts fertility or reads a clock.
+- `cycle_store_test.dart` drives the real preferences-backed store
+  through the plugin's in-memory implementation: a restart keeps the
+  dates, deleting removes both keys, and nothing lands outside the
+  `cycle.` prefix.
+- `cycle_screen_test.dart` records, edits and deletes dates through the
+  real screens, and checks that an estimate never looks or sounds like a
+  recorded date.

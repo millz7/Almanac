@@ -271,20 +271,20 @@ void main() {
     testWidgets('a feature switched off and on again still works', (
       tester,
     ) async {
-      final container = await pumpApp(tester, features: {FeatureId.cycle});
+      final container = await pumpApp(tester, features: {FeatureId.cookbook});
       final settings = container.read(userSettingsProvider.notifier);
 
-      await tester.tap(find.bySemanticsLabel('Cycle'));
+      await tester.tap(find.bySemanticsLabel('Cookbook'));
       await tester.pumpAndSettle();
 
-      await settings.setFeatureChosen(FeatureId.cycle, false);
+      await settings.setFeatureChosen(FeatureId.cookbook, false);
       await tester.pumpAndSettle();
       expect(destinationsOf(tester), ['Environment']);
 
-      await settings.setFeatureChosen(FeatureId.cycle, true);
+      await settings.setFeatureChosen(FeatureId.cookbook, true);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Cycle'));
+      await tester.tap(find.bySemanticsLabel('Cookbook'));
       await tester.pumpAndSettle();
       expect(find.text('Coming soon'), findsOneWidget);
     });

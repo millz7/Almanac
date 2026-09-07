@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/features/feature_registry.dart';
 import '../../features/chakras/presentation/chakras_screen.dart';
+import '../../features/cycle/presentation/cycle_screen.dart';
 import '../../features/environment/presentation/environment_screen.dart';
 import '../../features/meditation/presentation/meditation_screen.dart';
 import '../../features/placeholder/presentation/feature_screen.dart';
@@ -22,7 +23,7 @@ Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.meditation => const MeditationScreen(),
   FeatureId.yoga => const YogaScreen(),
   FeatureId.chakras => const ChakrasScreen(),
-  FeatureId.cycle ||
+  FeatureId.cycle => const CycleScreen(),
   FeatureId.cookbook ||
   FeatureId.garden ||
   FeatureId.natureLog => FeatureScreen(feature: feature),

@@ -72,6 +72,13 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  # Test-only, and already in the tree as a transitive dependency of
+  # shared_preferences: it carries the plugin's own in-memory
+  # implementation, which lets the Cycle store's real serialisation and
+  # its delete-everything be tested rather than mocked. Nothing in
+  # `lib/` imports it.
+  shared_preferences_platform_interface: ^2.4.2
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
