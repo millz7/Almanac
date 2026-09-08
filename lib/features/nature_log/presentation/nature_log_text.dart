@@ -42,13 +42,24 @@ abstract final class NatureLogText {
   static const nothingAroundNow =
       'Nothing in the Nature Book has a note for this month.';
   static const noGuideHere =
-      'Your Nature Book does not yet have a regional guide for this area.';
+      'Your Nature Book does not know which regional guide applies here '
+      'yet.';
   static const noGuideNote =
       'You can still record whatever you notice — the log is yours, '
       'wherever you are.';
-  static const unconfirmedGuide =
-      'Location is off, so this is the New Zealand guide rather than one '
-      'chosen for your area.';
+
+  /// Said only when the reason is that no position was resolved. It
+  /// explains; it does not ask, and there is no button beside it.
+  static const noLocationNote =
+      'Location is off, so seasonal species suggestions are not being '
+      'shown.';
+
+  /// Said where the whole book is on offer, so browsing a reference
+  /// catalogue is never mistaken for being told these things are
+  /// around you now.
+  static const bookIsReference =
+      'The whole Nature Book is here to read and record from, wherever '
+      'you are.';
   static const logEmpty = 'Nothing noticed yet.';
   static const logEmptyNote =
       'Anything you record stays here, in the order you noticed it.';
@@ -129,7 +140,8 @@ abstract final class NatureLogText {
     nothingAroundNow,
     noGuideHere,
     noGuideNote,
-    unconfirmedGuide,
+    noLocationNote,
+    bookIsReference,
     logEmpty,
     logEmptyNote,
     removeTitle,

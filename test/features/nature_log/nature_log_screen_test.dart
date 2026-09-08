@@ -176,18 +176,53 @@ void main() {
 
       expect(find.text('October · Spring'), findsOneWidget);
       expect(find.text(NatureCoverage.newZealand.label), findsOneWidget);
-      expect(find.text(NatureLogText.unconfirmedGuide), findsNothing);
+      expect(find.text(NatureLogText.noGuideHere), findsNothing);
+      expect(find.text(NatureLogText.noLocationNote), findsNothing);
     });
 
-    testWidgets('and says when the guide is only a hemisphere guess', (
+    testWidgets('with no location there is no guide, in either hemisphere', (
+      tester,
+    ) async {
+      for (final hemisphere in Hemisphere.values) {
+        await openNatureLog(
+          tester,
+          hemisphere: hemisphere,
+          locationState: const LocationPermissionDenied(),
+        );
+
+        // The season still follows the hemisphere; the guide does not
+        // exist either way.
+        expect(
+          find.text(NatureLogText.noGuideHere),
+          findsOneWidget,
+          reason: hemisphere.name,
+        );
+        expect(
+          find.text(NatureCoverage.newZealand.label),
+          findsNothing,
+          reason: hemisphere.name,
+        );
+      }
+    });
+
+    testWidgets('and says once why, without asking for anything', (
       tester,
     ) async {
       await openNatureLog(
         tester,
+        hemisphere: Hemisphere.southern,
         locationState: const LocationPermissionDenied(),
       );
 
-      expect(find.text(NatureLogText.unconfirmedGuide), findsOneWidget);
+      expect(find.text(NatureLogText.noLocationNote), findsOneWidget);
+      // An explanation, not a prompt: nothing on the page offers to
+      // turn location on.
+      expect(
+        find.textContaining(
+          RegExp('enable|turn on|allow location', caseSensitive: false),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('and says plainly when there is no guide here', (tester) async {
@@ -197,6 +232,9 @@ void main() {
       );
 
       expect(find.text(NatureLogText.noGuideHere), findsOneWidget);
+      // Outside the coverage, not unlocated: there is nothing to
+      // explain about location here.
+      expect(find.text(NatureLogText.noLocationNote), findsNothing);
       // The way in is still there: the log works everywhere.
       expect(recordSomething, findsOneWidget);
     });
@@ -292,6 +330,38 @@ void main() {
       // Not one New Zealand species suggested to somebody in London.
       expect(find.byType(NatureMark), findsNothing);
       expect(entry('Tūī'), findsNothing);
+    });
+
+    testWidgets('and with no location it offers nothing either', (
+      tester,
+    ) async {
+      for (final hemisphere in Hemisphere.values) {
+        await openNatureLog(
+          tester,
+          hemisphere: hemisphere,
+          locationState: const LocationPermissionDenied(),
+        );
+        await press(tester, route(NatureLogText.aroundNow));
+
+        expect(
+          find.text(NatureLogText.noGuideHere),
+          findsOneWidget,
+          reason: hemisphere.name,
+        );
+        expect(
+          find.text(NatureLogText.noGuideNote),
+          findsOneWidget,
+          reason: hemisphere.name,
+        );
+        expect(
+          find.text(NatureLogText.noLocationNote),
+          findsOneWidget,
+          reason: hemisphere.name,
+        );
+        // Southern hemisphere is not evidence of New Zealand.
+        expect(find.byType(NatureMark), findsNothing, reason: hemisphere.name);
+        expect(entry('Tūī'), findsNothing, reason: hemisphere.name);
+      }
     });
 
     testWidgets('the fungi shelf says what it is not', (tester) async {
@@ -592,6 +662,140 @@ void main() {
           reason: word,
         );
       }
+    });
+  });
+
+  group('with no location at all', () {
+    testWidgets('the Nature Book is still browsable, and says it is a book', (
+      tester,
+    ) async {
+      await openNatureLog(
+        tester,
+        hemisphere: Hemisphere.southern,
+        locationState: const LocationPermissionDenied(),
+      );
+      await press(tester, recordSomething);
+
+      // Browsing a reference catalogue is not a claim that these things
+      // are around you, and the page says which it is.
+      expect(find.text(NatureLogText.bookIsReference), findsOneWidget);
+      for (final category in NatureCategory.values) {
+        expect(
+          find.widgetWithText(SectionHeader, category.plural),
+          findsOneWidget,
+          reason: category.name,
+        );
+      }
+      expect(entry('Tūī'), findsOneWidget);
+      expect(entry('Pōhutukawa'), findsOneWidget);
+    });
+
+    testWidgets('a book entry can still be recorded', (tester) async {
+      final container = await openNatureLog(
+        tester,
+        locationState: const LocationPermissionDenied(),
+      );
+
+      await press(tester, recordSomething);
+      await press(tester, entry('Tūī'));
+      await press(tester, saveObservation);
+
+      final saved = container.read(natureLogProvider).value!.recent.single;
+      expect(saved.itemId, 'tui');
+      expect(saved.label, 'Tūī');
+      expect(entry('Tūī'), findsOneWidget);
+    });
+
+    testWidgets('a custom observation can still be recorded', (tester) async {
+      final container = await openNatureLog(
+        tester,
+        locationState: const LocationPermissionDenied(),
+      );
+
+      await recordCustom(tester, 'Tiny green beetle', place: 'Back garden');
+
+      final saved = container.read(natureLogProvider).value!.recent.single;
+      expect(saved.label, 'Tiny green beetle');
+      expect(saved.placeLabel, 'Back garden');
+    });
+
+    testWidgets('and it can be edited, removed and cleared', (tester) async {
+      final container = await openNatureLog(
+        tester,
+        locationState: const LocationPermissionDenied(),
+      );
+      await recordCustom(tester, 'A moth');
+
+      await press(tester, entry('A moth'));
+      await type(tester, NatureLogText.noteLabel, 'On the window');
+      await press(tester, saveChanges);
+      expect(
+        container.read(natureLogProvider).value!.recent.single.note,
+        'On the window',
+      );
+
+      await press(
+        tester,
+        find.widgetWithText(TextButton, NatureLogText.remove),
+      );
+      await press(tester, dialogButton(NatureLogText.remove));
+      expect(container.read(natureLogProvider).value!.isEmpty, isTrue);
+    });
+
+    testWidgets('and opening all of it asks for no permission', (tester) async {
+      final service = FakeLocationService(
+        checkResult: const LocationPermissionNotRequested(),
+      );
+      final container = ProviderContainer(
+        overrides: environmentOverrides(
+          now: october,
+          timeZone: TestTimeZones.wellington,
+          hemisphere: Hemisphere.southern,
+          locationService: service,
+          features: {FeatureId.natureLog},
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const AlmanacApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(navTab(NatureLogText.title));
+      await tester.pumpAndSettle();
+
+      // Every page, then the whole recording flow.
+      await press(tester, route(NatureLogText.aroundNow));
+      await press(tester, back);
+      await press(tester, route(NatureLogText.myObservations));
+      await press(tester, back);
+      await press(tester, recordSomething);
+      await press(tester, writeYourOwn);
+      await type(tester, NatureLogText.nameLabel, 'A moth');
+      await press(tester, saveObservation);
+
+      expect(service.requestCount, 0);
+      expect(container.read(natureLogProvider).value!.length, 1);
+    });
+
+    testWidgets('and no coordinate reaches storage', (tester) async {
+      final store = InMemoryNatureLogStore();
+      await openNatureLog(
+        tester,
+        store: store,
+        locationState: const LocationPermissionDenied(),
+      );
+
+      await recordCustom(tester, 'A moth', place: 'Kitchen');
+
+      final stored = encodeLog(await store.read()).join('\n');
+      expect(stored, contains('A moth'));
+      expect(stored, contains('Kitchen'));
+      expect(stored, isNot(contains('latitude')));
+      expect(stored, isNot(contains('longitude')));
     });
   });
 

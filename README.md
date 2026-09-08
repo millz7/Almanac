@@ -23,7 +23,8 @@ season. **Garden** is a gardening almanac: what is worth sowing,
 planting, tending, harvesting or pruning where you are, now, and a record
 of what you actually grow. **Nature Log** is the last of them: a quiet
 personal record of what you have noticed, beside a modest offline guide
-to what is often about at this time of year.
+to what is often about at this time of year — offered only where the app
+actually knows the guide applies.
 
 ## Getting started
 
@@ -919,19 +920,61 @@ in New Zealand can meet — so the honest model is "the guide covers this,
 or it does not". Inventing ecological subregions from a coarse position
 would be inventing precision.
 
-`NatureGuide.resolve` reads the environment the rest of the app already
-worked out. A shared position inside a generous box around New Zealand
-(including Stewart Island and the Chathams) gets the guide, sourced from
-`location`. A position outside it gets no guide, because the book has no
-content for there. With no position at all the hemisphere is the only
-signal: the southern hemisphere is offered the guide **marked
-unconfirmed**, and says so on screen; the northern hemisphere is offered
-nothing, since New Zealand species in a Vermont spring would be
-nonsense.
+`NatureGuide.resolve` takes a `LocationState` **and nothing else**:
 
-Either way the log works. Coverage gates suggestions, never the user's
-own record — somebody in London can record a robin, and the Nature Book
-is still there to record from.
+| Input | Coverage | Source |
+|---|---|---|
+| Position inside a generous box around New Zealand (including Stewart Island and the Chathams) | `newZealand` | `location` |
+| Position outside it | `unsupported` | `location` |
+| No position resolved, whatever the hemisphere | `unsupported` | `noLocation` |
+
+**A hemisphere is not evidence of a country.** This is the line the
+feature holds, and it is worth stating precisely, because the two halves
+look similar and are not:
+
+- **Astronomical season can be known from hemisphere.** It is a fact
+  about the sun and the date. The Environment, the Cookbook, the Garden
+  and Nature Log's own context line all read it from
+  `currentSeasonProvider`, which resolves through
+  `resolvedHemisphereProvider`, and that is correct.
+- **Ecological regional coverage cannot.** Somebody in Australia, Chile
+  or South Africa can choose the southern hemisphere and decline
+  location. Offering them New Zealand's birds would be claiming to know
+  something the app has not been told. Nature Log follows the Almanac
+  principle: *do not infer more environmental knowledge than we actually
+  have.*
+
+So the hemisphere is not a parameter of `resolve` — not merely unused,
+but absent, so it cannot quietly become a fallback again. There is a
+test that greps the file (comments stripped) for the word, and one that
+asserts the two hemispheres with no position produce the *identical*
+`NatureGuide` while still producing different seasons.
+
+Coverage gates suggestions and nothing else. With no location the user
+can still record something, browse the whole Nature Book, record from
+it, write a custom observation, and view, edit, delete and clear their
+log. Only Around now is unavailable, and the screen explains that once,
+quietly, without a prompt and without a button:
+
+```
+Your Nature Book does not know which regional guide applies here yet.
+You can still record whatever you notice — the log is yours, wherever
+you are.
+Location is off, so seasonal species suggestions are not being shown.
+```
+
+The third line appears only when the reason is that no position was
+resolved (`isUnlocated`) — somebody with a London fix is outside the
+coverage, not unlocated, and has nothing to be told about location. A
+test asserts the page contains no "enable", "turn on" or "allow
+location" wording anywhere.
+
+**Browsing the book is not a claim about here.** The bundled New Zealand
+catalogue stays fully browsable and recordable wherever the user is,
+because reading a reference catalogue is a different act from being told
+its species are around you now. The recording page says which it is —
+"The whole Nature Book is here to read and record from, wherever you
+are." — and that distinction is tested on both sides.
 
 ### The Nature Book
 
@@ -1050,7 +1093,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,315 tests. The ones worth knowing about:
+1,328 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -1136,10 +1179,13 @@ flutter test
   species.
 - `nature_log_environment_test.dart` proves the shared seams are shared —
   `todayProvider` is the same provider object Cycle and Garden read —
-  checks coverage for Auckland, Dunedin, the Chathams, London and Sydney,
-  that opening the feature asks for no permission, that a live position
-  still writes no coordinate, and that the feature calculates no date,
-  season, hemisphere or position of its own.
+  checks coverage for Wellington, Auckland, Dunedin, the Chathams, London
+  and Sydney, that **no position means no guide in either hemisphere**
+  (and that the two hemispheres then produce the identical guide while
+  still producing different seasons), that opening the feature asks for
+  no permission, that a live position still writes no coordinate, and
+  that the feature calculates no date, season, hemisphere or position of
+  its own.
 - `nature_log_store_test.dart` drives the real store through a restart,
   drops nine kinds of malformed line one at a time, keeps an item id from
   a later version, and checks that free text with quotes, pipes and
@@ -1147,4 +1193,9 @@ flutter test
 - `nature_log_screen_test.dart` records from the book and in the user's
   own words through the real screens, edits, removes, cancels a removal,
   clears the log, and checks the empty state, the unsupported-region
-  fallback, the semantics, 48 dp targets, 2× text and reduced motion.
+  fallback, the semantics, 48 dp targets, 2× text and reduced motion. A
+  whole group drives the no-location experience end to end: browsing the
+  book, recording from it, recording a custom observation, editing and
+  removing, that Around now offers nothing in *either* hemisphere, that
+  the page never asks for location, and that no coordinate reaches
+  storage.

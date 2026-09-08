@@ -16,16 +16,16 @@ export '../domain/observation.dart';
 
 /// Which nature guide applies where the user is.
 ///
-/// Reads the environment the rest of the app already resolved — the same
-/// location state and hemisphere the Environment screen shows — and
-/// turns it into coverage. It never asks for permission: opening the
-/// Nature Log must not make the phone put up a dialog, and there is a
-/// test for that.
+/// Reads the location state the rest of the app already resolved — and
+/// nothing else. The hemisphere is deliberately not consulted: it
+/// settles the astronomical season, which the screens read from
+/// `currentSeasonProvider`, but it cannot settle which species guide
+/// applies. See [NatureGuide.resolve].
+///
+/// It never asks for permission: opening the Nature Log must not make
+/// the phone put up a dialog, and there is a test for that.
 final natureGuideProvider = Provider<NatureGuide>(
-  (ref) => NatureGuide.resolve(
-    location: ref.watch(locationStateProvider),
-    hemisphere: ref.watch(resolvedHemisphereProvider).hemisphere,
-  ),
+  (ref) => NatureGuide.resolve(location: ref.watch(locationStateProvider)),
 );
 
 /// Where the Nature Log is kept. Tests override it; the app uses the

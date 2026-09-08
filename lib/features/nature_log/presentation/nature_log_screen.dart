@@ -417,10 +417,10 @@ class _Landing extends ConsumerWidget {
           guide.isSupported ? guide.coverage.label : NatureLogText.noGuideHere,
           style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
         ),
-        if (guide.isUnconfirmed) ...[
+        if (guide.isUnlocated) ...[
           const SizedBox(height: AppSpacing.xs),
           Text(
-            NatureLogText.unconfirmedGuide,
+            NatureLogText.noLocationNote,
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
         ],
@@ -490,6 +490,17 @@ class _AroundNowList extends ConsumerWidget {
           Text(NatureLogText.noGuideHere, style: textTheme.bodyLarge),
           const SizedBox(height: AppSpacing.sm),
           Text(NatureLogText.noGuideNote, style: textTheme.bodyMedium),
+          // Only when the reason is that we do not know where they are,
+          // and only as an explanation. No prompt, and no button.
+          if (around.guide.isUnlocated) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              NatureLogText.noLocationNote,
+              style: textTheme.bodySmall?.copyWith(
+                color: context.palette.textSecondary,
+              ),
+            ),
+          ],
         ],
       );
     }
@@ -501,15 +512,6 @@ class _AroundNowList extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (around.guide.isUnconfirmed) ...[
-          Text(
-            NatureLogText.unconfirmedGuide,
-            style: textTheme.bodySmall?.copyWith(
-              color: context.palette.textSecondary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
         for (final category in NatureCategory.values)
           if (around.ofCategory(category) case final found
               when found.isNotEmpty) ...[
@@ -560,6 +562,15 @@ class _BookList extends StatelessWidget {
       children: [
         if (forRecording) ...[
           Text(NatureLogText.whatDidYouNotice, style: textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.xs),
+          // The book is a reference, not a claim about this place: it is
+          // all here whether or not a regional guide could be resolved.
+          Text(
+            NatureLogText.bookIsReference,
+            style: textTheme.bodySmall?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
           const SizedBox(height: AppSpacing.sm),
           // The other half of the answer: not everything worth noticing
           // is in a book.

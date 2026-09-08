@@ -19,6 +19,7 @@ import '../../support/test_overrides.dart';
 const auckland = GeoLocation(latitude: -36.85, longitude: 174.76);
 const dunedin = GeoLocation(latitude: -45.87, longitude: 170.5);
 const chathams = GeoLocation(latitude: -43.95, longitude: 176.55);
+const wellington = GeoLocation(latitude: -41.29, longitude: 174.78);
 const london = GeoLocation(latitude: 51.51, longitude: -0.13);
 const sydney = GeoLocation(latitude: -33.87, longitude: 151.21);
 
@@ -77,8 +78,17 @@ void main() {
     });
 
     test('the suggestions follow the month, and only the month', () {
-      final september = containerWith(now: DateTime.utc(2026, 9, 15, 0));
-      final march = containerWith(now: DateTime.utc(2026, 3, 15, 0));
+      // A position, because that is now the only thing that resolves a
+      // guide — and the same position in both, so the month is the one
+      // thing that differs.
+      final september = containerWith(
+        now: DateTime.utc(2026, 9, 15, 0),
+        locationState: const LocationAvailable(wellington),
+      );
+      final march = containerWith(
+        now: DateTime.utc(2026, 3, 15, 0),
+        locationState: const LocationAvailable(wellington),
+      );
 
       final spring = september.read(aroundNowProvider);
       final autumn = march.read(aroundNowProvider);
@@ -103,7 +113,18 @@ void main() {
       final guide = container.read(natureGuideProvider);
       expect(guide.coverage, NatureCoverage.newZealand);
       expect(guide.source, NatureCoverageSource.location);
-      expect(guide.isUnconfirmed, isFalse);
+      expect(guide.isUnlocated, isFalse);
+      expect(container.read(aroundNowProvider).suggestions, isNotEmpty);
+    });
+
+    test('and so does Wellington', () {
+      final container = containerWith(
+        locationState: const LocationAvailable(wellington),
+      );
+
+      final guide = container.read(natureGuideProvider);
+      expect(guide.coverage, NatureCoverage.newZealand);
+      expect(guide.source, NatureCoverageSource.location);
       expect(container.read(aroundNowProvider).suggestions, isNotEmpty);
     });
 
@@ -140,28 +161,66 @@ void main() {
       }
     });
 
-    test('the southern hemisphere with no position is offered it, hedged', () {
+    test('no position means no guide, in the southern hemisphere', () {
       final container = containerWith(hemisphere: Hemisphere.southern);
 
+      // The correction: somebody in Australia, Chile or South Africa
+      // can choose the southern hemisphere and decline location. The
+      // hemisphere settles the season; it never settles the species
+      // guide.
       final guide = container.read(natureGuideProvider);
-      expect(guide.coverage, NatureCoverage.newZealand);
-      expect(guide.source, NatureCoverageSource.hemisphere);
-      // Offered, and marked as a guess rather than a fact about where
-      // they are.
-      expect(guide.isUnconfirmed, isTrue);
-    });
-
-    test('the northern hemisphere with no position is offered nothing', () {
-      final container = containerWith(hemisphere: Hemisphere.northern);
-
-      expect(
-        container.read(natureGuideProvider).coverage,
-        NatureCoverage.unsupported,
-      );
+      expect(guide.coverage, NatureCoverage.unsupported);
+      expect(guide.source, NatureCoverageSource.noLocation);
+      expect(guide.isUnlocated, isTrue);
       expect(container.read(aroundNowProvider).suggestions, isEmpty);
     });
 
-    test('a refused or denied permission is coverage by hemisphere', () {
+    test('and no guide in the northern hemisphere either', () {
+      final container = containerWith(hemisphere: Hemisphere.northern);
+
+      final guide = container.read(natureGuideProvider);
+      expect(guide.coverage, NatureCoverage.unsupported);
+      expect(guide.source, NatureCoverageSource.noLocation);
+      expect(container.read(aroundNowProvider).suggestions, isEmpty);
+    });
+
+    test('so with no position the two hemispheres are one answer', () {
+      final south = containerWith(hemisphere: Hemisphere.southern);
+      final north = containerWith(hemisphere: Hemisphere.northern);
+
+      // Identical guides: the hemisphere is not an input to this.
+      expect(south.read(natureGuideProvider), north.read(natureGuideProvider));
+      // And the season still differs, from the provider that decides it.
+      expect(
+        south.read(currentSeasonProvider),
+        isNot(north.read(currentSeasonProvider)),
+      );
+    });
+
+    test('and the hemisphere is not even a parameter of the decision', () {
+      // Structural rather than behavioural: `resolve` takes a location
+      // and nothing else, so a hemisphere cannot quietly become a
+      // fallback again.
+      expect(
+        NatureGuide.resolve(location: const LocationPermissionDenied()),
+        const NatureGuide(
+          coverage: NatureCoverage.unsupported,
+          source: NatureCoverageSource.noLocation,
+        ),
+      );
+
+      // Comments are stripped first: the file explains in prose why a
+      // hemisphere is not enough, and a check that tripped on that
+      // sentence would be measuring the wrong thing.
+      final code = File('lib/features/nature_log/domain/nature_coverage.dart')
+          .readAsLinesSync()
+          .where((line) => !line.trimLeft().startsWith('//'))
+          .join('\n');
+      expect(code, isNot(contains('Hemisphere')));
+      expect(code, isNot(contains('hemisphere')));
+    });
+
+    test('a refused or denied permission is no guide, whatever the reason', () {
       for (final state in const [
         LocationPermissionDenied(),
         LocationPermissionPermanentlyDenied(),
@@ -173,9 +232,12 @@ void main() {
           hemisphere: Hemisphere.southern,
         );
 
+        final guide = container.read(natureGuideProvider);
+        expect(guide.source, NatureCoverageSource.noLocation, reason: '$state');
+        expect(guide.coverage, NatureCoverage.unsupported, reason: '$state');
         expect(
-          container.read(natureGuideProvider).source,
-          NatureCoverageSource.hemisphere,
+          container.read(aroundNowProvider).suggestions,
+          isEmpty,
           reason: '$state',
         );
       }
@@ -216,6 +278,32 @@ void main() {
       // suggestions, never the user's own record.
       expect(container.read(aroundNowProvider).suggestions, isEmpty);
       expect(container.read(natureLogProvider).value!.length, 1);
+    });
+
+    test('and the whole Nature Book is still there to browse', () {
+      final container = containerWith(hemisphere: Hemisphere.southern);
+
+      // Reading a reference catalogue is a different act from being
+      // told its species are around you now. Coverage withholds the
+      // second, never the first.
+      expect(container.read(natureGuideProvider).isSupported, isFalse);
+      expect(NatureBook.all, hasLength(50));
+      for (final category in NatureCategory.values) {
+        expect(NatureBook.ofCategory(category), isNotEmpty);
+      }
+    });
+
+    test('and a Nature Book entry can still be recorded from it', () async {
+      final container = containerWith(hemisphere: Hemisphere.southern);
+      await container.read(natureLogProvider.future);
+
+      await container
+          .read(natureLogProvider.notifier)
+          .recordFromBook(item: NatureBook.byId('tui'));
+
+      final saved = container.read(natureLogProvider).value!.recent.single;
+      expect(saved.itemId, 'tui');
+      expect(saved.label, 'Tūī');
     });
 
     test('and outside the guide, with a place in their own words', () async {
