@@ -2,23 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/widgets/widgets.dart';
-import '../../domain/moon_meditation.dart';
+import '../../domain/meditation_technique.dart';
 
-/// The small contextual area Meditation shows when today's moon is worth
+/// The small contextual area Meditation shows when today is worth
 /// mentioning.
 ///
-/// **One Almanac, two views of the same evening.** The Moon page and the
-/// Meditation page are looking at the same phase; this is where
-/// Meditation says so. It is deliberately a quiet block above the usual
-/// choices, not a redesign: the four practices below it are unchanged
-/// and all still offered.
+/// **One Almanac, several views of the same day.** The Moon page and
+/// Cycle Syncing are both looking at today; this is where Meditation
+/// answers. Deliberately a quiet block above the usual choices, not a
+/// redesign: the four practices below it are unchanged and all still
+/// offered.
 ///
-/// Two ways in, one widget:
-///
-/// * **Arrived from the Moon** — the heading names the phase, because
-///   that is what the user just tapped.
-/// * **Opened normally** — the same suggestion, headed "For today", so
-///   the moon is mentioned rather than announced.
+/// **Context-agnostic on purpose.** It is handed a heading, a practice
+/// and a line — so the moon and the cycle use the same card and neither
+/// context has a card of its own to drift from the other. Meditation may
+/// show two of these at once; they are two observations and never one
+/// claim.
 ///
 /// The button selects one of the four practices that already exist. It
 /// does not start a session, and it does not open a different screen.
@@ -26,14 +25,19 @@ class MoonContextCard extends StatelessWidget {
   const MoonContextCard({
     super.key,
     required this.heading,
-    required this.suggestion,
+    required this.technique,
+    required this.invitation,
     required this.onBegin,
   });
 
-  /// "For today's New Moon", or "For today".
+  /// "For today's New Moon", "For your luteal phase", "New Moon".
   final String heading;
 
-  final MoonMeditation suggestion;
+  /// One of the four practices that already exist.
+  final MeditationTechnique technique;
+
+  /// One line. An invitation, not a prescription.
+  final String invitation;
 
   /// Selects the suggested practice, exactly as tapping it in the list
   /// below would.
@@ -43,7 +47,6 @@ class MoonContextCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
-    final technique = MoonMeditations.techniqueFor(suggestion.phase);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,7 +58,7 @@ class MoonContextCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Text(technique.name, style: textTheme.titleMedium),
         const SizedBox(height: AppSpacing.xs),
-        Text(suggestion.invitation, style: textTheme.journalNote),
+        Text(invitation, style: textTheme.journalNote),
         const SizedBox(height: AppSpacing.sm),
         Align(
           alignment: Alignment.centerLeft,

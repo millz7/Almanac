@@ -17,7 +17,8 @@ four breathing practices, a glowing orb, and nothing else on screen once
 you begin. **Yoga** is built too: three short practices, choose then
 prepare then move. **Chakras** is a quiet visual pause — seven traditional
 centres down an abstract body line, one at a time. **Cycle** records one
-thing, the first day of a period, and counts quietly from it.
+thing — the days you bleed — and counts quietly from them, beside the
+real moon.
 **Cookbook** is a small seasonal cookbook — sixteen recipes, four to a
 season. **Garden** is a gardening almanac: what is worth sowing,
 planting, tending, harvesting or pruning where you are, now, and a record
@@ -72,6 +73,23 @@ features`, and a test greps `lib/core/` to keep it that way. An intent
 is a value and core owns it; turning one into a journey needs the
 navigation shell and a feature's branch, which are the app's business, so
 `AlmanacDoorway` lives in the app layer rather than in `core/widgets/`.
+
+`CyclePhase` lives in `core/context/` for the same reason: four features
+now speak about a phase — Cycle works one out, and the Cookbook, Yoga and
+Meditation each answer for what they would offer during it — and four
+private copies of the word would be four vocabularies that can drift.
+The *meaning* stays with each feature: Cycle owns how a phase is
+estimated, the Cookbook owns which recipes suit one, Yoga owns which
+practice, Meditation owns which breathing.
+
+Where a feature needs another feature's *state* rather than a value —
+"is there a cycle phase to answer for?" — the wire is soldered in
+`lib/app/context/`, because the app layer is the composition root and
+already knows every feature exists. `almanacCyclePhaseProvider` is the
+one such seam today, and it exposes a phase or null.
+
+Built pathways: Moon → Meditation; Cycle → Cookbook, Yoga and
+Meditation.
 
 `currentMoonProvider` and `currentDaylightProvider` are **selectors**,
 written the same way `currentSeasonProvider` already was: they prefer
@@ -559,42 +577,251 @@ sync, no network, no analytics, and no new permissions.
 
 ## Cycle
 
-Notice where you are in your cycle. It records one thing — the first day
-of a period — and does arithmetic on it. The biggest thing on the screen
-is **Cycle day 12**, not a chart.
+Three layers, and they stay apart.
 
-### What it does not do
+**Cycle home** observes the current cycle beside the real moon.
+**Calendar** records bleeding — the only factual thing in the feature.
+**Cycle Syncing** explores the current phase through food, movement and
+reflection, with optional doorways into the rest of the Almanac.
 
-No fertility prediction, no probability of anything, no ovulation
-diagnosis, no pregnancy, no contraception, no symptom tracker, no mood
-log, no score, no streak, no notifications, no export, no sharing. It
-makes no medical claim and never says a calculated date is certain.
+Cycle is an **inner page of the Almanac**, so it is written on paper: the
+same warm cream in every season and at every hour, no landscape, and no
+dark version after dark. The Environment outside is the living painting;
+this is the book.
 
-`cycle_content_test.dart` reads every string the feature can show against
-a list of clinical words and a list of gamified ones, and separately
-against a list of over-claims ("you are ovulating", "guaranteed",
-"accurate"). `cycle_calculator_test.dart` greps the domain itself for
-anything that computes fertility, conception or pregnancy.
+### The bleeding model
+
+The old model recorded one thing — the days a period began. That is no
+longer enough, so records are now daily:
+
+```
+enum BleedingLevel { spotting, bleeding, heavy }
+
+CycleDayRecord { CalendarDate date, BleedingLevel level, bool isPeriodStart }
+```
+
+The date is the id, so two records for a day are the same record. There
+is deliberately **no `none`**: absence of a record *is* "nothing
+recorded", so clearing a day removes its record rather than writing a
+zero.
+
+**Spotting is not bleeding, and never begins a cycle.** Somebody may spot
+at any point in a month, and treating that as day 1 would silently
+restart their cycle. So `BleedingLevel.canStartPeriod` is false for it,
+the editor does not offer the control, and `CycleData` drops the flag
+even if a caller — or an old stored line — claims otherwise. The product
+example is a test:
+
+```
+2 Sep spotting · 3 Sep spotting · 4 Sep bleeding · 5 Sep heavy · 6 Sep bleeding
+                                   ↑ cycle day 1
+```
+
+Day 1 is the 4th, not the 2nd, and every one of those five records
+survives exactly as entered.
+
+### Day 1 is the user's, and correctable
+
+`isPeriodStart` is a property of a bleeding day, so there is one list of
+days and no separate list of starts to fall out of step with it. The
+editor shows **"First day of period"** as a plain switch for Bleeding and
+Heavy bleeding, and never for Spotting.
+
+The app offers a default — `looksLikeNewEpisode`, true when nothing was
+recorded in the three days before — and that is **all** it is: the toggle
+stays visible, the user decides, and changing it recomputes the cycle day
+without touching a single bleeding record. Turning day 1 off leaves the
+day recorded as bleeding with no cycle counted from it.
+
+### Migrating Step 11
+
+An installation may hold `cycle.periodStarts`. Each of those dates
+becomes exactly one day of recorded bleeding marked as that period's day
+1 — and **nothing else**. The following four days are not invented,
+because the old data never claimed them. The assumed length is
+preserved.
+
+The migration is a pure function (`migrateLegacyStarts`), runs inside
+`read()`, and removes the legacy key as part of the same write — so it
+happens once and a restart finds nothing left to migrate. If the write
+fails the old key survives and the next launch tries again. There are
+twelve tests on it, including idempotence and that delete-all removes the
+old key too.
+
+### The month wheel is a data visualisation
+
+The wheel is a **lunar calendar for the current local month**: one
+position per calendar date, 28 or 29 in February, 30 in September, 31 in
+October. Each moon is the real phase for that date, from the app's one
+moon service — asked at **local midday**, because a record is a date and
+the service wants an instant, and midday is the furthest point from
+either midnight. There is no second lunar calculation, and a test greps
+the feature to keep it that way.
+
+**Mathematical consistency outranks composition**, so the geometry is a
+pure value (`CycleWheelGeometry`) and the properties that matter are
+proved rather than eyeballed:
+
+- **every moon has exactly the same diameter.** A new moon is not smaller
+  for being dark, a full moon is not larger, and **today's moon is not
+  larger either**;
+- every centre is the same distance from the middle;
+- the angular spacing is identical all the way round;
+- the moons never overlap at any month length.
+
+Today is marked by **one thin ring outside** its moon — a current-date
+indicator, not part of the moon artwork. Twenty-three tests hold the
+geometry, including all four month lengths and both February cases.
+
+### One symbol language for bleeding
+
+Three marks, defined once in `BleedingMarkers` and read by the wheel, the
+legend and the calendar alike:
+
+| | Inner dot | Extra ring |
+|---|---|---|
+| **Spotting** | 0.30 — visibly smaller | none |
+| **Bleeding** | 0.52 | none |
+| **Heavy bleeding** | **0.52 — the same** | **exactly one** |
+
+Heavy differs from bleeding by the ring and by nothing else, so the eye
+reads "more" rather than "different". A legend that disagreed with the
+chart it explains would need a second set of numbers, and there is not
+one.
+
+### The Calendar
+
+A month grid on the same paper, with arrows either side of the month
+name. Tapping a date opens a sheet: None · Spotting · Bleeding · Heavy
+bleeding, the Day-1 switch where it applies, Save, Cancel, and Remove for
+a day that already has a record. **Saving returns to the Calendar**, not
+to home, so five days in a row can be entered without navigating back in
+each time — which is a test.
+
+A day 1 adds a small "Day 1" caption *beside* its mark rather than
+instead of it, and every day states its record in words: "4 September.
+Heavy bleeding. First day of period." A future date is not tappable at
+all.
+
+### Cycle Syncing
+
+The displayed phase, then six passages: **Focus · About this phase ·
+Food · Movement · Mind · Duration**, separated by fine rules rather than
+boxed into cards.
+
+**The guidance always exists.** Feature choices control the doorways
+underneath it and never the words: the food ideas are present with the
+Cookbook switched off, the movement ideas with Yoga off, the reflective
+line with Meditation off. That is the app's firmest product rule and
+there are tests on both sides of every one of the three.
+
+Menstruation offers iron-containing foods by name — spinach, silverbeet,
+lentils, beans, tofu, eggs, red meat — and the vitamin-C pairing that
+helps absorption, because menstruation involves blood loss and that is
+worth knowing. It does **not** say anybody is deficient, needs a
+supplement, or should follow a diet. No detoxes, no seed cycling, no
+hormone-balancing foods, no guaranteed energy and no guaranteed mood —
+each of those is a test.
+
+### Adjusting the phase
+
+The estimate can be wrong about somebody. So:
+
+```
+displayedPhase = manualPhase ?? calculatedPhase
+```
+
+Choosing a phase changes **what is displayed** and nothing else: no
+record moves, no day 1 moves, and the estimate is still there underneath.
+"Use automatic estimate" hands it back. A **new recorded period start
+clears a stale override**, because that answer was about the cycle that
+has just ended — and ordinary bleeding on a day that is not a day 1 does
+not.
+
+With nothing recorded at all, Cycle Syncing offers the four phases to
+read about rather than guessing one, and says so: "There is no cycle to
+count from yet. Choose a phase to read about it."
+
+### The moon cycle type
+
+An optional reflective reading, derived from the moon on the recorded day
+1:
+
+| | Moon at day 1 |
+|---|---|
+| **White Moon cycle** | new moon |
+| **Red Moon cycle** | full moon |
+| **Pink Moon cycle** | waxing crescent · first quarter · waxing gibbous |
+| **Purple Moon cycle** | waning gibbous · last quarter · waning crescent |
+
+Framed once, as a tradition: "In some modern spiritual traditions, the
+moon a period begins under is given a name." Nothing about it is
+persisted — it is derived fresh each time — so somebody can be one this
+month and another next month, and the app says so: "It is derived from
+each period you record, so it can be different next month. **None of the
+four is better than another.**"
+
+**Moon data is astronomy; bleeding is the user's record.** They are drawn
+together and never conflated. Nothing anywhere says the moon moves a
+cycle, that a cycle should match the moon, or that one alignment is
+better — and a test checks for "should align", "in sync with the moon",
+"back in sync", "ideal alignment" and nine more.
+
+Cycle Syncing (menstrual, follicular, ovulatory, luteal) and the moon
+cycle type are different concepts and stay in different places.
+
+### Cross-feature pathways
+
+Three typed intents, all carrying a `CyclePhase` and no strings. Each
+destination owns its own answer, so Cycle never names a recipe, a pose or
+a breathing pattern:
+
+| From | To | Owned by | Mapping |
+|---|---|---|---|
+| Food | Cookbook | `CycleRecipes` | 5–6 of the sixteen recipes per phase, chosen for what is in them |
+| Movement | Yoga | `CycleYoga` | menstrual → Unwind · follicular, ovulatory → Morning · luteal → Ground |
+| Mind | Meditation | `CycleMeditations` | menstrual, follicular → Focus · ovulatory → Balance · luteal → Release Tension |
+
+None of the destinations was redesigned and nothing was duplicated: the
+Cookbook's cycle collection sits *under* the seasonal one and draws from
+the same sixteen recipes; Yoga's three practices and Meditation's four
+are untouched and all still offered.
+
+Meditation can now hold **two independent contexts** — a moon and a cycle
+— shown as two small suggestions under one restrained "For today". They
+are two observations about the same day and are never combined into one
+claim.
+
+The phase reaches those three features through
+`almanacCyclePhaseProvider` in `lib/app/context/`, which is null when
+Cycle is not part of the Almanac or has nothing to say. The app layer is
+the composition root, so that is where the wire is soldered: no feature
+imports another, and a test greps the Cookbook's imports to prove it.
 
 ### Privacy, which is the whole architecture here
 
-Cycle dates are the most sensitive thing the app holds, so they get their
-own everything: their own store (`CycleStore`), their own two preference
-keys under a `cycle.` prefix, their own serialisation, and their own
-`deleteAll` that removes both keys so nothing is left to say anybody ever
-used the feature. **They are never put in `UserSettings`.** The store is
-opened on first use rather than at startup, so somebody who never opens
-Cycle never has their cycle dates read into memory.
+Cycle records are the most sensitive thing the app holds, so they get
+their own everything: their own store (`CycleStore`), their own keys
+under a `cycle.` prefix, their own serialisation, and their own
+`deleteAll` that removes **every** key — records, length, chosen phase
+and the legacy one — so nothing is left to say anybody ever used the
+feature. **They are never put in `UserSettings`.** The store is opened on
+first use, so somebody who never opens Cycle never has their records read
+into memory.
 
-`CycleData.toString()` reports *how many* dates it holds and never which —
-a `toString` is exactly how sensitive data ends up in a crash report — and
-there is a test asserting no `debugPrint` in the feature interpolates
-anything but a type name. Nothing about a cycle is shown anywhere else in
-the app, and there is a test for that too.
+Stored: `cycle.dayRecords`, `cycle.assumedCycleLength`,
+`cycle.manualPhase`. **Not** stored, because all of it is derived: the
+moon cycle type, the current phase, the next-period estimate, the current
+moon, the season.
+
+`CycleDayRecord.toString()` says nothing at all and `CycleData.toString()`
+reports only how much it holds — a `toString` is exactly how sensitive
+data ends up in a crash report — and there is a test that no `debugPrint`
+in the feature interpolates anything but a type name.
 
 Local only: no account, no cloud, no sync, no network, no analytics, no
-external API, no location, no microphone, no camera, no background work
-and no new permissions.
+external API, no location, no microphone, no camera, no background work,
+no notifications and no new permissions.
 
 ### Dates are dates, not instants
 
@@ -604,20 +831,13 @@ and storing that as an instant is how a date ends up shifting to the day
 before because somebody flew west or the clocks went back. Its arithmetic
 goes through UTC internally, so adding a day is always exactly a day —
 there is a test that walks it across both British daylight-saving
-changes. Stored as `YYYY-MM-DD`; an unreadable stored value is dropped
-rather than crashing the feature.
+changes.
 
 ### The estimate, and the model
 
-Everything past the recorded date is an estimate and is labelled as one.
-The basis is stated on the screen — "Using a 28-day estimate" — and the
-length is the user's own choice, 21 to 40 days, on a `+`/`−` stepper like
-Meditation's duration. Changing it changes estimates only; the recorded
-dates are passed through untouched, and the note under the stepper says
-so.
-
-The phase model is deliberately simple arithmetic, documented in full on
-`phaseSpansFor`:
+Everything past the recorded day 1 is an estimate and is labelled as one.
+The length is the user's own choice, 21 to 40 days; changing it changes
+estimates only, and the note under the stepper says so.
 
 | Phase | 28-day cycle | Rule |
 |---|---|---|
@@ -627,46 +847,26 @@ The phase model is deliberately simple arithmetic, documented in full on
 | Luteal | days 17–28 | the day after the window, to the end |
 
 A window rather than a claimed day, because a single day would be a claim
-this app cannot make. A day past the end of the estimate stays luteal and
-says "This cycle is longer than the estimate so far. That is simply what
-has been recorded." At the extremes of the allowed range the wording gets
-more cautious still.
+this app cannot make. It is not a fertile window and is never called one.
 
-Every phase is announced as "Approximate follicular phase", and each
-carries one reflective line — "Something is beginning to build." —
-followed always by **"Your experience may be different."**
+**What is recorded and what is estimated stay apart.** A day inside the
+estimated menstrual span is not drawn or described as bleeding unless the
+user recorded it — `CycleMoment.recordedToday` is the factual half and
+`phase` the estimated one, and there is a test for exactly that
+distinction.
 
-### Pure, and injected with today
+### What it does not do
 
-`cycleMomentAt({today, data})` is a pure function: no clock, no random, no
-side effects, no logging. `todayProvider` is the single place the clock
-becomes a date, which is what lets a test walk a whole cycle a day at a
-time and check every boundary. Observed cycle lengths are shown as
-history — "Recorded cycle length: 28 days" — and never silently become the
-estimate.
+No fertility prediction, no probability of anything, no ovulation
+diagnosis, no pregnancy, no contraception, no symptom tracker, no mood
+log, no medication log, no body metrics, no score, no streak, no
+notifications, no export, no sharing. It makes no medical claim and never
+says a calculated date is certain.
 
-### The calendar
-
-A hand-built seven-column grid, no calendar package. Recorded dates are
-drawn as a filled disc; estimated ones as a ring of twelve short dashes —
-a different *shape*, not a different colour — and each cell's semantics
-says "Recorded period start" or "Estimated period start" in words. A
-legend names both. With one date recorded there is no history to estimate,
-so none is invented: estimates only ever run forwards. Tapping a recorded
-date offers edit or delete; an estimate cannot be tapped, because there is
-nothing there to change. The picker's `lastDate` is today, so a future
-date cannot be chosen at all — and the controller refuses one anyway.
-
-At a large text size the grid grows with the text and scrolls sideways
-rather than squeezing the numbers, which is the same rule the navigation
-bar has followed since Step 6.
-
-### Deleting means deleting
-
-Both deletions confirm first. "Delete your cycle history?" — "Your
-recorded cycle dates will be removed from this device." — **Delete** /
-**Keep**. Confirming clears memory and storage together and lands back on
-the first-use screen, which the tests check by reopening the store.
+It also does not plaster the screen with disclaimers. "Estimated" is said
+where a value is genuinely estimated; the claims are kept out of the
+content rather than apologised for, and one honest line — "Your
+experience may be different." — is enough.
 
 ## Cookbook
 
@@ -1241,7 +1441,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,435 tests. The ones worth knowing about:
+1,559 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -1288,13 +1488,52 @@ flutter test
 - `cycle_calculator_test.dart` walks a whole cycle a day at a time, pins
   every phase boundary at 21, 28 and 40 days, and greps the domain for
   anything that predicts fertility or reads a clock.
-- `cycle_store_test.dart` drives the real preferences-backed store
-  through the plugin's in-memory implementation: a restart keeps the
-  dates, deleting removes both keys, and nothing lands outside the
-  `cycle.` prefix.
-- `cycle_screen_test.dart` records, edits and deletes dates through the
-  real screens, and checks that an estimate never looks or sounds like a
-  recorded date.
+- `cycle_bleeding_test.dart` is the model under test: three levels
+  recorded, changed and cleared; the product's own example proving day 1
+  is the 4th and not the 2nd; a month of spotting leaving the cycle
+  exactly where it was; day 1 corrected in both directions without
+  erasing a record; the override changing only what is displayed; and a
+  restart keeping every level and flag.
+- `cycle_migration_test.dart` seeds Step 11's keys and proves the
+  migration: both starts preserved as day 1, one bleeding record each,
+  **no invented following days**, the assumed length kept, idempotent
+  across three reads and two store objects, and delete-all removing the
+  legacy key too.
+- `cycle_wheel_geometry_test.dart` is the mathematics, not a screenshot:
+  28/29/30/31 positions, identical angular spacing all the way round,
+  every centre at one radius, one moon diameter for every phase and for
+  today, no overlap at any month length, spotting smaller than bleeding,
+  heavy identical plus exactly one ring, and the legend reading the same
+  specs as the wheel.
+- `cycle_moon_test.dart` pins the classification both ways — new → White,
+  full → Red, the three waxing → Pink, the three waning → Purple, all
+  eight phases accounted for once — proves no type exists without a day
+  1, that it changes when a later cycle begins under another moon, that
+  nothing about it is persisted, and that the wheel and the type ask the
+  one moon service at the same local-midday instant.
+- `cycle_content_test.dart` reads every string the feature and its three
+  answers can say: no detox, no seed cycling, no hormone-balancing foods,
+  no guaranteed energy or mood, no fertility or pregnancy, no diagnosis,
+  no moon-caused menstruation, no ideal alignment and no ranking of the
+  four moon cycle types — and, in the other direction, that it does not
+  bury the screen in disclaimers either.
+- `cycle_navigation_test.dart` walks Cycle Syncing → Cookbook, → Yoga and
+  → Meditation: the phase arrives, the destination's own answer is shown,
+  every existing practice and recipe remains, the intent is consumed, and
+  a later direct entry has current context rather than a stale journey.
+- `cookbook_cycle_test.dart` proves the recipe mapping belongs to the
+  Cookbook — Cycle names no recipe id and the Cookbook imports no Cycle —
+  that every mapped id exists with no duplicates, and that every recipe
+  in the menstrual collection genuinely carries lentils, beans,
+  chickpeas, greens, eggs or meat rather than being there to fill a
+  count.
+- `cycle_screen_test.dart` drives all three layers through the real
+  screens: home's simplicity (and that no food, movement or recipe copy
+  is on it), the same paper by day and night and in all four seasons,
+  five consecutive days entered without leaving the Calendar, the Day-1
+  control present for bleeding and absent for spotting, all four phases
+  of Cycle Syncing, and every doorway appearing and disappearing while
+  the guidance stays put.
 - `recipe_content_test.dart` reads all sixteen recipes: four to a season,
   stable ids, real quantities and units, numbered method steps, and no
   alcohol, peanuts, health claims, calorie language or diet talk — with

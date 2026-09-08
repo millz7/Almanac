@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../environment/moon_phase.dart';
 import '../features/feature_id.dart';
+import 'cycle_phase.dart';
 
 export '../features/feature_id.dart';
+export 'cycle_phase.dart';
 
 /// Why the user is going somewhere.
 ///
@@ -23,17 +25,12 @@ export '../features/feature_id.dart';
 /// clock, a store or a position — the caller passes in the fact it is
 /// travelling with.
 ///
-/// **The shape, for the connections still to come.** A new pathway is one
-/// more subclass, and nothing else:
-///
-/// * Cycle → Cookbook, Yoga, Meditation, each carrying the phase
-/// * Garden → Cookbook, carrying what is worth gathering
-/// * Season → Garden, Cookbook, Nature Log
-/// * Time of day → Meditation, Yoga
-///
-/// Each of those is a class with its own payload, its own [destination]
-/// and its own [heading]. None of them needs a route, a parameter or a
-/// change to the navigation.
+/// **The shape, and the connections still to come.** A new pathway is
+/// one more subclass, and nothing else. Cycle → Cookbook, Yoga and
+/// Meditation are built; Garden → Cookbook, Season → Garden/Cookbook/
+/// Nature Log and time of day → Meditation/Yoga are each a class with
+/// its own payload, its own [destination] and its own [heading]. None of
+/// them needs a route, a parameter or a change to the navigation.
 @immutable
 sealed class AlmanacIntent {
   const AlmanacIntent();
@@ -72,6 +69,63 @@ final class MoonMeditationIntent extends AlmanacIntent {
 
   @override
   String toString() => 'MoonMeditationIntent(${phase.label})';
+}
+
+/// Somewhere the user is going from their cycle, carrying the phase.
+///
+/// **One payload, three destinations.** The Cookbook, Yoga and
+/// Meditation each answer differently for a phase, so each gets its own
+/// class — but all three carry the same typed [CyclePhase] and none of
+/// them carries a string. Cycle knows *that* it is asking for recipes
+/// for a phase; the Cookbook knows *which* recipes, and Cycle never
+/// learns.
+sealed class CyclePhaseIntent extends AlmanacIntent {
+  const CyclePhaseIntent(this.phase);
+
+  final CyclePhase phase;
+
+  @override
+  String get heading => 'For your ${phase.phrase}';
+
+  @override
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is CyclePhaseIntent &&
+      other.phase == phase;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, phase);
+
+  @override
+  String toString() => '$runtimeType(${phase.name})';
+}
+
+/// The Cookbook, entered from Cycle Syncing's food guidance.
+final class CycleCookbookIntent extends CyclePhaseIntent {
+  const CycleCookbookIntent(super.phase);
+
+  @override
+  FeatureId get destination => FeatureId.cookbook;
+}
+
+/// Yoga, entered from Cycle Syncing's movement guidance.
+final class CycleYogaIntent extends CyclePhaseIntent {
+  const CycleYogaIntent(super.phase);
+
+  @override
+  FeatureId get destination => FeatureId.yoga;
+}
+
+/// Meditation, entered from Cycle Syncing's reflective suggestion.
+///
+/// Independent of [MoonMeditationIntent]. Meditation may have a moon
+/// context and a cycle context at once, and they are two separate
+/// observations about the same day — never combined into one claim.
+final class CycleMeditationIntent extends CyclePhaseIntent {
+  const CycleMeditationIntent(super.phase);
+
+  @override
+  FeatureId get destination => FeatureId.meditation;
 }
 
 /// The intent the user is currently travelling with, if any.

@@ -52,7 +52,63 @@ List<CalendarDate> parseStoredStarts(List<String> stored) => [
   for (final entry in stored) ?CalendarDate.tryParse(entry),
 ];
 
-/// `YYYY-MM-DD`, one per recorded start, earliest first.
-List<String> encodeStarts(CycleData data) => [
-  for (final date in data.periodStarts) date.iso,
+/// One recorded day, as a single stored line.
+///
+/// `YYYY-MM-DD|level|start`, e.g. `2026-09-04|heavy|1`. Pipe-separated
+/// rather than JSON because every field is a short token with no free
+/// text in it — there is nothing here a user typed.
+String encodeRecord(CycleDayRecord record) => [
+  record.date.iso,
+  record.level.name,
+  record.isPeriodStart ? '1' : '0',
+].join('|');
+
+/// Reads one stored line, or null if it cannot be trusted.
+CycleDayRecord? decodeRecord(String line) {
+  final parts = line.split('|');
+  if (parts.length != 3) return null;
+
+  final date = CalendarDate.tryParse(parts[0]);
+  if (date == null) return null;
+  final level = BleedingLevel.tryParse(parts[1]);
+  if (level == null) return null;
+
+  return CycleDayRecord(
+    date: date,
+    level: level,
+    // A period start on a spotting day is dropped by `CycleData` rather
+    // than trusted from a line — including a line an older or newer
+    // version wrote.
+    isPeriodStart: parts[2] == '1',
+  );
+}
+
+/// `YYYY-MM-DD|level|start`, one per recorded day, earliest first.
+List<String> encodeRecords(CycleData data) => [
+  for (final record in data.records) encodeRecord(record),
+];
+
+/// Reads a whole stored log, dropping any line that will not parse.
+List<CycleDayRecord> decodeRecords(List<String> lines) => [
+  for (final line in lines) ?decodeRecord(line),
+];
+
+/// Turns Step 11's period-start-only data into day records.
+///
+/// **Conservative on purpose.** The old model recorded one thing: the
+/// dates the user said a period began. So each of those becomes exactly
+/// one day of recorded bleeding, marked as that period's day 1 — and
+/// **nothing else**. The following four days are not invented, because
+/// the old data never claimed them, and inventing them would put
+/// bleeding in somebody's history that they never entered.
+///
+/// Deterministic, and a pure function so the migration can be tested
+/// without a store at all.
+List<CycleDayRecord> migrateLegacyStarts(Iterable<CalendarDate> starts) => [
+  for (final date in starts)
+    CycleDayRecord(
+      date: date,
+      level: BleedingLevel.bleeding,
+      isPeriodStart: true,
+    ),
 ];

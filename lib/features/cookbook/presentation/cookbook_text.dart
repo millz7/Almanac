@@ -1,3 +1,4 @@
+import '../../../core/context/cycle_phase.dart';
 import '../domain/recipe_catalogue.dart';
 
 /// Everything the Cookbook says, and the two things it has to work out
@@ -8,6 +9,14 @@ import '../domain/recipe_catalogue.dart';
 /// check every line of it for health claims, calorie language and diet
 /// talk in one place.
 abstract final class CookbookText {
+  /// The heading over the cycle collection when the user came from
+  /// Cycle Syncing: "For your luteal phase".
+  static String forYourPhase(CyclePhase phase) => 'For your ${phase.phrase}';
+
+  /// The quieter heading on a direct entry. It mentions the cycle; it
+  /// does not announce it.
+  static const forYourCycle = 'For your cycle';
+
   static const title = 'Cookbook';
   static const introduction = RecipeCatalogue.introduction;
   static const yourSeason = RecipeCatalogue.yourSeason;

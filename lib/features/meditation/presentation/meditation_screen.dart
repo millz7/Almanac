@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/almanac_button.dart';
 import '../../../app/navigation/immersive_session.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../app/context/cycle_phase_context.dart';
 import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
+import '../domain/cycle_meditation.dart';
 import '../domain/meditation_technique.dart';
 import '../domain/moon_meditation.dart';
 import 'meditation_text.dart';
@@ -94,6 +96,14 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
   /// not find yesterday's moon still waiting.
   MoonPhase? _arrivedFromMoon;
 
+  /// The cycle phase the user arrived with, when they came from Cycle
+  /// Syncing's reflective suggestion.
+  ///
+  /// Independent of [_arrivedFromMoon]. A moon and a cycle are two
+  /// separate observations about the same day, and Meditation may hold
+  /// both at once without ever combining them into one claim.
+  CyclePhase? _arrivedForPhase;
+
   @override
   void initState() {
     super.initState();
@@ -136,13 +146,20 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
     // the visible branch.
     if (!TickerMode.valuesOf(context).enabled) {
       _arrivedFromMoon = null;
+      _arrivedForPhase = null;
       return;
     }
 
     final intent = ref.read(almanacIntentProvider);
-    if (intent is! MoonMeditationIntent) return;
+    // Two doors into the same room, and each is remembered separately.
+    if (intent is MoonMeditationIntent) {
+      _arrivedFromMoon = intent.phase;
+    } else if (intent is CycleMeditationIntent) {
+      _arrivedForPhase = intent.phase;
+    } else {
+      return;
+    }
 
-    _arrivedFromMoon = intent.phase;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Takes rather than clears, so a journey to somewhere else that
@@ -272,11 +289,12 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
           MeditationStage.choosingTechnique => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // One Almanac: the same evening the Moon page is looking
-              // at. Above the usual choices, and it changes none of
-              // them.
-              _MoonContext(
-                arrivedFrom: _arrivedFromMoon,
+              // One Almanac: the same day the Moon page and Cycle
+              // Syncing are looking at. Above the usual choices, and it
+              // changes none of them.
+              _TodayContext(
+                arrivedFromMoon: _arrivedFromMoon,
+                arrivedForPhase: _arrivedForPhase,
                 onChoose: _chooseTechnique,
               ),
               TechniqueChooser(onChosen: _chooseTechnique),
@@ -295,6 +313,90 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
           ),
         },
       ],
+    );
+  }
+}
+
+/// What today has to say, from up to two independent directions.
+///
+/// **A moon and a cycle are two observations, never one claim.** They
+/// are shown as two small suggestions under one restrained heading, so
+/// the page does not repeat "For today" twice and does not push the
+/// four practices down the screen. Nothing here ever says a menstrual
+/// new moon means anything.
+///
+/// Either may be absent — Meditation opened normally with no Cycle in
+/// the Almanac has only the moon — and then the other is shown on its
+/// own, exactly as before.
+class _TodayContext extends ConsumerWidget {
+  const _TodayContext({
+    required this.arrivedFromMoon,
+    required this.arrivedForPhase,
+    required this.onChoose,
+  });
+
+  final MoonPhase? arrivedFromMoon;
+  final CyclePhase? arrivedForPhase;
+  final ValueChanged<MeditationTechnique> onChoose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cyclePhase = arrivedForPhase ?? ref.watch(almanacCyclePhaseProvider);
+    // The moon is always available; a cycle phase may not be.
+    final arrived = arrivedFromMoon != null || arrivedForPhase != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // On a direct entry the heading is said once, here, and each
+        // suggestion below simply names what it is about.
+        if (!arrived) ...[
+          Text(
+            MeditationText.forToday,
+            style: Theme.of(context).textTheme.journalLabel
+                ?.copyWith(color: context.palette.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        _MoonContext(arrivedFrom: arrivedFromMoon, onChoose: onChoose),
+        if (cyclePhase case final phase?)
+          _CycleContext(
+            phase: phase,
+            arrived: arrivedForPhase != null,
+            onChoose: onChoose,
+          ),
+      ],
+    );
+  }
+}
+
+/// The cycle phase, and the practice that suits it.
+///
+/// Reads the phase from the app's shared seam, so Meditation never
+/// imports Cycle and never learns anything about bleeding.
+class _CycleContext extends StatelessWidget {
+  const _CycleContext({
+    required this.phase,
+    required this.arrived,
+    required this.onChoose,
+  });
+
+  final CyclePhase phase;
+
+  /// Whether the user came through Cycle Syncing's door, which decides
+  /// only how the heading reads.
+  final bool arrived;
+
+  final ValueChanged<MeditationTechnique> onChoose;
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestion = CycleMeditations.forPhase(phase);
+    return MoonContextCard(
+      heading: arrived ? CycleMeditationIntent(phase).heading : phase.phrase,
+      technique: CycleMeditations.techniqueFor(phase),
+      invitation: suggestion.invitation,
+      onBegin: () => onChoose(CycleMeditations.techniqueFor(phase)),
     );
   }
 }
@@ -325,10 +427,13 @@ class _MoonContext extends ConsumerWidget {
     final suggestion = MoonMeditations.forPhase(phase);
 
     return MoonContextCard(
+      // The "For today" heading is said once by the block above, so a
+      // direct entry's moon suggestion simply names the moon.
       heading: arrivedFrom == null
-          ? MeditationText.forToday
+          ? phase.label
           : MoonMeditationIntent(arrivedFrom!).heading,
-      suggestion: suggestion,
+      technique: MoonMeditations.techniqueFor(phase),
+      invitation: suggestion.invitation,
       onBegin: () => onChoose(MoonMeditations.techniqueFor(phase)),
     );
   }

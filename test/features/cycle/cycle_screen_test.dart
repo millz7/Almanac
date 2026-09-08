@@ -1,12 +1,19 @@
 import 'package:almanac/app/almanac_button.dart';
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
+import 'package:almanac/app/navigation/widgets/almanac_doorway.dart';
+import 'package:almanac/core/settings/settings_providers.dart';
+import 'package:almanac/app/theme/app_theme.dart';
+import 'package:almanac/core/environment/environment_providers.dart';
+import 'package:almanac/core/environment/moon_service.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/time/calendar_date.dart';
+import 'package:almanac/core/widgets/widgets.dart';
 import 'package:almanac/features/cycle/application/cycle_providers.dart';
+import 'package:almanac/features/cycle/domain/cycle_syncing.dart';
 import 'package:almanac/features/cycle/presentation/cycle_text.dart';
-import 'package:almanac/features/cycle/presentation/widgets/cycle_calendar.dart';
-import 'package:almanac/features/cycle/presentation/widgets/cycle_wheel.dart';
+import 'package:almanac/features/cycle/presentation/widgets/bleeding_marker.dart';
+import 'package:almanac/features/cycle/presentation/widgets/cycle_moon_wheel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,44 +21,60 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/fake_environment_services.dart';
 import '../../support/test_overrides.dart';
 
-/// Monday 7 September 2026, midday.
-final testNow = DateTime.utc(2026, 9, 7, 12);
-const testToday = CalendarDate(2026, 9, 7);
+/// A moon pinned to one phase, so a test about the screen is not also a
+/// test of the date it happens to be.
+class _FixedMoonService implements MoonService {
+  const _FixedMoonService(this.state);
+
+  final MoonPhaseState state;
+
+  @override
+  MoonPhaseState phaseAt(DateTime instant) => state;
+}
+
+const _waxingCrescent = MoonPhaseState(
+  phase: MoonPhase.waxingCrescent,
+  elongationDegrees: 60,
+  illuminatedFraction: 0.34,
+);
+
+/// 20 September 2026, midday in London.
+final testNow = DateTime.utc(2026, 9, 20, 12);
+const testToday = CalendarDate(2026, 9, 20);
+const sep4 = CalendarDate(2026, 9, 4);
+
+CycleData withDay1(CalendarDate date, {CyclePhase? manualPhase}) => CycleData(
+  records: [
+    CycleDayRecord(
+      date: date,
+      level: BleedingLevel.bleeding,
+      isPeriodStart: true,
+    ),
+  ],
+  manualPhase: manualPhase,
+);
 
 void main() {
   setUpAll(useTimeZoneDatabase);
-
-  final recordToday = find.widgetWithText(
-    ElevatedButton,
-    CycleText.recordToday,
-  );
-  final chooseAnother = find.widgetWithText(
-    TextButton,
-    CycleText.chooseAnotherDate,
-  );
-  final calendarButton = find.widgetWithText(TextButton, CycleText.calendar);
-  final adjustButton = find.widgetWithText(TextButton, CycleText.adjust);
-  final back = find.widgetWithText(TextButton, CycleText.back);
-  final deleteAll = find.widgetWithText(TextButton, CycleText.deleteAll);
-  final confirmDelete = find.widgetWithText(TextButton, CycleText.delete);
-  final keep = find.widgetWithText(TextButton, CycleText.keep);
-  final longer = find.widgetWithIcon(IconButton, Icons.add);
-  final shorter = find.widgetWithIcon(IconButton, Icons.remove);
 
   Finder navTab(String name) => find.descendant(
     of: find.byType(AlmanacNavigationBar),
     matching: find.bySemanticsLabel(name),
   );
 
-  /// Opens Cycle through the real navigation.
+  Finder route(String title) => find.bySemanticsLabel(RegExp('^$title\\.'));
+  Finder back() => find.widgetWithText(TextButton, CycleText.back);
+
   Future<ProviderContainer> openCycle(
     WidgetTester tester, {
+    CycleData? data,
     CycleStore? store,
     DateTime? now,
+    MoonPhaseState moon = _waxingCrescent,
+    Set<FeatureId> features = const {FeatureId.cycle},
     double textScale = 1,
     bool reducedMotion = false,
-    Size surface = const Size(420, 2000),
-    Set<FeatureId> features = const {FeatureId.cycle},
+    Size surface = const Size(430, 3600),
   }) async {
     tester.view.physicalSize = surface * 2;
     tester.view.devicePixelRatio = 2;
@@ -68,11 +91,14 @@ void main() {
     }
 
     final container = ProviderContainer(
-      overrides: environmentOverrides(
-        now: now ?? testNow,
-        features: features,
-        cycleStore: store ?? InMemoryCycleStore(),
-      ),
+      overrides: [
+        ...environmentOverrides(
+          now: now ?? testNow,
+          features: features,
+          cycleStore: store ?? InMemoryCycleStore(data ?? CycleData.empty),
+        ),
+        moonServiceProvider.overrideWithValue(_FixedMoonService(moon)),
+      ],
     );
     addTearDown(container.dispose);
 
@@ -84,7 +110,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(navTab('Cycle'));
+    await tester.tap(navTab(CycleText.title));
     await tester.pumpAndSettle();
     return container;
   }
@@ -96,670 +122,712 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Picks a day of the current month in the Material date picker.
-  Future<void> pickDay(WidgetTester tester, String day) async {
-    await tester.tap(
-      find.descendant(
-        of: find.byType(DatePickerDialog),
-        matching: find.text(day),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
+  /// A level choice in the day editor. Keyed rather than found by its
+  /// label, because "Bleeding" is also the heading above the choices.
+  Finder levelChoice(BleedingLevel? level) =>
+      find.byKey(ValueKey('level-${level?.name ?? 'none'}'));
+
+  /// Opens a date's editor, chooses a level, and saves.
+  Future<void> recordDay(
+    WidgetTester tester,
+    int day, {
+    required BleedingLevel? level,
+    bool? firstDay,
+  }) async {
+    await press(tester, find.bySemanticsLabel(RegExp('^$day September')));
+    await press(tester, levelChoice(level));
+    if (firstDay != null) {
+      final toggle = find.byType(Switch);
+      if (tester.widget<Switch>(toggle).value != firstDay) {
+        await press(tester, toggle);
+      }
+    }
+    await press(tester, find.widgetWithText(ElevatedButton, CycleText.save));
   }
 
-  group('first use', () {
-    testWidgets('invites one recording, and asks for nothing else', (
-      tester,
-    ) async {
-      await openCycle(tester);
+  group('Cycle home is simple', () {
+    testWidgets('a wheel, two ways deeper, and little else', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
 
-      expect(find.text(CycleText.introHeading), findsOneWidget);
-      expect(find.text(CycleText.introBody), findsOneWidget);
-      expect(recordToday, findsOneWidget);
-      expect(chooseAnother, findsOneWidget);
-
-      // Nothing about a cycle that does not exist yet.
-      expect(find.byType(CycleWheel), findsNothing);
-      expect(find.textContaining('Cycle day'), findsNothing);
+      expect(find.byType(CycleMoonWheel), findsOneWidget);
+      expect(route(CycleText.calendar), findsOneWidget);
+      expect(route(CycleText.syncing), findsOneWidget);
+      expect(find.text('September · Summer'), findsOneWidget);
     });
 
-    testWidgets('asks nothing about a body, a history or an intention', (
+    testWidgets('the cycle day and phase are in the middle', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(find.text(CycleText.dayLine(17)), findsOneWidget);
+      expect(find.text(CyclePhase.luteal.label), findsWidgets);
+    });
+
+    testWidgets('with the current moon as a quieter line', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(find.text(MoonPhase.waxingCrescent.label), findsOneWidget);
+    });
+
+    testWidgets('and the moon cycle type when it can be derived', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      // A waxing crescent day 1 is a Pink Moon cycle.
+      expect(find.text(MoonCycleType.pink.label), findsOneWidget);
+      expect(
+        find.text(CycleText.moonCycleLine(MoonCycleType.pink)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('but not when there is no day 1 to derive it from', (
       tester,
     ) async {
       await openCycle(tester);
 
-      for (final never in [
-        'age',
-        'weight',
-        'height',
-        'medication',
-        'diagnos',
-        'pregnan',
-        'contracept',
-        'fertil',
-        'sexual',
+      for (final type in MoonCycleType.values) {
+        expect(find.text(type.label), findsNothing, reason: type.name);
+      }
+    });
+
+    testWidgets('the next-period estimate appears only when possible', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+      expect(
+        find.text(CycleText.nextPeriodAround(sep4.addDays(28))),
+        findsOneWidget,
+      );
+      expect(find.textContaining(CycleText.estimated), findsWidgets);
+
+      await openCycle(tester);
+      expect(find.textContaining('Next period'), findsNothing);
+    });
+
+    testWidgets('no food, movement, recipe or meditation copy is here', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      for (final heading in [
+        CycleText.foodHeading,
+        CycleText.movementHeading,
+        CycleText.mindHeading,
+        CycleText.durationHeading,
+        CycleText.aboutHeading,
+      ]) {
+        expect(find.text(heading), findsNothing, reason: heading);
+      }
+      expect(find.text(CycleText.seeRecipes), findsNothing);
+      expect(find.text(CycleText.tryYoga), findsNothing);
+      // And no statistics dashboard.
+      expect(find.textContaining('Recent cycles'), findsNothing);
+    });
+
+    testWidgets('it is useful before anything is recorded', (tester) async {
+      await openCycle(tester);
+
+      expect(find.byType(CycleMoonWheel), findsOneWidget);
+      expect(find.text(CycleText.noCycleYet), findsOneWidget);
+      expect(find.text(MoonPhase.waxingCrescent.label), findsOneWidget);
+      expect(route(CycleText.calendar), findsOneWidget);
+      expect(route(CycleText.syncing), findsOneWidget);
+    });
+  });
+
+  group('Cycle is an inner page of the Almanac', () {
+    testWidgets('it is written on paper', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(find.byType(AlmanacPaperSurface), findsOneWidget);
+    });
+
+    Future<Color> groundAt(WidgetTester tester, DateTime instant) async {
+      await openCycle(tester, now: instant, data: withDay1(sep4));
+      return tester
+          .widget<ColoredBox>(
+            find
+                .descendant(
+                  of: find.byType(AlmanacPaperSurface),
+                  matching: find.byType(ColoredBox),
+                )
+                .first,
+          )
+          .color;
+    }
+
+    testWidgets('the same paper by day and after dark', (tester) async {
+      final night = await groundAt(tester, DateTime.utc(2026, 9, 20, 1));
+      final day = await groundAt(tester, DateTime.utc(2026, 9, 20, 12));
+
+      expect(night, AlmanacPaper.ground);
+      expect(day, AlmanacPaper.ground);
+      expect(night, day);
+    });
+
+    testWidgets('and the same paper in every season', (tester) async {
+      for (final instant in [
+        DateTime.utc(2026, 1, 15, 12),
+        DateTime.utc(2026, 4, 15, 12),
+        DateTime.utc(2026, 7, 15, 12),
+        DateTime.utc(2026, 10, 15, 12),
       ]) {
         expect(
-          find.textContaining(never, findRichText: true),
-          findsNothing,
-          reason: never,
+          await groundAt(tester, instant),
+          AlmanacPaper.ground,
+          reason: '$instant',
         );
       }
     });
 
-    testWidgets('says where the dates will live before any are given', (
+    testWidgets('the Almanac is reachable and the tabs are unchanged', (
       tester,
     ) async {
-      await openCycle(tester);
+      await openCycle(tester, features: {FeatureId.cycle, FeatureId.cookbook});
 
-      expect(find.text(CycleText.privacyNote), findsOneWidget);
+      expect(find.byType(AlmanacButton), findsOneWidget);
+      expect(navTab('Environment'), findsOneWidget);
+      expect(navTab(CycleText.title), findsOneWidget);
     });
   });
 
-  group('recording', () {
-    testWidgets('"Record today" begins a cycle on day one', (tester) async {
+  group('the Calendar records bleeding', () {
+    testWidgets('a month can be walked backwards and forwards', (tester) async {
       await openCycle(tester);
-      await press(tester, recordToday);
-
-      expect(find.text('Cycle day 1'), findsOneWidget);
-      expect(
-        find.text('${CycleText.recordedStartLabel}: Monday 7 September'),
-        findsOneWidget,
-      );
-      expect(find.text('Approximate menstrual phase'), findsOneWidget);
-      expect(find.text('Using a 28-day estimate'), findsOneWidget);
-      expect(find.byType(CycleWheel), findsOneWidget);
-    });
-
-    testWidgets('the day advances with the calendar, not with a timer', (
-      tester,
-    ) async {
-      final store = InMemoryCycleStore();
-      await openCycle(tester, store: store);
-      await press(tester, recordToday);
-      expect(find.text('Cycle day 1'), findsOneWidget);
-
-      // Four days later, same device, same stored date.
-      await openCycle(tester, store: store, now: DateTime.utc(2026, 9, 11, 12));
-
-      expect(find.text('Cycle day 5'), findsOneWidget);
-      expect(
-        find.text('${CycleText.recordedStartLabel}: Monday 7 September'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('"Choose another date" offers nothing later than today', (
-      tester,
-    ) async {
-      await openCycle(tester);
-      await press(tester, chooseAnother);
-
-      final picker = tester.widget<DatePickerDialog>(
-        find.byType(DatePickerDialog),
-      );
-      // A future date cannot be chosen, rather than being chosen and
-      // then refused.
-      expect(picker.lastDate, testToday.toLocalDateTime());
-      expect(picker.initialDate, testToday.toLocalDateTime());
-    });
-
-    testWidgets('a chosen date is counted from', (tester) async {
-      final container = await openCycle(tester);
-      await press(tester, chooseAnother);
-      await pickDay(tester, '3');
-
-      expect(find.text('Cycle day 5'), findsOneWidget);
-      expect(container.read(cycleDataProvider).value!.periodStarts, [
-        const CalendarDate(2026, 9, 3),
-      ]);
-    });
-  });
-
-  group('the current cycle', () {
-    Future<ProviderContainer> withRecorded(
-      WidgetTester tester, {
-      List<CalendarDate> starts = const [],
-      int length = kDefaultCycleLength,
-      double textScale = 1,
-      bool reducedMotion = false,
-    }) => openCycle(
-      tester,
-      store: InMemoryCycleStore(
-        CycleData(periodStarts: starts, assumedCycleLength: length),
-      ),
-      textScale: textScale,
-      reducedMotion: reducedMotion,
-    );
-
-    testWidgets('the day is the biggest thing on it', (tester) async {
-      await withRecorded(tester, starts: [testToday.addDays(-11)]);
-
-      final day = tester.widget<Text>(find.text('Cycle day 12'));
-      final phase = tester.widget<Text>(
-        find.text('Approximate follicular phase'),
-      );
-      expect(day.style!.fontSize, greaterThan(phase.style!.fontSize!));
-    });
-
-    testWidgets('a reflective line, and a reminder that it may not fit', (
-      tester,
-    ) async {
-      await withRecorded(tester, starts: [testToday.addDays(-11)]);
-
-      expect(find.text('Something is beginning to build.'), findsOneWidget);
-      expect(find.text(CycleText.experienceMayDiffer), findsOneWidget);
-    });
-
-    testWidgets('estimates are gathered together and labelled', (tester) async {
-      await withRecorded(tester, starts: [const CalendarDate(2026, 9, 1)]);
-
-      expect(find.text(CycleText.estimatesHeading), findsOneWidget);
-      expect(
-        find.text('Estimated ovulatory window: 14 September to 16 September'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Estimated next start: Tuesday 29 September'),
-        findsOneWidget,
-      );
-      expect(find.text(CycleText.estimateCaution), findsOneWidget);
-
-      // Never in the present tense about the person reading it.
-      expect(find.textContaining('You are ovulating'), findsNothing);
-      expect(find.textContaining('fertile'), findsNothing);
-    });
-
-    testWidgets('a cycle longer than the estimate is stated, not flagged', (
-      tester,
-    ) async {
-      await withRecorded(tester, starts: [testToday.addDays(-30)]);
-
-      expect(find.text('Cycle day 31'), findsOneWidget);
-      expect(find.text(CycleText.pastEstimate), findsOneWidget);
-      expect(find.text('Approximate luteal phase'), findsOneWidget);
-    });
-
-    testWidgets('recorded lengths are listed without judgement', (
-      tester,
-    ) async {
-      await withRecorded(
-        tester,
-        starts: [
-          const CalendarDate(2026, 6, 3),
-          const CalendarDate(2026, 7, 1),
-          const CalendarDate(2026, 8, 1),
-          const CalendarDate(2026, 8, 28),
-        ],
-      );
-
-      expect(find.text(CycleText.recentCyclesHeading), findsOneWidget);
-      expect(
-        find.text('${CycleText.recordedLengthLabel}: 27 days'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('${CycleText.recordedLengthLabel}: 31 days'),
-        findsOneWidget,
-      );
-      // No average, no verdict.
-      expect(find.textContaining('average'), findsNothing);
-      expect(find.textContaining('normal'), findsNothing);
-    });
-
-    testWidgets('there is nothing to show a cycle nobody has begun', (
-      tester,
-    ) async {
-      await withRecorded(tester);
-      expect(find.text(CycleText.introHeading), findsOneWidget);
-    });
-  });
-
-  group('the assumed length', () {
-    testWidgets('steps a day at a time, and moves the estimates with it', (
-      tester,
-    ) async {
-      final container = await openCycle(
-        tester,
-        store: InMemoryCycleStore(
-          CycleData(periodStarts: [const CalendarDate(2026, 9, 1)]),
-        ),
-      );
-      await press(tester, adjustButton);
-
-      expect(find.text('28 days'), findsOneWidget);
-      await press(tester, longer);
-      await press(tester, longer);
-      expect(find.text('30 days'), findsOneWidget);
-
-      await press(tester, back);
-      expect(find.text('Using a 30-day estimate'), findsOneWidget);
-      expect(
-        find.text('Estimated next start: Thursday 1 October'),
-        findsOneWidget,
-      );
-      // The recorded date is exactly where it was.
-      expect(container.read(cycleDataProvider).value!.periodStarts, [
-        const CalendarDate(2026, 9, 1),
-      ]);
-      expect(
-        find.text('${CycleText.recordedStartLabel}: Tuesday 1 September'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('stops at 21 days and at 40', (tester) async {
-      await openCycle(tester);
-      await press(tester, recordToday);
-      await press(tester, adjustButton);
-
-      for (var i = 0; i < 10; i++) {
-        await press(tester, shorter);
-      }
-      expect(find.text('21 days'), findsOneWidget);
-      expect(tester.widget<IconButton>(shorter).onPressed, isNull);
-
-      for (var i = 0; i < 25; i++) {
-        await press(tester, longer);
-      }
-      expect(find.text('40 days'), findsOneWidget);
-      expect(tester.widget<IconButton>(longer).onPressed, isNull);
-    });
-
-    testWidgets('says plainly that it changes estimates only', (tester) async {
-      await openCycle(tester);
-      await press(tester, recordToday);
-      await press(tester, adjustButton);
-
-      expect(find.text(CycleText.lengthNote), findsOneWidget);
-    });
-  });
-
-  group('the calendar', () {
-    Future<ProviderContainer> openCalendar(
-      WidgetTester tester, {
-      List<CalendarDate> starts = const [],
-      double textScale = 1,
-    }) async {
-      final container = await openCycle(
-        tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: starts)),
-        textScale: textScale,
-      );
-      await press(tester, calendarButton);
-      return container;
-    }
-
-    /// How one day of the shown month is drawn.
-    DayMark markOn(
-      WidgetTester tester,
-      CalendarDate date, {
-      bool today = false,
-    }) {
-      final label = tester
-          .widgetList<Semantics>(find.byType(Semantics))
-          .map((s) => s.properties.label)
-          .whereType<String>()
-          .firstWhere(
-            (l) => l.startsWith(
-              '${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][date.weekday - 1]} ${date.day} ',
-            ),
-            orElse: () => '',
-          );
-      if (label.contains('Recorded period start')) return DayMark.recorded;
-      if (label.contains('Estimated period start')) return DayMark.estimated;
-      return DayMark.plain;
-    }
-
-    testWidgets('shows the month, with today in it', (tester) async {
-      await openCalendar(tester, starts: [const CalendarDate(2026, 9, 3)]);
-
-      expect(find.text('September 2026'), findsOneWidget);
-      expect(find.byType(CycleCalendar), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('Monday 7 September. Today.'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('marks what was recorded, and says so in words', (
-      tester,
-    ) async {
-      await openCalendar(tester, starts: [const CalendarDate(2026, 9, 3)]);
-
-      expect(markOn(tester, const CalendarDate(2026, 9, 3)), DayMark.recorded);
-      expect(
-        find.bySemanticsLabel(
-          RegExp('Thursday 3 September. Recorded period start'),
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('an estimate never looks or sounds like a recorded date', (
-      tester,
-    ) async {
-      await openCalendar(tester, starts: [const CalendarDate(2026, 9, 3)]);
-
-      // 1 October is an estimate; the marks differ, and so do the words.
-      await press(tester, find.byTooltip(CycleText.nextMonth));
-      expect(find.text('October 2026'), findsOneWidget);
-      expect(
-        markOn(tester, const CalendarDate(2026, 10, 1)),
-        DayMark.estimated,
-      );
-      expect(
-        find.bySemanticsLabel(
-          RegExp('Thursday 1 October. Estimated period start'),
-        ),
-        findsOneWidget,
-      );
-      // And the legend names both, so the difference is never left to
-      // the drawing.
-      expect(find.text(CycleText.recordedLegend), findsOneWidget);
-      expect(find.text(CycleText.estimatedLegend), findsOneWidget);
-    });
-
-    testWidgets('invents no history before the first recorded date', (
-      tester,
-    ) async {
-      await openCalendar(tester, starts: [const CalendarDate(2026, 9, 3)]);
+      await press(tester, route(CycleText.calendar));
+      expect(find.text('September 2026'), findsWidgets);
 
       await press(tester, find.byTooltip(CycleText.previousMonth));
-      expect(find.text('August 2026'), findsOneWidget);
+      expect(find.text('August 2026'), findsWidgets);
 
-      for (var day = 1; day <= 31; day++) {
+      await press(tester, find.byTooltip(CycleText.nextMonth));
+      await press(tester, find.byTooltip(CycleText.nextMonth));
+      expect(find.text('October 2026'), findsWidgets);
+    });
+
+    testWidgets('each of the three levels can be recorded', (tester) async {
+      final container = await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+
+      await recordDay(tester, 2, level: BleedingLevel.spotting);
+      await recordDay(tester, 4, level: BleedingLevel.bleeding);
+      await recordDay(tester, 5, level: BleedingLevel.heavy);
+
+      final data = container.read(cycleDataProvider).value!;
+      expect(
+        data.levelOn(const CalendarDate(2026, 9, 2)),
+        BleedingLevel.spotting,
+      );
+      expect(data.levelOn(sep4), BleedingLevel.bleeding);
+      expect(data.levelOn(const CalendarDate(2026, 9, 5)), BleedingLevel.heavy);
+    });
+
+    testWidgets('and a day can be set back to nothing', (tester) async {
+      final container = await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+      await recordDay(tester, 4, level: BleedingLevel.bleeding);
+
+      await recordDay(tester, 4, level: null);
+
+      expect(container.read(cycleDataProvider).value!.recordOn(sep4), isNull);
+    });
+
+    testWidgets('or removed outright', (tester) async {
+      final container = await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+      await recordDay(tester, 4, level: BleedingLevel.bleeding);
+
+      await press(tester, find.bySemanticsLabel(RegExp('^4 September')));
+      await press(tester, find.widgetWithText(TextButton, CycleText.remove));
+
+      expect(container.read(cycleDataProvider).value!.recordOn(sep4), isNull);
+    });
+
+    testWidgets('the Day 1 control is offered for bleeding and heavy', (
+      tester,
+    ) async {
+      await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+
+      await press(tester, find.bySemanticsLabel(RegExp('^4 September')));
+      await press(tester, levelChoice(BleedingLevel.bleeding));
+      expect(find.text(CycleText.firstDayOfPeriod), findsOneWidget);
+
+      await press(tester, levelChoice(BleedingLevel.heavy));
+      expect(find.text(CycleText.firstDayOfPeriod), findsOneWidget);
+    });
+
+    testWidgets('and never for spotting', (tester) async {
+      await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+
+      await press(tester, find.bySemanticsLabel(RegExp('^4 September')));
+      await press(tester, levelChoice(BleedingLevel.bleeding));
+      expect(find.text(CycleText.firstDayOfPeriod), findsOneWidget);
+
+      // Choosing spotting takes the control away with it.
+      await press(tester, levelChoice(BleedingLevel.spotting));
+      expect(find.text(CycleText.firstDayOfPeriod), findsNothing);
+    });
+
+    testWidgets('saving returns to the Calendar, not to home', (tester) async {
+      await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+
+      await recordDay(tester, 4, level: BleedingLevel.bleeding);
+
+      // Still on the Calendar, ready for the next day.
+      expect(find.text('September 2026'), findsWidgets);
+      expect(find.byType(BleedingLegend), findsOneWidget);
+      expect(route(CycleText.calendar), findsNothing);
+    });
+
+    testWidgets('so several days in a row are easy to enter', (tester) async {
+      final container = await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+
+      await recordDay(tester, 4, level: BleedingLevel.bleeding, firstDay: true);
+      await recordDay(tester, 5, level: BleedingLevel.heavy);
+      await recordDay(tester, 6, level: BleedingLevel.heavy);
+      await recordDay(tester, 7, level: BleedingLevel.bleeding);
+      await recordDay(tester, 8, level: BleedingLevel.spotting);
+
+      final data = container.read(cycleDataProvider).value!;
+      expect(data.records, hasLength(5));
+      expect(data.periodStarts, [sep4]);
+      expect(
+        data.levelOn(const CalendarDate(2026, 9, 8)),
+        BleedingLevel.spotting,
+      );
+    });
+
+    testWidgets('a future date cannot be opened', (tester) async {
+      await openCycle(tester);
+      await press(tester, route(CycleText.calendar));
+
+      // The 25th has not happened; the 20th has.
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(RegExp('^25 September')))
+            .flagsCollection
+            .isButton,
+        isFalse,
+      );
+      expect(
+        tester
+            .getSemantics(find.bySemanticsLabel(RegExp('^20 September')))
+            .flagsCollection
+            .isButton,
+        isTrue,
+      );
+    });
+
+    testWidgets('the legend uses the same marks as the calendar', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+      await press(tester, route(CycleText.calendar));
+
+      expect(find.byType(BleedingLegend), findsOneWidget);
+      for (final level in BleedingLevel.values) {
         expect(
-          markOn(tester, CalendarDate(2026, 8, day)),
-          DayMark.plain,
-          reason: 'August $day',
+          find.bySemanticsLabel(level.label),
+          findsWidgets,
+          reason: level.name,
         );
+      }
+      // One marker widget per level in the legend, plus the recorded
+      // day on the grid — all of them built from the same specs.
+      expect(find.byType(BleedingMarker), findsWidgets);
+    });
+  });
+
+  group('Cycle Syncing', () {
+    testWidgets('every phase has all six passages', (tester) async {
+      for (final phase in CyclePhase.values) {
+        await openCycle(tester, data: withDay1(sep4, manualPhase: phase));
+        await press(tester, route(CycleText.syncing));
+
+        final guide = PhaseGuides.forPhase(phase);
+        expect(
+          find.text('${phase.label} phase'),
+          findsWidgets,
+          reason: phase.name,
+        );
+        expect(find.text(CycleText.focusHeading), findsOneWidget);
+        expect(find.text(guide.focus), findsOneWidget, reason: phase.name);
+        expect(find.text(CycleText.aboutHeading), findsOneWidget);
+        expect(find.text(guide.about), findsOneWidget, reason: phase.name);
+        expect(find.text(CycleText.foodHeading), findsOneWidget);
+        expect(find.text(guide.food.first), findsOneWidget, reason: phase.name);
+        expect(find.text(CycleText.movementHeading), findsOneWidget);
+        expect(
+          find.text(guide.movement.first),
+          findsOneWidget,
+          reason: phase.name,
+        );
+        expect(find.text(CycleText.mindHeading), findsOneWidget);
+        expect(find.text(guide.reflection), findsOneWidget, reason: phase.name);
+        expect(find.text(CycleText.durationHeading), findsOneWidget);
+        expect(find.text(guide.duration), findsOneWidget, reason: phase.name);
       }
     });
 
-    testWidgets('a recorded date can be edited from it', (tester) async {
-      final container = await openCalendar(
-        tester,
-        starts: [const CalendarDate(2026, 9, 3)],
-      );
+    testWidgets('it shows the calculated phase by default', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
+      await press(tester, route(CycleText.syncing));
 
-      await press(
-        tester,
-        find.bySemanticsLabel(
-          RegExp('Thursday 3 September. Recorded period start'),
-        ),
-      );
-      expect(find.text('Thursday 3 September'), findsOneWidget);
-
-      await press(tester, find.widgetWithText(TextButton, CycleText.editDate));
-      await pickDay(tester, '4');
-
-      expect(container.read(cycleDataProvider).value!.periodStarts, [
-        const CalendarDate(2026, 9, 4),
-      ]);
+      // Day 17 of a 28-day estimate is luteal.
+      expect(find.text('Luteal phase'), findsWidgets);
+      expect(find.text(CycleText.dayLineEstimated(17)), findsOneWidget);
     });
 
-    testWidgets('a recorded date can be deleted from it, once confirmed', (
-      tester,
-    ) async {
-      final container = await openCalendar(
-        tester,
-        starts: [const CalendarDate(2026, 9, 3)],
-      );
+    testWidgets('and the phase can be adjusted', (tester) async {
+      final container = await openCycle(tester, data: withDay1(sep4));
+      await press(tester, route(CycleText.syncing));
 
-      await press(
-        tester,
-        find.bySemanticsLabel(
-          RegExp('Thursday 3 September. Recorded period start'),
-        ),
-      );
-      await press(
-        tester,
-        find.widgetWithText(TextButton, CycleText.deleteDate),
-      );
+      await press(tester, find.bySemanticsLabel(CyclePhase.menstrual.label));
 
-      expect(find.text(CycleText.deleteOneTitle), findsOneWidget);
-      await press(tester, confirmDelete);
-
-      expect(container.read(cycleDataProvider).value!.periodStarts, isEmpty);
+      expect(find.text('Menstrual phase'), findsWidgets);
+      expect(find.text(CycleText.phaseIsYours), findsOneWidget);
+      expect(container.read(displayedCyclePhaseProvider), CyclePhase.menstrual);
     });
-  });
 
-  group('deleting', () {
-    testWidgets('one date can be kept after all', (tester) async {
+    testWidgets('without rewriting anything factual', (tester) async {
+      final container = await openCycle(tester, data: withDay1(sep4));
+      await press(tester, route(CycleText.syncing));
+
+      await press(tester, find.bySemanticsLabel(CyclePhase.ovulatory.label));
+
+      final moment = container.read(cycleMomentProvider);
+      expect(moment.recordedStart, sep4);
+      expect(moment.currentDay, 17);
+      expect(moment.phase, CyclePhase.luteal);
+      expect(
+        container.read(cycleDataProvider).value!.levelOn(sep4),
+        BleedingLevel.bleeding,
+      );
+    });
+
+    testWidgets('and can be handed back to the estimate', (tester) async {
       final container = await openCycle(
         tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: [testToday])),
+        data: withDay1(sep4, manualPhase: CyclePhase.menstrual),
       );
-      await press(tester, adjustButton);
-      await press(
-        tester,
-        find.byTooltip('${CycleText.deleteDate}, Monday 7 September'),
-      );
+      await press(tester, route(CycleText.syncing));
+      expect(find.text(CycleText.phaseIsYours), findsOneWidget);
 
-      expect(find.text(CycleText.deleteOneTitle), findsOneWidget);
-      await press(tester, keep);
+      await press(tester, find.bySemanticsLabel(CycleText.automaticEstimate));
 
-      expect(container.read(cycleDataProvider).value!.periodStarts, [
-        testToday,
-      ]);
+      expect(find.text('Luteal phase'), findsWidgets);
+      expect(find.text(CycleText.phaseIsYours), findsNothing);
+      expect(container.read(cycleMomentProvider).phaseIsManual, isFalse);
     });
 
-    testWidgets('everything can go, and it asks first in plain words', (
-      tester,
-    ) async {
-      final store = InMemoryCycleStore(
-        CycleData(
-          periodStarts: [testToday.addDays(-28), testToday],
-          assumedCycleLength: 31,
-        ),
+    testWidgets('it is still useful with no cycle recorded', (tester) async {
+      final container = await openCycle(tester);
+      await press(tester, route(CycleText.syncing));
+
+      // Four phases offered to read about, and none of them pretended
+      // to be the user's.
+      expect(find.text(CycleText.chooseAPhase), findsOneWidget);
+      for (final phase in CyclePhase.values) {
+        expect(
+          find.bySemanticsLabel(phase.label),
+          findsOneWidget,
+          reason: phase.name,
+        );
+      }
+
+      await press(tester, find.bySemanticsLabel(CyclePhase.follicular.label));
+
+      expect(find.text('Follicular phase'), findsWidgets);
+      expect(
+        find.text(PhaseGuides.forPhase(CyclePhase.follicular).focus),
+        findsOneWidget,
       );
-      final container = await openCycle(tester, store: store);
-      await press(tester, adjustButton);
-      await press(tester, deleteAll);
-
-      expect(find.text(CycleText.deleteAllTitle), findsOneWidget);
-      expect(find.text(CycleText.deleteAllBody), findsOneWidget);
-      expect(confirmDelete, findsOneWidget);
-      expect(keep, findsOneWidget);
-
-      await press(tester, confirmDelete);
-
-      // Gone from the screen, from memory, and from the store.
       expect(container.read(cycleDataProvider).value!.isEmpty, isTrue);
-      expect((await store.read()).periodStarts, isEmpty);
-      expect((await store.read()).assumedCycleLength, kDefaultCycleLength);
-    });
-
-    testWidgets('after everything goes, it is a first use again', (
-      tester,
-    ) async {
-      await openCycle(
-        tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: [testToday])),
-      );
-      await press(tester, adjustButton);
-      await press(tester, deleteAll);
-      await press(tester, confirmDelete);
-
-      expect(find.text(CycleText.introHeading), findsOneWidget);
-      expect(recordToday, findsOneWidget);
-      expect(find.textContaining('Cycle day'), findsNothing);
     });
   });
 
-  group('living in the Almanac', () {
-    testWidgets('the Almanac is reachable from every page of it', (
+  group('the optional doorways', () {
+    testWidgets('all three are there when the features are', (tester) async {
+      await openCycle(
+        tester,
+        data: withDay1(sep4),
+        features: {
+          FeatureId.cycle,
+          FeatureId.cookbook,
+          FeatureId.yoga,
+          FeatureId.meditation,
+        },
+      );
+      await press(tester, route(CycleText.syncing));
+
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsOneWidget);
+      expect(find.bySemanticsLabel(CycleText.tryYoga), findsOneWidget);
+      expect(find.bySemanticsLabel(CycleText.tryMeditation), findsOneWidget);
+    });
+
+    testWidgets('with Cookbook off the food guidance stays', (tester) async {
+      await openCycle(
+        tester,
+        data: withDay1(sep4),
+        features: {FeatureId.cycle, FeatureId.yoga, FeatureId.meditation},
+      );
+      await press(tester, route(CycleText.syncing));
+
+      final guide = PhaseGuides.forPhase(CyclePhase.luteal);
+      expect(find.text(CycleText.foodHeading), findsOneWidget);
+      for (final line in guide.food) {
+        expect(find.text(line), findsOneWidget, reason: line);
+      }
+      // Only the door goes.
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsNothing);
+      expect(find.bySemanticsLabel(CycleText.tryYoga), findsOneWidget);
+    });
+
+    testWidgets('with Yoga off the movement guidance stays', (tester) async {
+      await openCycle(
+        tester,
+        data: withDay1(sep4),
+        features: {FeatureId.cycle, FeatureId.cookbook, FeatureId.meditation},
+      );
+      await press(tester, route(CycleText.syncing));
+
+      final guide = PhaseGuides.forPhase(CyclePhase.luteal);
+      expect(find.text(CycleText.movementHeading), findsOneWidget);
+      for (final line in guide.movement) {
+        expect(find.text(line), findsOneWidget, reason: line);
+      }
+      expect(find.bySemanticsLabel(CycleText.tryYoga), findsNothing);
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsOneWidget);
+    });
+
+    testWidgets('with Meditation off the reflective line stays', (
       tester,
     ) async {
       await openCycle(
         tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: [testToday])),
+        data: withDay1(sep4),
+        features: {FeatureId.cycle, FeatureId.cookbook, FeatureId.yoga},
       );
+      await press(tester, route(CycleText.syncing));
 
-      expect(find.byType(AlmanacButton), findsOneWidget);
-      await press(tester, calendarButton);
-      expect(find.byType(AlmanacButton), findsOneWidget);
-      await press(tester, back);
-      await press(tester, adjustButton);
-      expect(find.byType(AlmanacButton), findsOneWidget);
+      expect(find.text(CycleText.mindHeading), findsOneWidget);
+      expect(
+        find.text(PhaseGuides.forPhase(CyclePhase.luteal).reflection),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(CycleText.tryMeditation), findsNothing);
     });
 
-    testWidgets('there is no immersive mode and nothing left running', (
+    testWidgets('with all three off, every word of guidance remains', (
       tester,
     ) async {
       await openCycle(
         tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: [testToday])),
-        features: {FeatureId.cycle, FeatureId.garden},
+        data: withDay1(sep4),
+        features: {FeatureId.cycle},
       );
+      await press(tester, route(CycleText.syncing));
 
-      // The navigation never goes away here — Cycle is a page, not a
-      // session.
-      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
-      expect(tester.binding.transientCallbackCount, 0);
+      final guide = PhaseGuides.forPhase(CyclePhase.luteal);
+      for (final line in [
+        ...guide.food,
+        ...guide.movement,
+        guide.reflection,
+        guide.about,
+        guide.duration,
+        guide.focus,
+      ]) {
+        expect(find.text(line), findsOneWidget, reason: line);
+      }
+      expect(find.byType(AlmanacDoorway), findsWidgets);
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsNothing);
+      expect(find.bySemanticsLabel(CycleText.tryYoga), findsNothing);
+      expect(find.bySemanticsLabel(CycleText.tryMeditation), findsNothing);
+    });
 
-      await tester.tap(navTab('Garden'));
+    testWidgets('and a doorway appears the moment its feature does', (
+      tester,
+    ) async {
+      final container = await openCycle(
+        tester,
+        data: withDay1(sep4),
+        features: {FeatureId.cycle},
+      );
+      await press(tester, route(CycleText.syncing));
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsNothing);
+
+      await container
+          .read(userSettingsProvider.notifier)
+          .setFeatureChosen(FeatureId.cookbook, true);
       await tester.pumpAndSettle();
 
-      expect(tester.binding.transientCallbackCount, 0);
-      expect(find.byType(CycleWheel), findsNothing);
-    });
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsOneWidget);
+      // And the guidance never moved.
+      expect(find.text(CycleText.foodHeading), findsOneWidget);
 
-    testWidgets('nothing about a cycle appears anywhere else', (tester) async {
-      await openCycle(
-        tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: [testToday])),
-        features: {FeatureId.cycle, FeatureId.garden},
-      );
-      expect(find.text('Cycle day 1'), findsOneWidget);
-
-      await tester.tap(navTab('Environment'));
+      await container
+          .read(userSettingsProvider.notifier)
+          .setFeatureChosen(FeatureId.cookbook, false);
       await tester.pumpAndSettle();
 
-      // The Environment shows today's date, as it always has. What it
-      // must never show is anything about a cycle.
-      expect(find.textContaining('Cycle day'), findsNothing);
-      expect(find.textContaining(CycleText.recordedStartLabel), findsNothing);
-      expect(find.textContaining('Approximate'), findsNothing);
-      expect(find.textContaining('estimate'), findsNothing);
-    });
-  });
-
-  group('reduced motion', () {
-    testWidgets('the wheel is simply already drawn', (tester) async {
-      await openCycle(
-        tester,
-        store: InMemoryCycleStore(CycleData(periodStarts: [testToday])),
-        reducedMotion: true,
-      );
-
-      expect(tester.widget<CycleWheel>(find.byType(CycleWheel)).entrance, 1);
-      expect(tester.binding.transientCallbackCount, 0);
-      expect(find.text('Cycle day 1'), findsOneWidget);
-    });
-
-    testWidgets('everything still works', (tester) async {
-      final container = await openCycle(tester, reducedMotion: true);
-      await press(tester, recordToday);
-      await press(tester, adjustButton);
-      await press(tester, longer);
-
-      expect(container.read(cycleDataProvider).value!.assumedCycleLength, 29);
+      expect(find.bySemanticsLabel(CycleText.seeRecipes), findsNothing);
+      expect(find.text(CycleText.foodHeading), findsOneWidget);
     });
   });
 
   group('accessibility', () {
-    testWidgets('the cycle can be understood without seeing the drawing', (
-      tester,
-    ) async {
+    testWidgets('the wheel is one summary, not thirty moons', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(
+        find.bySemanticsLabel(RegExp('^September lunar calendar')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(RegExp('Cycle day 17')), findsWidgets);
+    });
+
+    testWidgets('and it names the days that carry a record', (tester) async {
       await openCycle(
         tester,
-        store: InMemoryCycleStore(
-          CycleData(periodStarts: [testToday.addDays(-11)]),
+        data: CycleData(
+          records: [
+            CycleDayRecord(
+              date: const CalendarDate(2026, 9, 2),
+              level: BleedingLevel.spotting,
+            ),
+            CycleDayRecord(
+              date: sep4,
+              level: BleedingLevel.bleeding,
+              isPeriodStart: true,
+            ),
+            CycleDayRecord(
+              date: const CalendarDate(2026, 9, 5),
+              level: BleedingLevel.heavy,
+            ),
+          ],
         ),
       );
 
       expect(
-        find.bySemanticsLabel(
-          'Cycle day 12. Approximate follicular phase. '
-          'Using a 28-day estimate.',
-        ),
+        find.bySemanticsLabel(RegExp('Spotting recorded on 2')),
         findsOneWidget,
       );
-      // And the drawing itself says nothing.
       expect(
-        find.descendant(
-          of: find.byType(CycleWheel),
-          matching: find.byType(ExcludeSemantics),
-        ),
+        find.bySemanticsLabel(RegExp('Heavy bleeding recorded on 5')),
         findsOneWidget,
       );
     });
 
+    testWidgets('a calendar day says its record in words', (tester) async {
+      await openCycle(
+        tester,
+        data: CycleData(
+          records: [
+            CycleDayRecord(
+              date: sep4,
+              level: BleedingLevel.heavy,
+              isPeriodStart: true,
+            ),
+            CycleDayRecord(
+              date: const CalendarDate(2026, 9, 18),
+              level: BleedingLevel.spotting,
+            ),
+          ],
+        ),
+      );
+      await press(tester, route(CycleText.calendar));
+
+      expect(
+        find.bySemanticsLabel(
+          '4 September. Heavy bleeding. First day of '
+          'period.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('18 September. Spotting.'), findsOneWidget);
+    });
+
+    testWidgets('the drawn marks and the wheel say nothing themselves', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(
+        find.descendant(
+          of: find.byType(CycleMoonWheel),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsWidgets,
+      );
+    });
+
     testWidgets('every control is a comfortable target', (tester) async {
-      await openCycle(tester);
-      for (final control in [recordToday, chooseAnother]) {
-        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
-      }
+      await openCycle(tester, data: withDay1(sep4));
 
-      await press(tester, recordToday);
-      for (final control in [calendarButton, adjustButton]) {
-        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
-      }
-
-      await press(tester, adjustButton);
-      for (final control in [shorter, longer, deleteAll]) {
-        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
-      }
-
-      await press(tester, back);
-      await press(tester, calendarButton);
-      for (final icon in [Icons.chevron_left, Icons.chevron_right]) {
+      for (final title in [CycleText.calendar, CycleText.syncing]) {
         expect(
-          tester.getSize(find.widgetWithIcon(IconButton, icon)).height,
+          tester.getSize(route(title)).height,
           greaterThanOrEqualTo(48),
+          reason: title,
         );
       }
-      // And every day in the grid, since each one is a place a finger
-      // has to land.
+
+      await press(tester, route(CycleText.syncing));
       expect(
-        tester.getSize(
-          find.bySemanticsLabel(
-            RegExp('Monday 7 September. Today. Recorded period start'),
-          ),
-        ),
-        const Size(48, 48),
+        tester
+            .getSize(find.bySemanticsLabel(CyclePhase.menstrual.label))
+            .height,
+        greaterThanOrEqualTo(48),
       );
+      expect(tester.getSize(back()).height, greaterThanOrEqualTo(48));
     });
 
     testWidgets('doubling the text size breaks nothing', (tester) async {
       await openCycle(
         tester,
-        store: InMemoryCycleStore(
-          CycleData(periodStarts: [testToday.addDays(-11)]),
-        ),
+        data: withDay1(sep4),
         textScale: 2,
+        surface: const Size(430, 6000),
       );
 
-      expect(find.text('Cycle day 12'), findsOneWidget);
-      await press(tester, adjustButton);
-      expect(find.text('28 days'), findsOneWidget);
+      expect(find.text(CycleText.dayLine(17)), findsOneWidget);
+      expect(find.text(CycleText.calendar), findsOneWidget);
+      expect(find.text(CycleText.syncing), findsOneWidget);
+      expect(find.textContaining('…'), findsNothing);
 
-      await press(tester, back);
-      await press(tester, calendarButton);
-      // The grid grows with the text and scrolls sideways rather than
-      // squeezing the numbers — the same rule the navigation bar keeps.
-      expect(find.text('September 2026'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(CycleCalendar),
-          matching: find.byType(SingleChildScrollView),
-        ),
-        findsOneWidget,
-      );
+      await press(tester, route(CycleText.syncing));
+      final guide = PhaseGuides.forPhase(CyclePhase.luteal);
+      expect(find.text(guide.focus), findsOneWidget);
+      expect(find.text(guide.food.first), findsOneWidget);
+      expect(find.bySemanticsLabel(CyclePhase.menstrual.label), findsOneWidget);
+    });
+  });
+
+  group('motion', () {
+    testWidgets('nothing is ticking once the page has settled', (tester) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(tester.binding.transientCallbackCount, 0);
+
+      await press(tester, route(CycleText.calendar));
+      expect(tester.binding.transientCallbackCount, 0);
+    });
+
+    testWidgets('and reduced motion changes nothing about it', (tester) async {
+      await openCycle(tester, data: withDay1(sep4), reducedMotion: true);
+
+      expect(find.byType(CycleMoonWheel), findsOneWidget);
+      expect(find.text(CycleText.dayLine(17)), findsOneWidget);
+      expect(tester.binding.transientCallbackCount, 0);
+
+      await press(tester, route(CycleText.syncing));
+      expect(find.text(CycleText.focusHeading), findsOneWidget);
+      expect(tester.binding.transientCallbackCount, 0);
     });
   });
 }

@@ -18,6 +18,16 @@ export 'cycle_phase.dart';
 /// It is safe on every shape of input the app can reach it with: no
 /// records at all, records only in the future, a today before the first
 /// recorded date, and a cycle running longer than the estimate.
+///
+/// **Cycle day comes from the latest recorded period start**, which is a
+/// property the user set on a bleeding day. Spotting is never one, so a
+/// month of spotting leaves the cycle exactly where it was — see
+/// `BleedingLevel.canStartPeriod`.
+///
+/// **What is recorded and what is estimated stay apart.** The phase here
+/// is estimated from the cycle day; it never invents a bleeding record,
+/// and a day inside the estimated menstrual span is not claimed as
+/// bleeding unless the user recorded it.
 CycleMoment cycleMomentAt({
   required CalendarDate today,
   required CycleData data,
@@ -40,10 +50,12 @@ CycleMoment cycleMomentAt({
       recordedStart: null,
       currentDay: null,
       phase: null,
+      manualPhase: data.manualPhase,
       estimatedNextStart: null,
       estimatedOvulatoryWindow: null,
       recordedLengths: data.recordedLengths,
       hasRecords: data.isNotEmpty,
+      recordedToday: data.recordOn(today),
     );
   }
 
@@ -60,6 +72,7 @@ CycleMoment cycleMomentAt({
     recordedStart: recordedStart,
     currentDay: currentDay,
     phase: phaseForDay(currentDay, length),
+    manualPhase: data.manualPhase,
     estimatedNextStart: recordedStart.addDays(length),
     estimatedOvulatoryWindow: DateRange(
       // Cycle day N is the recorded start plus N-1 days.
@@ -68,6 +81,7 @@ CycleMoment cycleMomentAt({
     ),
     recordedLengths: data.recordedLengths,
     hasRecords: true,
+    recordedToday: data.recordOn(today),
   );
 }
 

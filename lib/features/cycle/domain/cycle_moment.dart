@@ -74,6 +74,8 @@ class CycleMoment {
     required this.estimatedOvulatoryWindow,
     required this.recordedLengths,
     required this.hasRecords,
+    this.manualPhase,
+    this.recordedToday,
   });
 
   /// The day this was worked out for. Injected, never read from a clock.
@@ -92,7 +94,21 @@ class CycleMoment {
   final int? currentDay;
 
   /// The approximate phase, or null when there is no current cycle.
+  ///
+  /// Estimated. [displayedPhase] is what a screen shows.
   final CyclePhase? phase;
+
+  /// The phase the user said they are actually in, if they said.
+  ///
+  /// It changes what is **displayed** and nothing else: no record moves,
+  /// no day 1 moves, and [phase] above still holds the estimate.
+  final CyclePhase? manualPhase;
+
+  /// What the user recorded for today, if anything.
+  ///
+  /// Factual, unlike [phase]. A day inside the estimated menstrual span
+  /// is not bleeding unless it is in here.
+  final CycleDayRecord? recordedToday;
 
   /// When the next period would begin if this cycle ran exactly as long
   /// as the estimate. It very often will not.
@@ -110,6 +126,22 @@ class CycleMoment {
   final bool hasRecords;
 
   bool get hasCurrentCycle => currentDay != null;
+
+  /// The phase a screen should show: the user's own answer if they gave
+  /// one, otherwise the estimate.
+  ///
+  /// Null only when there is neither — no cycle to count and nothing
+  /// chosen.
+  CyclePhase? get displayedPhase => manualPhase ?? phase;
+
+  /// Whether what is displayed is the user's answer rather than the
+  /// arithmetic. Screens use it to stop calling a chosen phase an
+  /// estimate.
+  bool get phaseIsManual => manualPhase != null;
+
+  /// Whether the user recorded bleeding — not spotting — today.
+  bool get bleedingToday =>
+      recordedToday != null && recordedToday!.level.canStartPeriod;
 
   /// True when today is further into the cycle than the estimate
   /// allowed for. Not a problem, and never presented as one.

@@ -5,8 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/almanac_button.dart';
 import '../../../app/navigation/immersive_session.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../app/context/cycle_phase_context.dart';
+import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
+import '../domain/cycle_yoga.dart';
 import '../domain/yoga_practices.dart';
+import 'widgets/cycle_context_card.dart';
 import 'widgets/pose_figure.dart';
 import 'widgets/practice_chooser.dart';
 import 'widgets/step_guidance.dart';
@@ -78,6 +82,14 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
   YogaStage _stage = YogaStage.choosingPractice;
   YogaPractice? _chosen;
 
+  /// The cycle phase the user arrived with, when they came from Cycle
+  /// Syncing's movement guidance.
+  ///
+  /// Held for as long as this screen is the one in front of them, and
+  /// dropped the moment it is not: a contextual intent belongs to the
+  /// journey that created it.
+  CyclePhase? _arrivedForPhase;
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +112,28 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _immersion.checkVisibility(context);
+    _syncArrival();
+  }
+
+  /// Collects an intent on arrival, and lets go of it on the way out.
+  ///
+  /// Read now, emptied after the frame: changing a provider from a
+  /// widget life-cycle is not allowed, and deferring it also means the
+  /// first frame already shows the right context.
+  void _syncArrival() {
+    if (!TickerMode.valuesOf(context).enabled) {
+      _arrivedForPhase = null;
+      return;
+    }
+
+    final intent = ref.read(almanacIntentProvider);
+    if (intent is! CycleYogaIntent) return;
+
+    _arrivedForPhase = intent.phase;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(almanacIntentProvider.notifier).take(FeatureId.yoga);
+    });
   }
 
   @override
@@ -204,8 +238,17 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
       trailing: const AlmanacButton(),
       body: [
         switch (_stage) {
-          YogaStage.choosingPractice => PracticeChooser(
-            onChosen: _choosePractice,
+          YogaStage.choosingPractice => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // One Almanac: the same day Cycle Syncing is looking at.
+              // Above the usual choices, and it changes none of them.
+              _CycleContext(
+                arrivedFor: _arrivedForPhase,
+                onChoose: _choosePractice,
+              ),
+              PracticeChooser(onChosen: _choosePractice),
+            ],
           ),
           YogaStage.finished => _Finished(
             practice: _chosen!,
@@ -446,4 +489,43 @@ class _Finished extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The cycle phase, and the practice that suits it.
+///
+/// Reads the phase from the app's shared seam — the same one the
+/// Cookbook and Meditation read — so Yoga never imports Cycle and never
+/// learns anything about bleeding.
+///
+/// [arrivedFor] is the phase the user travelled with, when they came
+/// through Cycle Syncing's door. When it is null they opened Yoga
+/// normally: the same suggestion appears under a quieter heading if
+/// there is a phase to answer for, and nothing at all if there is not.
+class _CycleContext extends ConsumerWidget {
+  const _CycleContext({required this.arrivedFor, required this.onChoose});
+
+  final CyclePhase? arrivedFor;
+  final ValueChanged<YogaPractice> onChoose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final phase = arrivedFor ?? ref.watch(almanacCyclePhaseProvider);
+    // No Cycle in the Almanac, or nothing for it to say.
+    if (phase == null) return const SizedBox.shrink();
+
+    return CycleContextCard(
+      heading: arrivedFor == null
+          ? YogaText.forToday
+          : CycleYogaIntent(arrivedFor!).heading,
+      suggestion: CycleYoga.forPhase(phase),
+      onBegin: () => onChoose(CycleYoga.practiceFor(phase)),
+    );
+  }
+}
+
+/// The one contextual heading Yoga adds.
+abstract final class YogaText {
+  /// Shown when Yoga was opened normally rather than through a doorway.
+  /// It mentions today; it does not announce it.
+  static const forToday = 'For today';
 }

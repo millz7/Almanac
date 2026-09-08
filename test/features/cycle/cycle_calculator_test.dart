@@ -8,13 +8,28 @@ import 'package:flutter_test/flutter_test.dart';
 /// clock, which is the whole point of the model.
 const today = CalendarDate(2026, 9, 7);
 
+/// A recorded day 1, in the new day-record model.
+///
+/// The calculator's contract did not change with the model: a cycle is
+/// still counted from the latest recorded period start, and the start is
+/// now a property of a bleeding day rather than an entry in a separate
+/// list.
+CycleDayRecord day1(CalendarDate date) => CycleDayRecord(
+  date: date,
+  level: BleedingLevel.bleeding,
+  isPeriodStart: true,
+);
+
 CycleMoment momentWith({
   List<CalendarDate> starts = const [],
   int length = kDefaultCycleLength,
   CalendarDate on = today,
 }) => cycleMomentAt(
   today: on,
-  data: CycleData(periodStarts: starts, assumedCycleLength: length),
+  data: CycleData(
+    records: [for (final date in starts) day1(date)],
+    assumedCycleLength: length,
+  ),
 );
 
 void main() {
@@ -157,9 +172,10 @@ void main() {
     });
 
     test('changing it leaves the recorded dates exactly as they were', () {
-      final data = CycleData(periodStarts: [today.addDays(-30), today]);
+      final data = CycleData(records: [day1(today.addDays(-30)), day1(today)]);
       final relengthed = data.withAssumedLength(35);
 
+      expect(relengthed.records, data.records);
       expect(relengthed.periodStarts, data.periodStarts);
       expect(relengthed.assumedCycleLength, 35);
       expect(data.assumedCycleLength, 28);
