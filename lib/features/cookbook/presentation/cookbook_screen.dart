@@ -148,7 +148,7 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     // — on a direct entry — whatever phase Cycle currently shows.
     // Null when Cycle is not part of their Almanac or has nothing to
     // say, and then there is simply no cycle collection.
-    final cyclePhase = _arrivedForPhase ?? ref.watch(almanacCyclePhaseProvider);
+    final cyclePhase = ref.watch(almanacCyclePhaseProvider(_arrivedForPhase));
 
     return AppScaffold(
       title: CookbookText.title,

@@ -91,6 +91,40 @@ one such seam today, and it exposes a phase or null.
 Built pathways: Moon → Meditation; Cycle → Cookbook, Yoga and
 Meditation.
 
+### A feature that is switched off goes dormant
+
+> **An optional Almanac feature that is turned off becomes dormant. Its
+> locally stored data is retained unless the user explicitly deletes it,
+> but other features do not read it while the feature is disabled.**
+
+This is a standing rule for every cross-feature seam, not a detail of
+Cycle. Removing a feature in Settings hides it and hibernates it; it does
+not delete anything. Turning it back on finds the data where it was.
+
+Three things follow, and each is tested:
+
+- **the gate comes before the read.** `almanacCyclePhaseProvider` asks
+  `featureAvailableProvider(FeatureId.cycle)` and returns null *without
+  watching* Cycle's providers. Because Riverpod builds only what is
+  watched, `cycleDataProvider` is never created and `CycleStore.read()`
+  is never called. This is deliberately not "read it and throw the answer
+  away": a store that is never opened cannot leak and cannot appear in a
+  log. A counting fake store proves the read count is **zero** when the
+  Cookbook, Yoga and Meditation are opened with Cycle switched off;
+- **the gate is in one place.** The three consuming features take a
+  `CyclePhase?` and know nothing about how availability is decided —
+  a test greps them for `CycleStore`, `cycleDataProvider`,
+  `displayedCyclePhaseProvider` and `FeatureId.cycle` and expects none of
+  them. Four copies of the rule would be four places it could differ;
+- **a phase carried in from a doorway is gated too.** The intent's phase
+  is passed *through* the seam rather than preferred at the call site, so
+  a screen cannot keep showing cycle content it arrived with after Cycle
+  has been switched off.
+
+The next cross-feature context to be built inherits this by using the
+same seam: Garden off must mean the Cookbook never opens `GardenStore`,
+in the same shape, for the same reason.
+
 `currentMoonProvider` and `currentDaylightProvider` are **selectors**,
 written the same way `currentSeasonProvider` already was: they prefer
 the resolved environment and fall back to the same service it uses. A
@@ -249,6 +283,30 @@ summer" — and how many days until autumn.
   15 minutes old; the app re-checks permission on resume without
   prompting, and only ever prompts from a deliberate tap. There is no
   tracking, no background location and no stored history.
+
+### Backlog: the agreed location-refresh policy
+
+Recorded here so the decision is not re-argued once a feature wants
+fresher place data (tides being the first). **Nothing below is
+implemented yet, and the current behaviour above is unchanged.**
+
+- **One shared coarse location source** for the whole app. Not one per
+  feature, and never a second permission flow.
+- **Foreground only.** No background location, ever, under any feature's
+  requirements.
+- **One cached location, shared by every feature.** A feature never asks
+  the platform directly.
+- **Refresh no more often than roughly every 12 hours.** A person's
+  coarse position does not change often enough to justify more, and
+  each fix is a battery and privacy cost.
+- **Sooner only on an explicit user refresh**, or on another strong
+  shared trigger — a time-zone change being the clearest, since it means
+  the device has genuinely moved.
+- **Tide data freshness and GPS freshness are separate concepts.** Tide
+  *data* may refresh far more often than the location it was computed
+  for: a 12-hour-old coarse position is a perfectly good input to a tide
+  prediction made a minute ago. Confusing the two is what would drag the
+  app towards continuous positioning.
 
 ## The moon
 
@@ -647,6 +705,27 @@ happens once and a restart finds nothing left to migrate. If the write
 fails the old key survives and the next launch tries again. There are
 twelve tests on it, including idempotence and that delete-all removes the
 old key too.
+
+### Cycle Home is always now
+
+**CYCLE HOME = CURRENT LOCAL MONTH.** The central wheel is the month
+containing `todayProvider`'s date, and there is no way to tell it
+otherwise: `_Home` takes no month argument and derives one from today.
+
+The Calendar's month arrows are therefore **Calendar state alone** — not
+persisted, not in `CycleStore`, and dropped when the Calendar is left, so
+each visit opens on the current month. Walking back to August to fill in
+a missed week cannot leave Home sitting in August with no current-day
+ring, and the user is never asked to press a "back to today" control that
+should not need to exist.
+
+Because `todayProvider` prefers the resolved environment's instant, and
+the environment re-resolves at each day/night change, on its six-hourly
+cap and whenever the app returns to the foreground, a phone left open
+across midnight on 30 September shows October on the 1st by itself.
+
+Records in other months are dormant on the wheel, never ignored: a Day 1
+saved on 31 August still makes 20 September cycle day 21.
 
 ### The month wheel is a data visualisation
 

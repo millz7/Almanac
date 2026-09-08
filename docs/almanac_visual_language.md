@@ -250,6 +250,22 @@ This is a firm product rule, and it is tested.
 Features read context through the shared seam (`lib/core/context/`) and
 never through each other's widgets or stores.
 
+### A feature that is switched off goes dormant (hard)
+
+**An optional Almanac feature that is turned off becomes dormant. Its
+locally stored data is retained unless the user explicitly deletes it,
+but other features do not read it while the feature is disabled.**
+
+So when Cycle is not part of the user's Almanac there is no cycle heading
+and no cycle collection anywhere — and, behind the page, no phase is
+derived and `CycleStore` is not opened at all. The availability check
+comes *before* the read, in one place in the app layer, and the features
+consuming the context are only ever handed a `CyclePhase?`. Turning the
+feature back on finds the data where it was.
+
+This is the rule for every future cross-feature context, not a detail of
+Cycle. See the README for how it is wired and tested.
+
 ---
 
 ## 7. Voice

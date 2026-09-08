@@ -70,6 +70,7 @@ void main() {
     CycleData? data,
     CycleStore? store,
     DateTime? now,
+    DateTime Function()? clock,
     MoonPhaseState moon = _waxingCrescent,
     Set<FeatureId> features = const {FeatureId.cycle},
     double textScale = 1,
@@ -94,6 +95,7 @@ void main() {
       overrides: [
         ...environmentOverrides(
           now: now ?? testNow,
+          clock: clock,
           features: features,
           cycleStore: store ?? InMemoryCycleStore(data ?? CycleData.empty),
         ),
@@ -133,8 +135,9 @@ void main() {
     int day, {
     required BleedingLevel? level,
     bool? firstDay,
+    String month = 'September',
   }) async {
-    await press(tester, find.bySemanticsLabel(RegExp('^$day September')));
+    await press(tester, find.bySemanticsLabel(RegExp('^$day $month')));
     await press(tester, levelChoice(level));
     if (firstDay != null) {
       final toggle = find.byType(Switch);
@@ -233,6 +236,133 @@ void main() {
       expect(find.text(MoonPhase.waxingCrescent.label), findsOneWidget);
       expect(route(CycleText.calendar), findsOneWidget);
       expect(route(CycleText.syncing), findsOneWidget);
+    });
+  });
+
+  group('Cycle home is always the current month', () {
+    // CYCLE HOME = CURRENT LOCAL MONTH. The wheel is the month the user
+    // is living in, and browsing the Calendar is a way of looking at the
+    // Calendar — not a change of month for the whole feature.
+    CycleMoonWheel wheel(WidgetTester tester) =>
+        tester.widget<CycleMoonWheel>(find.byType(CycleMoonWheel));
+
+    testWidgets('today is September, so the wheel is September', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      expect(wheel(tester).month.year, 2026);
+      expect(wheel(tester).month.month, 9);
+      expect(wheel(tester).today, testToday);
+      // September's own record is drawn, which is the other half of the
+      // same claim: this is the month the records are read from.
+      expect(wheel(tester).records.keys, contains(4));
+    });
+
+    testWidgets('browsing back to August leaves the wheel in September', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      await press(tester, route(CycleText.calendar));
+      await press(tester, find.byTooltip(CycleText.previousMonth));
+      // The Calendar may sit wherever the user has walked it.
+      expect(find.text('August 2026'), findsWidgets);
+
+      await press(tester, back());
+
+      expect(wheel(tester).month.month, 9);
+      expect(wheel(tester).records.keys, contains(4));
+      expect(find.text('September · Summer'), findsOneWidget);
+      expect(find.text(CycleText.dayLine(17)), findsOneWidget);
+    });
+
+    testWidgets('and walking forward into an empty month leaves it there too', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      await press(tester, route(CycleText.calendar));
+      for (var i = 0; i < 3; i++) {
+        await press(tester, find.byTooltip(CycleText.nextMonth));
+      }
+      expect(find.text('December 2026'), findsWidgets);
+
+      await press(tester, back());
+
+      expect(wheel(tester).month.month, 9);
+      expect(find.text('September · Summer'), findsOneWidget);
+    });
+
+    testWidgets('the Calendar opens on the current month each time', (
+      tester,
+    ) async {
+      await openCycle(tester, data: withDay1(sep4));
+
+      await press(tester, route(CycleText.calendar));
+      await press(tester, find.byTooltip(CycleText.previousMonth));
+      expect(find.text('August 2026'), findsWidgets);
+
+      await press(tester, back());
+      await press(tester, route(CycleText.calendar));
+
+      expect(find.text('September 2026'), findsWidgets);
+      expect(find.text('August 2026'), findsNothing);
+    });
+
+    testWidgets('a record saved in a past month counts, and Home stays put', (
+      tester,
+    ) async {
+      final container = await openCycle(tester);
+
+      await press(tester, route(CycleText.calendar));
+      await press(tester, find.byTooltip(CycleText.previousMonth));
+      await recordDay(
+        tester,
+        31,
+        month: 'August',
+        level: BleedingLevel.bleeding,
+        firstDay: true,
+      );
+
+      // Saving does not throw the user out of the month they were
+      // entering days in.
+      expect(find.text('August 2026'), findsWidgets);
+
+      final data = container.read(cycleDataProvider).value!;
+      expect(data.periodStarts, contains(const CalendarDate(2026, 8, 31)));
+
+      await press(tester, back());
+
+      // Home is still September — and 31 August is still day 1, so the
+      // 20th is day 21. Dormant months are not ignored; they are simply
+      // not what the wheel is showing.
+      expect(wheel(tester).month.month, 9);
+      expect(find.textContaining(CycleText.dayLine(21)), findsOneWidget);
+    });
+
+    testWidgets('and the wheel moves into October when today does', (
+      tester,
+    ) async {
+      var now = DateTime.utc(2026, 9, 30, 12);
+      final container = await openCycle(
+        tester,
+        now: now,
+        clock: () => now,
+        data: withDay1(sep4),
+      );
+      expect(wheel(tester).month.month, 9);
+
+      // Midnight passes. The environment re-resolves on its own in the
+      // running app — at each day/night change and on its six-hourly
+      // cap — and `todayProvider` follows it.
+      now = DateTime.utc(2026, 10, 1, 12);
+      container.read(naturalEnvironmentProvider.notifier).refresh();
+      await tester.pumpAndSettle();
+
+      expect(wheel(tester).month.year, 2026);
+      expect(wheel(tester).month.month, 10);
+      expect(wheel(tester).today, const CalendarDate(2026, 10, 1));
     });
   });
 

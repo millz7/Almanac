@@ -341,9 +341,13 @@ class _TodayContext extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cyclePhase = arrivedForPhase ?? ref.watch(almanacCyclePhaseProvider);
-    // The moon is always available; a cycle phase may not be.
-    final arrived = arrivedFromMoon != null || arrivedForPhase != null;
+    final cyclePhase = ref.watch(almanacCyclePhaseProvider(arrivedForPhase));
+    // The moon is always available; a cycle phase may not be — and if
+    // Cycle has been switched off since they walked in, the phase they
+    // arrived with is gone too, so this is no longer an arrival.
+    final arrived =
+        arrivedFromMoon != null ||
+        (arrivedForPhase != null && cyclePhase != null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

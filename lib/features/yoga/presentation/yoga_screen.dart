@@ -509,7 +509,7 @@ class _CycleContext extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final phase = arrivedFor ?? ref.watch(almanacCyclePhaseProvider);
+    final phase = ref.watch(almanacCyclePhaseProvider(arrivedFor));
     // No Cycle in the Almanac, or nothing for it to say.
     if (phase == null) return const SizedBox.shrink();
 

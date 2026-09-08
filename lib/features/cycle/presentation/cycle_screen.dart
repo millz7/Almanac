@@ -72,8 +72,13 @@ class CycleScreen extends ConsumerStatefulWidget {
 class _CycleScreenState extends ConsumerState<CycleScreen> {
   final List<CyclePage> _stack = [const CycleHome()];
 
-  /// The month the calendar and the wheel are showing. Null means the
-  /// month today is in.
+  /// The month the **Calendar** is showing. Null means the month today
+  /// is in.
+  ///
+  /// Calendar-only presentation state. It is deliberately not persisted,
+  /// not in `CycleStore`, and never handed to [_Home]: CYCLE HOME =
+  /// CURRENT LOCAL MONTH, so walking the Calendar back to August cannot
+  /// move the wheel off the month the user is actually living in.
   CalendarDate? _browsing;
 
   bool _saveFailed = false;
@@ -88,6 +93,9 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
   void _back() => setState(() {
     if (_stack.length > 1) _stack.removeLast();
     _saveFailed = false;
+    // Leaving the Calendar takes the browsed month with it: it is a way
+    // of looking at the Calendar, not a place the feature remembers.
+    _browsing = null;
   });
 
   void _toHome() => setState(() {
@@ -95,6 +103,7 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
       ..clear()
       ..add(const CycleHome());
     _saveFailed = false;
+    _browsing = null;
   });
 
   CycleController get _cycle => ref.read(cycleDataProvider.notifier);
@@ -166,7 +175,7 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
     final page = _page;
     final today = ref.watch(todayProvider);
     final season = ref.watch(currentSeasonProvider);
-    final month = _browsing ?? today;
+    final browsing = _browsing ?? today;
 
     return AlmanacPaperSurface(
       child: AppScaffold(
@@ -179,7 +188,7 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
         },
         subtitle: switch (page) {
           CycleHome() => CycleText.context(today.month, season),
-          CycleCalendarPage() => formatMonth(month),
+          CycleCalendarPage() => formatMonth(browsing),
           _ => null,
         },
         trailing: const AlmanacButton(),
@@ -197,7 +206,6 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
 
           switch (page) {
             CycleHome() => _Home(
-              month: month,
               onCalendar: () => _open(const CycleCalendarPage()),
               onSyncing: () => _open(const CycleSyncingPage()),
               onMoonType: () => _open(const CycleMoonTypePage()),
@@ -205,7 +213,7 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
             ),
 
             CycleCalendarPage() => _CalendarPage(
-              month: month,
+              month: browsing,
               onMonth: (next) => setState(() => _browsing = next),
               onOpenDay: _editDay,
             ),
@@ -247,14 +255,12 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
 /// test that they are not here.
 class _Home extends ConsumerWidget {
   const _Home({
-    required this.month,
     required this.onCalendar,
     required this.onSyncing,
     required this.onMoonType,
     required this.onAdjust,
   });
 
-  final CalendarDate month;
   final VoidCallback onCalendar;
   final VoidCallback onSyncing;
   final VoidCallback onMoonType;
@@ -265,6 +271,13 @@ class _Home extends ConsumerWidget {
     final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
     final today = ref.watch(todayProvider);
+
+    // CYCLE HOME = CURRENT LOCAL MONTH. Home is given no month to show;
+    // it derives one from today, which is why browsing the Calendar
+    // cannot change it and why the wheel moves into October by itself
+    // when today does.
+    final month = today;
+
     final moment = ref.watch(cycleMomentProvider);
     final data = ref.watch(cycleDataProvider).value ?? CycleData.empty;
     final moons = ref.watch(monthMoonsProvider(month));

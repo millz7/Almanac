@@ -23,6 +23,9 @@ import 'fake_environment_services.dart';
 /// onboarding already finished, no name, no chosen features and location
 /// never shared. Tests override only the part they are about.
 ///
+/// Pass `clock` instead of `now` when a test needs the clock to advance
+/// during the test; `now` still sets the day the sun defaults to.
+///
 /// Pass `onboardingCompleted: false` (and whichever earlier answers are
 /// still missing) to land in the middle of first-launch setup.
 ///
@@ -30,6 +33,7 @@ import 'fake_environment_services.dart';
 /// test needs a named zone.
 List<Override> environmentOverrides({
   DateTime? now,
+  DateTime Function()? clock,
   LocalTimeZone? timeZone,
   DateTime? sunrise,
   DateTime? sunset,
@@ -86,7 +90,10 @@ List<Override> environmentOverrides({
     natureLogStoreProvider.overrideWithValue(
       natureLogStore ?? InMemoryNatureLogStore(),
     ),
-    clockProvider.overrideWithValue(() => instant),
+    // `clock` is for the rare test that needs time to *move*: pass a
+    // closure over a variable the test reassigns. Everything else pins a
+    // single instant with `now`.
+    clockProvider.overrideWithValue(clock ?? () => instant),
     initialTimeZoneProvider.overrideWithValue(zone),
     timeZoneServiceProvider.overrideWithValue(FixedTimeZoneService(zone)),
     locationServiceProvider.overrideWithValue(
