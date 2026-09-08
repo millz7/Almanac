@@ -7,6 +7,7 @@ import 'seasonal_palettes.dart';
 export 'app_spacing.dart';
 export 'app_typography.dart';
 export 'chakra_accents.dart';
+export 'journal_typography.dart';
 export 'season_illustration.dart';
 export 'seasonal_palettes.dart';
 

@@ -11,6 +11,7 @@ import '../features/onboarding/presentation/hemisphere_screen.dart';
 import '../features/onboarding/presentation/location_intro_screen.dart';
 import '../features/onboarding/presentation/name_screen.dart';
 import 'app_shell.dart';
+import 'navigation/detail_routes.dart';
 import 'navigation/feature_screens.dart';
 
 /// Where the app lands once setup is done. Owned by the registry, so the
@@ -26,6 +27,17 @@ const kFeatureChoiceRoute = '/onboarding/almanac';
 
 /// Route for the developer theme preview. Only registered in debug builds.
 const kThemePreviewRoute = '/dev/theme';
+
+/// The Moon detail page.
+///
+/// **A page inside the Environment, not a feature.** It is declared as a
+/// child of the Environment branch's route, which is what gives it the
+/// behaviour it should have for free: Back returns to the Environment, the
+/// user's own navigation bar stays put with the Environment still
+/// selected, and there is no extra tab, no [FeatureId], no onboarding
+/// question and no second navigator. Reaching it is a matter of having
+/// explored the Environment page.
+const kMoonRoute = '/environment/moon';
 
 /// The app's router.
 ///
@@ -110,6 +122,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 GoRoute(
                   path: feature.route,
                   builder: (_, _) => screenForFeature(feature),
+                  routes: [
+                    // Detail pages that belong *inside* a feature rather
+                    // than beside it. The Moon is the first: it is part
+                    // of the Environment, so it lives in the
+                    // Environment's own branch and its stack.
+                    ...detailRoutesFor(feature),
+                  ],
                 ),
               ],
             ),

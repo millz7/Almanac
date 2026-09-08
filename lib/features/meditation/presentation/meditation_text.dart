@@ -1,5 +1,14 @@
 /// The words the Meditation screen uses that are worth reading in one
-/// place — which is to say the ones with a number in them.
+/// place — the ones with a number in them, and the one contextual
+/// heading.
+abstract final class MeditationText {
+  /// The heading over the moon suggestion when Meditation was opened
+  /// normally rather than through the Moon's doorway. Deliberately
+  /// quieter than the intent's own heading: it mentions today, it does
+  /// not announce it.
+  static const forToday = 'For today';
+}
+
 const _numbers = [
   'zero',
   'one',

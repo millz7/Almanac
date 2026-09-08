@@ -26,12 +26,69 @@ personal record of what you have noticed, beside a modest offline guide
 to what is often about at this time of year — offered only where the app
 actually knows the guide applies.
 
+The Environment has depth as well as breadth: tapping its moon opens a
+page about the moon, and from there — if Meditation is part of your
+Almanac — a practice chosen for tonight's phase.
+
 ## Getting started
 
 ```
 flutter pub get
 flutter run
 ```
+
+## One Almanac
+
+The eight areas are not eight apps. They are views into the same current
+moment, and the relationship is always the same:
+
+```
+CONTEXT   ->   GUIDANCE   ->   OPTIONAL DOORWAY TO AN ENABLED FEATURE
+```
+
+**Feature choices control the doorway. They never remove the guidance.**
+The Moon's reflective practices still say "Meditate" when Meditation is
+switched off; only "Try a meditation →" goes. This is a firm product
+rule, and it is tested from both sides.
+
+`lib/core/context/` is the seam that makes it possible without features
+importing each other's widgets or stores:
+
+```
+AlmanacMoment       today · season · hemisphere · moon · daylight
+                    composed from the existing providers, never a
+                    second calculation, and never persisted
+AlmanacFeatures     "is this feature part of the user's Almanac?",
+                    asked one way, in one place
+AlmanacIntent       why the user is going somewhere — a value, handed
+                    off once and taken by the destination
+AlmanacDoorway      a link that renders itself away when its
+                    destination is not part of the Almanac
+```
+
+`currentMoonProvider` and `currentDaylightProvider` are **selectors**,
+written the same way `currentSeasonProvider` already was: they prefer
+the resolved environment and fall back to the same service it uses. A
+screen that needs one fact watches one provider; `almanacMomentProvider`
+is there for a screen that genuinely needs several.
+
+An intent is deliberately thin. `MoonMeditationIntent` carries a
+`MoonPhase` and nothing else, so the Moon page knows nothing about
+breathing patterns and Meditation knows nothing about lunar copy — each
+feature answers for its own half. The connections still to come (Cycle →
+Cookbook, Yoga, Meditation; Garden ↔ Cookbook; Season → Garden,
+Cookbook, Nature Log) are each one more subclass, with no new route and
+no change to the navigation.
+
+Nothing in the shared context is stored. There is no context history and
+no snapshot: it is derived when asked and thrown away, so there is
+nothing to leak, and there are no coordinates in it at all.
+
+The visual and animation rules the whole app follows are written down in
+[`docs/almanac_visual_language.md`](docs/almanac_visual_language.md) —
+including the landscape geometry rule (the landscape is one place, and
+its land never changes shape between seasons or between day and night)
+and the animation principle: **nature moves, interface stays still.**
 
 ## Architecture
 
@@ -40,6 +97,10 @@ flutter run
 - `lib/core/environment/` — the natural environment: season, day/night,
   hemisphere, location and solar services. The single source of truth the
   theme (and later, features) read from.
+- `lib/core/context/` — the shared Almanac context: the current moment,
+  feature availability, and the contextual-intent model every
+  cross-feature doorway uses. Depends on `core/environment` and
+  `core/time`; knows nothing about any feature.
 - `lib/core/settings/` — the small set of persisted user choices, behind a
   `SettingsStore` interface.
 - `lib/core/widgets/` — small reusable UI building blocks shared across
@@ -1062,6 +1123,69 @@ observation is "A moth. Insect. Recorded 15 October." The way back sits
 *above* a page's list rather than below it, every target clears 48 dp,
 and names wrap rather than truncate at 2× text.
 
+## The Moon, inside the Environment
+
+The moon on the Environment page opens a page about the moon. It is
+**not** a feature: no tab, no `FeatureId`, no onboarding question, no
+entry in the registry. It is a child route of the Environment's own shell
+branch (`/environment/moon`), which is what gives it the right behaviour
+for free — Back returns to the Environment, the navigation bar stays put
+with the Environment still selected, and there is no second navigator.
+The only change to the Environment screen itself was making its existing
+moon section tappable; nothing moved.
+
+The page is the reference implementation of the **detail-page rule**:
+paper ground, one illustration, fine rules between passages, and mostly
+space. No landscape, no flowers around the moon, no botanical wreath, no
+forest, no seasonal background painting. Environment is the app's one
+living painting; everything under it is a page in the same notebook. That
+is what stops the app needing four seasonal paintings and two day/night
+versions of every screen it ever adds — and there is a test for each of
+those absences.
+
+### Two layers
+
+**What the moon is doing**, from `currentMoonProvider` — the same
+astronomy the Environment page shows, not a second moon system. The
+phase, the illuminated percentage, and whether it is waxing or waning,
+with the lit side turned over for a southern observer. The timing of the
+next major phase is **deliberately absent**: the existing calculation
+resolves a phase at an instant rather than searching for the instant a
+phase begins, and a guessed date would be worse than a gap.
+
+**What somebody might do with it**, as eight structured reflections — a
+theme, an explanation, four words, and a handful of practices. Written as
+invitations: "can be used as", "may be a moment to", "in some modern
+spiritual traditions". `moon_content_test.dart` fails on any causal
+biological, hormonal, menstrual, fertility, emotional, personality or
+medical claim, and the page says once, out loud, what kind of writing it
+is.
+
+**Astronomy and cycle records are separate things** and stay that way.
+The moon's phase is the same for everybody on Earth tonight; a cycle is
+something the user recorded. The Moon page does not mention a cycle at
+all — there is a test — and the app never says one moves the other.
+
+### Moon → Meditation
+
+The first cross-feature pathway. When Meditation is part of the Almanac,
+the Moon offers "Try a meditation →", which carries a
+`MoonMeditationIntent` into the **normal** Meditation screen. There is no
+duplicate screen, and none of the four practices — Focus, Sleep, Balance,
+Release Tension — is removed or changed.
+
+Meditation's answer is the smallest coherent one: each phase points at
+**one of the four practices that already exist** plus one line saying why
+it suits this moon. No ninth breathing pattern, no new engine. Arriving
+from the Moon, the block is headed "For today's New Moon"; opening
+Meditation from the navigation bar, the same suggestion appears under the
+quieter "For today", because the context is true either way and only the
+wording knows how you got there.
+
+The intent is a hand-off, not stored state: it is taken on arrival and
+emptied on the next frame, so leaving and returning never finds
+yesterday's moon still waiting.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -1093,7 +1217,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,328 tests. The ones worth knowing about:
+1,420 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -1190,6 +1314,33 @@ flutter test
   drops nine kinds of malformed line one at a time, keeps an item id from
   a later version, and checks that free text with quotes, pipes and
   newlines survives a round trip.
+- `almanac_context_test.dart` proves the seams are shared rather than
+  merely in agreement: `todayProvider` is the same provider object Cycle,
+  Garden and the Nature Log re-export, one season, one moon, feature
+  availability that follows the persisted choices as they change, intents
+  that are deterministic values, and a grep of `lib/core/context/`
+  proving it calculates nothing and stores nothing.
+- `moon_content_test.dart` reads all eight lunar reflections and every
+  fixed string the Moon and its Meditation suggestion can say: no
+  biological, hormonal, menstrual, fertility, emotional, personality or
+  medical claim, every explanation hedged, and no score kept.
+- `moon_screen_test.dart` opens the Moon from the Environment and checks
+  what is there and what is not: the astronomy matches, the hemisphere
+  still turns the light over, no timing is invented, one illustration and
+  no landscape or wreath, Back returns to the Environment three times
+  over with no stack left behind, and no Moon tab appears in the
+  navigation bar. Its doorway group is the product rule under test — with
+  Meditation on the door is there, with Meditation off every word of the
+  guidance remains and the door is simply absent, and re-enabling brings
+  it back with the user still standing on the page.
+- `moon_context_test.dart` walks Environment → Moon → Meditation and
+  checks the phase arrives, the suggestion suits it, all four practices
+  are still offered, and the intent does not linger: leaving and
+  re-entering finds no stale moon, and a direct entry never sees one.
+- `paper_surface_test.dart` checks the detail-page paper tone in all
+  eight palettes: body and secondary text legible on it, the accent
+  legible, and the tone still the palette's own ground rather than a
+  fixed cream held up in a dark room.
 - `nature_log_screen_test.dart` records from the book and in the user's
   own words through the real screens, edits, removes, cancels a removal,
   clears the log, and checks the empty state, the unsupported-region

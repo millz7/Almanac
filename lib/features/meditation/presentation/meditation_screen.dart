@@ -7,12 +7,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/almanac_button.dart';
 import '../../../app/navigation/immersive_session.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/meditation_technique.dart';
+import '../domain/moon_meditation.dart';
 import 'meditation_text.dart';
 import 'widgets/breath_guidance.dart';
 import 'widgets/duration_stepper.dart';
 import 'widgets/glowing_orb.dart';
+import 'widgets/moon_context_card.dart';
 import 'widgets/technique_chooser.dart';
 
 /// Where the user has got to.
@@ -82,6 +85,15 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
   MeditationTechnique? _technique;
   int _minutes = kDefaultSessionMinutes;
 
+  /// The moon the user arrived with, when they came from the Moon page.
+  ///
+  /// Taken from the shared intent on arrival and held here for as long as
+  /// this screen is the one in front of them. Dropped the moment it is
+  /// not, because a contextual intent belongs to the journey that
+  /// created it: opening Meditation from the navigation bar later must
+  /// not find yesterday's moon still waiting.
+  MoonPhase? _arrivedFromMoon;
+
   @override
   void initState() {
     super.initState();
@@ -104,6 +116,39 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _immersion.checkVisibility(context);
+    _syncArrival();
+  }
+
+  /// Collects an intent on arrival, and lets go of it on the way out.
+  ///
+  /// Assigned directly rather than through `setState`: this runs
+  /// immediately before the build it belongs to, so the new value is
+  /// already picked up — and the phase is local state, not a provider.
+  ///
+  /// **The intent is emptied after the frame, not during it.** Reading it
+  /// here is free; clearing it is a change to a provider, and Riverpod
+  /// rightly refuses that from a widget life-cycle. So the value is
+  /// copied now and the hand-off is closed on the next frame, which also
+  /// means the first frame already shows the right context instead of
+  /// flickering into it.
+  void _syncArrival() {
+    // The same seam the immersive session uses to notice it is no longer
+    // the visible branch.
+    if (!TickerMode.valuesOf(context).enabled) {
+      _arrivedFromMoon = null;
+      return;
+    }
+
+    final intent = ref.read(almanacIntentProvider);
+    if (intent is! MoonMeditationIntent) return;
+
+    _arrivedFromMoon = intent.phase;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Takes rather than clears, so a journey to somewhere else that
+      // began in the same frame is not thrown away.
+      ref.read(almanacIntentProvider.notifier).take(FeatureId.meditation);
+    });
   }
 
   @override
@@ -224,8 +269,18 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
       trailing: const AlmanacButton(),
       body: [
         switch (_stage) {
-          MeditationStage.choosingTechnique => TechniqueChooser(
-            onChosen: _chooseTechnique,
+          MeditationStage.choosingTechnique => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // One Almanac: the same evening the Moon page is looking
+              // at. Above the usual choices, and it changes none of
+              // them.
+              _MoonContext(
+                arrivedFrom: _arrivedFromMoon,
+                onChoose: _chooseTechnique,
+              ),
+              TechniqueChooser(onChosen: _chooseTechnique),
+            ],
           ),
           MeditationStage.finished => _Finished(
             minutes: _minutes,
@@ -240,6 +295,41 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
           ),
         },
       ],
+    );
+  }
+}
+
+/// Today's moon, and the practice that suits it.
+///
+/// Reads the moon from the shared [currentMoonProvider] — the same one
+/// the Environment page and the Moon detail page read, so all three
+/// agree by construction rather than by coincidence.
+///
+/// [arrivedFrom] is the phase the user travelled with, when they came
+/// through the Moon's doorway. When it is null they opened Meditation
+/// normally, and the same suggestion appears under a quieter heading
+/// rather than being withheld: the context is true either way, and only
+/// the wording knows how they got here.
+class _MoonContext extends ConsumerWidget {
+  const _MoonContext({required this.arrivedFrom, required this.onChoose});
+
+  final MoonPhase? arrivedFrom;
+  final ValueChanged<MeditationTechnique> onChoose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // The phase they arrived with, if any, otherwise tonight's. They are
+    // normally the same; they differ only if the moon has moved on since
+    // the tap, and the phase in hand is the honest one to answer.
+    final phase = arrivedFrom ?? ref.watch(currentMoonProvider).phase;
+    final suggestion = MoonMeditations.forPhase(phase);
+
+    return MoonContextCard(
+      heading: arrivedFrom == null
+          ? MeditationText.forToday
+          : MoonMeditationIntent(arrivedFrom!).heading,
+      suggestion: suggestion,
+      onBegin: () => onChoose(MoonMeditations.techniqueFor(phase)),
     );
   }
 }
