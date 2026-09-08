@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/almanac_button.dart';
+import '../../../app/navigation/widgets/almanac_doorway.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/context/almanac_context.dart';
 import '../../../core/environment/geo_location.dart';
@@ -194,7 +195,14 @@ class _Reflection extends StatelessWidget {
           MoonText.forThisMoon,
           style: textTheme.journalLabel?.copyWith(color: palette.textSecondary),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xs),
+        // The tradition named once, here, so every phase underneath can
+        // simply be written. Not a disclaimer at the foot of the page.
+        Text(
+          MoonText.reflectiveFraming,
+          style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.lg),
         Text(reflection.theme, style: textTheme.headlineSmall),
         const SizedBox(height: AppSpacing.xs),
         Text(
@@ -238,8 +246,7 @@ class _Reflection extends StatelessWidget {
                 ),
               ),
 
-        const SizedBox(height: AppSpacing.xl),
-        Text(MoonText.framing, style: textTheme.bodySmall),
+        const SizedBox(height: AppSpacing.lg),
       ],
     );
   }

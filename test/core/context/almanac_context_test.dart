@@ -365,6 +365,47 @@ void main() {
       }
     });
 
+    test('and core never reaches up into the app layer for navigation', () {
+      // The cross-feature foundation points one way:
+      //
+      //   core/context  ->  app/navigation  ->  features
+      //
+      // An intent is a value, and core owns it. Turning one into a
+      // journey needs the navigation shell and a feature's branch,
+      // which are the app's business — which is why AlmanacDoorway
+      // lives in `lib/app/navigation/widgets/` and not here.
+      final reachingUp = Directory('lib/core')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'))
+          .where(
+            (file) => file
+                .readAsLinesSync()
+                .where((line) => line.startsWith('import '))
+                .any((line) => line.contains('app/navigation')),
+          );
+
+      expect(
+        reachingUp.map((file) => file.path),
+        isEmpty,
+        reason: 'lib/core imports app/navigation',
+      );
+
+      // And the doorway is where it belongs.
+      expect(
+        File('lib/app/navigation/widgets/almanac_doorway.dart').existsSync(),
+        isTrue,
+      );
+      expect(
+        File('lib/core/widgets/almanac_doorway.dart').existsSync(),
+        isFalse,
+      );
+      expect(
+        File('lib/core/widgets/widgets.dart').readAsStringSync(),
+        isNot(contains('almanac_doorway')),
+      );
+    });
+
     test('reading everything twice settles, with no circular dependency', () {
       final container = containerWith(
         features: {FeatureId.meditation},

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../app/theme/app_theme.dart';
-import '../context/almanac_context.dart';
-import '../../app/navigation/navigation_providers.dart';
-import '../features/feature_registry.dart';
+import '../../../core/context/almanac_context.dart';
+import '../../../core/features/feature_registry.dart';
+import '../../theme/app_theme.dart';
+import '../navigation_providers.dart';
 
 /// A way from one part of the Almanac into another, which appears only
 /// while the destination is part of the user's Almanac.
@@ -27,6 +27,14 @@ import '../features/feature_registry.dart';
 /// It carries the [intent] so the destination knows why the user came,
 /// then navigates to the destination's normal route. There is no hidden
 /// duplicate screen at the other end.
+///
+/// **Why it lives in the app layer.** It needs the navigation shell and
+/// the branch a feature lives in, both of which are the app's business.
+/// `lib/core/` must not reach upward for those: the intent model in
+/// `core/context/` is a value, and turning one into a journey is a
+/// decision about this app's navigation. So the direction is
+/// `core/context -> app/navigation -> features`, and a test greps
+/// `lib/core/` to keep it that way.
 class AlmanacDoorway extends ConsumerWidget {
   const AlmanacDoorway({super.key, required this.label, required this.intent});
 

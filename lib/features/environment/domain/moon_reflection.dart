@@ -134,10 +134,9 @@ abstract final class MoonReflections {
       phase: MoonPhase.waxingCrescent,
       theme: 'Nurture what is beginning',
       explanation:
-          'A thin line of light after dark. In some modern spiritual '
-          'traditions this is treated as the tending part of the month: '
-          'you might return to something you decided a few days ago and '
-          'give it a little attention rather than a plan.',
+          'A thin line of light after dark, and the tending part of the '
+          'month: you might return to something you decided a few days '
+          'ago and give it a little attention rather than a plan.',
       words: ['Tend', 'Return', 'Patience', 'Small steps'],
       practices: [
         MoonPractice.tend,
@@ -216,9 +215,9 @@ abstract final class MoonReflections {
       theme: 'Release and simplify',
       explanation:
           'Half lit again, on the way down, and rising after midnight. '
-          'In some modern spiritual traditions the waning half of the '
-          'month is given to letting things go — you might use it to '
-          'finish something, or simply to put one thing down.',
+          'The waning half of the month is associated with letting '
+          'things go — you might use it to finish something, or simply '
+          'to put one thing down.',
       words: ['Release', 'Finish', 'Clear', 'Soften'],
       practices: [
         MoonPractice.release,

@@ -2,33 +2,43 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 
-/// The paper a detail page is written on.
+/// The paper an inner page of the Almanac is written on.
 ///
-/// **Why this exists rather than a hard cream.** Environment is the app's
-/// living painting; the pages underneath it are paper. But the app is
-/// already dressed by eight seasonal palettes including night ones, and a
-/// fixed cream would be a white sheet held up in a dark room. So the
-/// paper tone is the palette's own ground, warmed a little toward its
-/// earth token: warm cream by day, and the same paper by lamplight after
-/// dark.
+/// **The Environment changes with the world outside; the pages inside
+/// the Almanac remain paper.** The ground is a fixed warm cream in all
+/// eight palettes — every season, day and night — because opening a
+/// detail page should feel like turning to a page of a physical almanac
+/// rather than stepping outside again. There is no night paper and no
+/// seasonal paper, and there is a test for each.
 ///
-/// The warmth is deliberately slight — six per cent — so text contrast
-/// is unchanged in every palette. There is a test.
+/// It does more than paint a colour: it re-prints the active palette on
+/// paper (see [AlmanacPaper.reprint]) and hands that to the theme. So a
+/// page inside it goes on using `Theme.of(context).textTheme` and
+/// `context.palette` exactly as any other screen does, and gets paper
+/// ink and paper-safe accents without knowing anything about either.
+/// That is what lets Cycle, a recipe, a plant or a Nature Log entry
+/// share one inner-page language later by wrapping themselves in this
+/// and changing nothing else.
+///
+/// The season is not thrown away. Accents, small selected states, the
+/// moon's shading and illustration detail still come from the active
+/// palette — re-based so a winter night's primary is still legible on
+/// cream.
 ///
 /// See `docs/almanac_visual_language.md`: detail pages are paper, not
-/// scenery. No landscape, no wreath, one illustration, and mostly space.
+/// scenery.
 class AlmanacPaperSurface extends StatelessWidget {
   const AlmanacPaperSurface({super.key, required this.child});
 
   final Widget child;
 
-  /// The paper tone for a palette. Exposed so a page can paint it into
-  /// something other than this widget — an app bar, say — without
-  /// working the blend out again.
-  static Color toneOf(SeasonalPalette palette) =>
-      Color.lerp(palette.background, palette.earth, 0.06)!;
+  /// The paper ground. Takes no palette, because it does not depend on
+  /// one — the signature is the rule.
+  static Color get ground => AlmanacPaper.ground;
 
   @override
-  Widget build(BuildContext context) =>
-      ColoredBox(color: toneOf(context.palette), child: child);
+  Widget build(BuildContext context) => Theme(
+    data: AppTheme.fromPalette(AlmanacPaper.reprint(context.palette)),
+    child: ColoredBox(color: AlmanacPaper.ground, child: child),
+  );
 }

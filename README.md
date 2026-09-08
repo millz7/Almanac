@@ -64,7 +64,14 @@ AlmanacIntent       why the user is going somewhere — a value, handed
                     off once and taken by the destination
 AlmanacDoorway      a link that renders itself away when its
                     destination is not part of the Almanac
+                    (lib/app/navigation/widgets/ — see below)
 ```
+
+The dependency direction is `core/context -> app/navigation ->
+features`, and a test greps `lib/core/` to keep it that way. An intent
+is a value and core owns it; turning one into a journey needs the
+navigation shell and a feature's branch, which are the app's business, so
+`AlmanacDoorway` lives in the app layer rather than in `core/widgets/`.
 
 `currentMoonProvider` and `currentDaylightProvider` are **selectors**,
 written the same way `currentSeasonProvider` already was: they prefer
@@ -1137,11 +1144,23 @@ moon section tappable; nothing moved.
 The page is the reference implementation of the **detail-page rule**:
 paper ground, one illustration, fine rules between passages, and mostly
 space. No landscape, no flowers around the moon, no botanical wreath, no
-forest, no seasonal background painting. Environment is the app's one
-living painting; everything under it is a page in the same notebook. That
-is what stops the app needing four seasonal paintings and two day/night
-versions of every screen it ever adds — and there is a test for each of
-those absences.
+forest, no seasonal background painting.
+
+**The Environment changes with the world outside; the pages inside the
+Almanac remain paper.** The ground is one fixed warm cream —
+`AlmanacPaper.ground`, the single token — in every season and at every
+hour. There is no night paper and no seasonal paper: opening a detail
+page should feel like turning to a page of a physical almanac, not like
+stepping outside again. `AlmanacPaperSurface` re-prints the active
+palette onto that sheet (`AlmanacPaper.reprint`), so a page inside it
+uses `Theme.of(context).textTheme` and `context.palette` exactly as any
+screen does and gets paper ink for free — which is how Cycle, a recipe,
+a plant or a Nature Log entry will share the same inner-page language
+later. The season is still present in the accents, re-based by
+`AlmanacPaper.accentOn` so a winter night's primary is legible on cream.
+Tested: one ground across all eight palettes, unchanged between day and
+night and across the four seasons, body text at 4.5:1 and every usable
+accent at 3:1, and the paper colour written down nowhere but its token.
 
 ### Two layers
 
@@ -1154,12 +1173,17 @@ resolves a phase at an instant rather than searching for the instant a
 phase begins, and a guessed date would be worse than a gap.
 
 **What somebody might do with it**, as eight structured reflections — a
-theme, an explanation, four words, and a handful of practices. Written as
-invitations: "can be used as", "may be a moment to", "in some modern
-spiritual traditions". `moon_content_test.dart` fails on any causal
-biological, hormonal, menstrual, fertility, emotional, personality or
-medical claim, and the page says once, out loud, what kind of writing it
-is.
+theme, an explanation, four words, and a handful of practices. The
+tradition is named **once**, at the top of the reflective passage — "In
+some modern spiritual traditions, the phases of the moon are used as
+moments for reflection." — and every phase underneath is then simply
+written. There is no science disclaimer and no paragraph that opens by
+apologising for itself: the two halves are told apart by tone, and the
+screen reads like an almanac rather than a policy document.
+`moon_content_test.dart` still fails on any causal biological, hormonal,
+menstrual, fertility, emotional, personality or medical claim — the
+exclusions hold, they are simply not something the reader is told
+about.
 
 **Astronomy and cycle records are separate things** and stay that way.
 The moon's phase is the same for everybody on Earth tonight; a cycle is
@@ -1217,7 +1241,7 @@ token classes) rather than hard-coding values.
 flutter test
 ```
 
-1,420 tests. The ones worth knowing about:
+1,435 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.
@@ -1337,10 +1361,12 @@ flutter test
   checks the phase arrives, the suggestion suits it, all four practices
   are still offered, and the intent does not linger: leaving and
   re-entering finds no stale moon, and a direct entry never sees one.
-- `paper_surface_test.dart` checks the detail-page paper tone in all
-  eight palettes: body and secondary text legible on it, the accent
-  legible, and the tone still the palette's own ground rather than a
-  fixed cream held up in a dark room.
+- `paper_surface_test.dart` checks the inner-page paper: one warm cream
+  across all eight palettes, identical between day and night and across
+  the four seasons, never interpolated toward a night background, body
+  and secondary ink at 4.5:1, every accent a page may use at 3:1, a night
+  palette's accent re-based while a day palette's is left alone, and the
+  colour written down nowhere outside its token.
 - `nature_log_screen_test.dart` records from the book and in the user's
   own words through the real screens, edits, removes, cancels a removal,
   clears the log, and checks the empty state, the unsupported-region

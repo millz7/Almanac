@@ -255,14 +255,81 @@ void main() {
       }
     });
 
-    test('and it says once, out loud, what kind of writing this is', () {
-      expect(MoonText.framing, contains('spiritual'));
-      expect(MoonText.framing, contains('not a physical effect'));
-      // Said once, not repeated as a disclaimer beside every line.
-      expect(
-        everythingSaid().where((said) => said == MoonText.framing),
-        hasLength(1),
-      );
+    test('the reflective half is framed, not disclaimed', () {
+      // Named once, as an invitation into a way of reading — not as a
+      // warning about what the writing is not.
+      expect(MoonText.reflectiveFraming, startsWith('In some modern'));
+      expect(MoonText.reflectiveFraming, contains('spiritual traditions'));
+      expect(MoonText.reflectiveFraming, contains('reflection'));
+    });
+
+    test('and the old disclaimer sentence is gone', () {
+      // It read as a policy document rather than an almanac. Nothing
+      // the app can say contains it any more.
+      for (final said in everythingSaid()) {
+        for (final disclaimer in [
+          'not a physical effect',
+          'is not a physical',
+          'no scientific',
+          'not scientifically',
+          'this is not medical',
+          'does not affect',
+        ]) {
+          expect(
+            said.toLowerCase().contains(disclaimer),
+            isFalse,
+            reason: '"$said" contains "$disclaimer"',
+          );
+        }
+      }
+    });
+
+    test('and the tradition is named once, not paragraph by paragraph', () {
+      // Said at the top of the reflective passage, so every phase
+      // underneath can simply be written.
+      final naming = [
+        MoonText.reflectiveFraming,
+        for (final reflection in MoonReflections.all) reflection.explanation,
+      ].where((said) => said.toLowerCase().contains('spiritual traditions'));
+
+      expect(naming, hasLength(1));
+      expect(naming.single, MoonText.reflectiveFraming);
+    });
+
+    test('the factual and reflective halves stay distinct', () {
+      // The factual half states what the moon is doing; the reflective
+      // half offers. Neither leaks into the other.
+      for (final factual in [
+        MoonText.title,
+        MoonText.illumination(34),
+        for (final phase in MoonPhase.values) MoonText.direction(phase),
+        for (final phase in MoonPhase.values) phase.label,
+      ]) {
+        final lower = factual.toLowerCase();
+        for (final reflective in [
+          'you might',
+          'traditions',
+          'can be used',
+          'may be',
+          'reflect',
+        ]) {
+          expect(
+            lower.contains(reflective),
+            isFalse,
+            reason: 'factual "$factual" reads as reflective',
+          );
+        }
+      }
+
+      // And the reflective half never states a measurement.
+      for (final reflection in MoonReflections.all) {
+        expect(reflection.explanation, isNot(contains('%')));
+        expect(
+          reflection.explanation.toLowerCase(),
+          isNot(contains('illuminated')),
+          reason: reflection.phase.name,
+        );
+      }
     });
 
     test('it keeps no score', () {

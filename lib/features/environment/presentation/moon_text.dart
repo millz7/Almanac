@@ -16,13 +16,18 @@ abstract final class MoonText {
 
   static const practices = 'You might';
 
-  /// Said once, quietly, under the reflective passage. Not a disclaimer
-  /// repeated beside every line — one honest sentence about what kind of
-  /// writing this is.
-  static const framing =
-      'Lunar reflection is a spiritual and cultural practice, not a '
-      'physical effect. The moon lights the sky; what you do with the '
-      'month is yours.';
+  /// The one line that frames the whole reflective half, said under the
+  /// "For this moon" heading and nowhere else.
+  ///
+  /// **Where the tradition sentence lives.** Naming the tradition once,
+  /// at the top, lets every phase underneath simply be written — so the
+  /// page reads as an almanac rather than a policy document, and no
+  /// paragraph has to open by apologising for itself. There is no
+  /// science disclaimer: the factual half above states what the moon is
+  /// doing, and the difference in tone is what separates the two.
+  static const reflectiveFraming =
+      'In some modern spiritual traditions, the phases of the moon are '
+      'used as moments for reflection.';
 
   /// The one doorway out of the page, when Meditation is part of the
   /// user's Almanac.
@@ -55,8 +60,8 @@ abstract final class MoonText {
     back,
     forThisMoon,
     practices,
-    framing,
     tryAMeditation,
+    reflectiveFraming,
     illumination(34),
     for (final phase in MoonPhase.values) direction(phase),
   ];

@@ -112,10 +112,70 @@ and July.
 
 ## 4. Detail pages are paper, not scenery
 
-Environment is the primary living painting. **Most deeper pages should
-not duplicate a full landscape.** A detail page uses:
+> **ENVIRONMENT IS OUTSIDE. DETAIL PAGES ARE THE BOOK.**
+>
+> The Environment changes with the world outside.
+> The pages inside the Almanac remain paper.
 
-- a cream/paper background (`AlmanacPaperSurface`)
+This is a locked rule, and it is the one people are most likely to break
+by being helpful.
+
+**Environment / Home** is the living painting. It responds strongly to
+the astronomical season, to sunrise, day, sunset and night, to sky
+colour, landscape lighting, water colour and foreground vegetation. That
+is its job.
+
+**Inner / detail pages** are pages *of* the Almanac. They stay on the
+**same warm cream paper** through spring, summer, autumn, winter,
+daytime and night. A detail page does **not** turn into a dark surface
+because it happens to be dark outside, and there is no seasonal variant
+of the paper either. Opening one should feel like turning to a page of a
+physical almanac — not like stepping outside again into a different
+version of the same scene.
+
+There is therefore:
+
+- **no night paper**
+- **no four seasonal page backgrounds**
+- **no dark mode for a detail page**
+
+### What may still respond to context
+
+A detail page is not cut off from the season. It may still use the
+active palette, subtly, for:
+
+- accent lines
+- small selected states
+- the moon's shading
+- botanical and celestial illustration accents
+- restrained icon and detail colour
+- contextual labels where they help
+
+**But the main paper background stays warm cream.** A seasonal accent
+taken from a night palette is re-based so it is still legible on cream
+(`AlmanacPaper.accentOn`), so the season is present without the page
+losing its ground.
+
+### How it is implemented
+
+One token, one primitive, no hard-coded colour anywhere else:
+
+- `AlmanacPaper` (`lib/app/theme/almanac_paper.dart`) — `ground`, `ink`,
+  `inkMuted`, `rule`, `accentOn(...)`, and `reprint(palette)`.
+- `AlmanacPaperSurface` (`lib/core/widgets/`) — paints the ground and
+  hands the re-printed palette to the theme, so a page inside it goes on
+  using `Theme.of(context).textTheme` and `context.palette` as normal
+  and gets paper ink without knowing about it.
+
+That is what lets future inner pages — Cycle, Cycle Syncing, a recipe, a
+plant, a Nature Log entry — share one stable inner-page language by
+wrapping themselves in the primitive and changing nothing else.
+
+### The rest of the rule
+
+A detail page uses:
+
+- the paper ground
 - lots of breathing room
 - **one** central or small feature illustration
 - the field-journal typographic feeling
@@ -205,3 +265,20 @@ never through each other's widgets or stores.
 - No score. No total anybody is asked to beat.
 - Say what the app does not know, out loud, rather than filling the gap
   with a guess.
+
+### Framing, not disclaiming
+
+A page with a factual half and a reflective half separates them **by
+tone**, not by warning the reader about the second one.
+
+- The factual half states what is true: the phase, the illumination,
+  waxing or waning.
+- The reflective half is introduced once — "In some modern spiritual
+  traditions, the phases of the moon are used as moments for
+  reflection." — and then simply written.
+
+Name the tradition **once**, at the top of the reflective passage. Do
+not open every paragraph with it, and do not add a closing sentence
+explaining what the writing is not. The exclusions still hold and are
+still tested; they are not something to tell the reader about. The
+screen should read like an almanac, not a policy document.

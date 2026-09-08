@@ -1,6 +1,8 @@
 import 'package:almanac/app/almanac_button.dart';
 import 'package:almanac/app/app.dart';
+import 'package:almanac/app/navigation/widgets/almanac_doorway.dart';
 import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
+import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/core/context/almanac_context.dart';
 import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/environment/geo_location.dart';
@@ -66,6 +68,7 @@ void main() {
     Set<FeatureId> features = const {FeatureId.meditation},
     double textScale = 1,
     bool reducedMotion = false,
+    DateTime? now,
     Size surface = const Size(420, 2200),
   }) async {
     tester.view.physicalSize = surface * 2;
@@ -85,6 +88,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         ...environmentOverrides(
+          now: now,
           hemisphere: hemisphere,
           features: features,
           timeZone: hemisphere == Hemisphere.southern
@@ -281,11 +285,43 @@ void main() {
       }
     });
 
-    testWidgets('and says once what kind of writing it is', (tester) async {
+    testWidgets('and frames itself once, without disclaiming', (tester) async {
       await openEnvironment(tester);
       await openMoon(tester);
 
-      expect(find.text(MoonText.framing), findsOneWidget);
+      // One line under the heading, naming the way of reading. Not a
+      // sentence at the bottom explaining what the page is not.
+      expect(find.text(MoonText.reflectiveFraming), findsOneWidget);
+      expect(find.textContaining('not a physical effect'), findsNothing);
+      expect(find.textContaining('spiritual traditions'), findsOneWidget);
+    });
+
+    testWidgets('and the factual half stays above the reflective one', (
+      tester,
+    ) async {
+      await openEnvironment(tester);
+      await openMoon(tester);
+
+      double topOf(Finder finder) => tester.getTopLeft(finder.first).dy;
+
+      // Told apart by tone and by order: what the moon is doing, a
+      // rule, then what somebody might do with it.
+      expect(
+        topOf(find.text('34% illuminated')),
+        lessThan(topOf(find.text(MoonText.forThisMoon))),
+      );
+      expect(
+        topOf(find.text(MoonText.forThisMoon)),
+        lessThan(topOf(find.text(MoonText.reflectiveFraming))),
+      );
+      expect(
+        topOf(find.text(MoonText.reflectiveFraming)),
+        lessThan(
+          topOf(
+            find.text(MoonReflections.forPhase(MoonPhase.waxingCrescent).theme),
+          ),
+        ),
+      );
     });
 
     testWidgets('a different phase is a different page', (tester) async {
@@ -311,6 +347,81 @@ void main() {
 
       expect(find.byType(AlmanacPaperSurface), findsOneWidget);
       expect(find.byType(AlmanacSectionDivider), findsWidgets);
+    });
+
+    testWidgets('and it is the same paper after dark', (tester) async {
+      Future<Color> groundAt(DateTime instant) async {
+        await openEnvironment(tester, now: instant);
+        await openMoon(tester);
+        final surface = tester.widget<AlmanacPaperSurface>(
+          find.byType(AlmanacPaperSurface),
+        );
+        expect(surface, isNotNull);
+        return tester
+            .widget<ColoredBox>(
+              find
+                  .descendant(
+                    of: find.byType(AlmanacPaperSurface),
+                    matching: find.byType(ColoredBox),
+                  )
+                  .first,
+            )
+            .color;
+      }
+
+      // 02:00 in London in July is night; midday is not. The
+      // Environment outside changes completely between them; the page
+      // inside the Almanac does not.
+      final night = await groundAt(DateTime.utc(2025, 7, 15, 1));
+      final day = await groundAt(DateTime.utc(2025, 7, 15, 12));
+
+      expect(night, AlmanacPaper.ground);
+      expect(day, AlmanacPaper.ground);
+      expect(night, day);
+    });
+
+    testWidgets('and the same paper in every season', (tester) async {
+      // One sheet through the year: no seasonal page backgrounds.
+      for (final instant in [
+        DateTime.utc(2025, 1, 15, 12),
+        DateTime.utc(2025, 4, 15, 12),
+        DateTime.utc(2025, 7, 15, 12),
+        DateTime.utc(2025, 10, 15, 12),
+      ]) {
+        await openEnvironment(tester, now: instant);
+        await openMoon(tester);
+
+        expect(
+          tester
+              .widget<ColoredBox>(
+                find
+                    .descendant(
+                      of: find.byType(AlmanacPaperSurface),
+                      matching: find.byType(ColoredBox),
+                    )
+                    .first,
+              )
+              .color,
+          AlmanacPaper.ground,
+          reason: '$instant',
+        );
+      }
+    });
+
+    testWidgets('and its text is printed in paper ink, not palette ink', (
+      tester,
+    ) async {
+      await openEnvironment(tester, now: DateTime.utc(2025, 7, 15, 1));
+      await openMoon(tester);
+
+      // The night palette's own text colour would be a light one, and
+      // invisible here. Inside the paper surface the theme is
+      // re-printed, so a page's widgets get paper ink without asking.
+      final context = tester.element(find.text(MoonText.title));
+      final palette = Theme.of(context).extension<SeasonalPalette>()!;
+      expect(palette.background, AlmanacPaper.ground);
+      expect(palette.textPrimary, AlmanacPaper.ink);
+      expect(Theme.of(context).textTheme.bodyLarge?.color, AlmanacPaper.ink);
     });
 
     testWidgets('with no landscape, and no scene behind the moon', (
@@ -425,6 +536,7 @@ void main() {
       // product rule: feature choices control the doorway, never the
       // guidance.
       expect(find.text(MoonText.forThisMoon), findsOneWidget);
+      expect(find.text(MoonText.reflectiveFraming), findsOneWidget);
       expect(find.text(reflection.theme), findsOneWidget);
       expect(find.text(reflection.explanation), findsOneWidget);
       expect(find.text(MoonText.practices), findsOneWidget);

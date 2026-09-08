@@ -4,6 +4,7 @@ import 'app_spacing.dart';
 import 'app_typography.dart';
 import 'seasonal_palettes.dart';
 
+export 'almanac_paper.dart';
 export 'app_spacing.dart';
 export 'app_typography.dart';
 export 'chakra_accents.dart';
