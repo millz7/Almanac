@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 
-/// A soft, low-decoration surface for grouping content.
+/// A passage grouped on the page.
 ///
-/// Uses the theme's card colour and a generous rounded radius so it reads
-/// as an integrated part of the page rather than a bordered dashboard
-/// widget. Wrap it in [onTap] only when the whole card is a single
-/// tappable destination.
+/// Since Step 17 this is the same thing as [AlmanacInset] with a little
+/// more padding: the theme's card colour is the *inset* ground, the
+/// radius is small, and there is no shadow, no border and no surface
+/// tint. A card in this app is ink laid on the paper, never a sheet
+/// floating above it.
+///
+/// Reach for a label, some space and a rule first. Use this only where
+/// grouping genuinely aids comprehension, and wrap it in [onTap] only
+/// when the whole passage is one destination.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -26,7 +31,7 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(AppRadius.lg),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
     );
 
     final content = Container(

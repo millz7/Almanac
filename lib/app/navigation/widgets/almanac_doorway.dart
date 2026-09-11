@@ -96,7 +96,7 @@ class AlmanacDoorway extends ConsumerWidget {
       excludeSemantics: true,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => _walkThrough(context, ref),
@@ -117,17 +117,14 @@ class AlmanacDoorway extends ConsumerWidget {
                   Flexible(
                     child: Text(
                       label,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: palette.primary,
+                      style: textTheme.journalNote?.copyWith(
+                        fontSize: 16,
+                        color: palette.textPrimary,
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Icon(
-                    Icons.arrow_forward,
-                    size: AppIconSize.sm,
-                    color: palette.primary,
-                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  _DoorwayMark(colour: palette.primary),
                 ],
               ),
             ),
@@ -136,4 +133,29 @@ class AlmanacDoorway extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The mark at the end of an invitation: a thin ring with an arrow in
+/// it, as in the visual reference.
+///
+/// Decorative — the whole doorway is already one labelled button — and
+/// deliberately small: an invitation in a book is written, not
+/// advertised, so the words carry it and this only points.
+class _DoorwayMark extends StatelessWidget {
+  const _DoorwayMark({required this.colour});
+
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: colour.withValues(alpha: 0.5)),
+      ),
+      child: Icon(Icons.arrow_forward, size: 15, color: colour),
+    ),
+  );
 }

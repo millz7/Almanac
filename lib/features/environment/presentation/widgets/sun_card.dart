@@ -31,7 +31,7 @@ class SunCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'The sun today'),
+        const AlmanacSectionLabel(label: 'The sun today'),
         const SizedBox(height: AppSpacing.md),
         AppCard(
           child: switch (events.kind) {

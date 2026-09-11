@@ -43,10 +43,6 @@ dependencies:
   # shell (StatefulShellRoute), which the primary navigation needs.
   go_router: ^18.0.1
 
-  # Bundles the editorial heading font and readable body font used by the
-  # design system, with on-device caching (no placeholder system fonts).
-  google_fonts: ^8.2.1
-
   # Local storage for the small set of user preferences (currently just the
   # chosen hemisphere). Maintained by the Flutter team. Uses
   # SharedPreferencesWithCache so reads are synchronous after one async
@@ -101,22 +97,27 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
+  # THE BUNDLED-FONT SLOT.
+  #
+  # The Almanac names no typeface anywhere in `lib/` except
+  # `lib/app/theme/almanac_fonts.dart`, which currently resolves to the
+  # platform's own serif and UI faces. To give the app the hand-lettered
+  # display face the visual references are set in:
+  #
+  #   1. put the licensed files in `assets/fonts/`;
+  #   2. uncomment and complete the block below;
+  #   3. set `AlmanacFonts.bundledDisplay` to the same family name.
+  #
+  # Nothing else changes. The face MUST be bundled, never fetched: the
+  # `google_fonts` package was removed in Step 17 precisely because it
+  # downloaded its fonts at runtime, which this app must never do.
+  #
   # fonts:
-  #   - family: Schyler
+  #   - family: AlmanacDisplay
   #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
+  #       - asset: assets/fonts/AlmanacDisplay-Regular.ttf
+  #       - asset: assets/fonts/AlmanacDisplay-Medium.ttf
+  #         weight: 500
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

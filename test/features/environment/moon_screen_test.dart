@@ -46,6 +46,14 @@ const _fullMoon = MoonPhaseState(
   illuminatedFraction: 1,
 );
 
+/// The way back off the page.
+///
+/// Words with a chevron rather than a bare glyph with a tooltip, since
+/// Step 17 — see `AlmanacPage`. What the tests assert about it is
+/// unchanged: it is comfortable to hit, and pressing it returns to the
+/// Environment.
+Finder backControl() => find.widgetWithText(TextButton, MoonText.back);
+
 void main() {
   setUpAll(useTimeZoneDatabase);
 
@@ -465,7 +473,7 @@ void main() {
       await openEnvironment(tester);
       await openMoon(tester);
 
-      await tester.tap(find.byTooltip(MoonText.back));
+      await tester.tap(backControl());
       await tester.pumpAndSettle();
 
       expect(find.byType(MoonScreen), findsNothing);
@@ -492,7 +500,7 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await openMoon(tester);
         expect(find.byType(MoonScreen), findsOneWidget, reason: 'open $i');
-        await tester.tap(find.byTooltip(MoonText.back));
+        await tester.tap(backControl());
         await tester.pumpAndSettle();
         expect(find.byType(MoonScreen), findsNothing, reason: 'closed $i');
       }
@@ -676,10 +684,7 @@ void main() {
       await openMoon(tester);
 
       expect(tester.getSize(doorway()).height, greaterThanOrEqualTo(48));
-      expect(
-        tester.getSize(find.byTooltip(MoonText.back)).height,
-        greaterThanOrEqualTo(48),
-      );
+      expect(tester.getSize(backControl()).height, greaterThanOrEqualTo(48));
     });
 
     testWidgets('and the moon card on the Environment is one too', (
@@ -731,7 +736,7 @@ void main() {
       expect(tester.binding.transientCallbackCount, 0);
 
       // And everything still works.
-      await tester.tap(find.byTooltip(MoonText.back));
+      await tester.tap(backControl());
       await tester.pumpAndSettle();
       expect(find.byType(MoonScreen), findsNothing);
     });

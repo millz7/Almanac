@@ -24,20 +24,71 @@ import 'seasonal_palette.dart';
 ///
 /// See `docs/almanac_visual_language.md`.
 abstract final class AlmanacPaper {
+  // ── Ground ────────────────────────────────────────────────────────
+  //
+  // Two grounds, not five. Every extra cream is a decision somebody has
+  // to make on every page, and the answer to "which cream?" should
+  // almost always be "the paper".
+
   /// The paper itself. Warm, slightly yellowed, and never anything else.
+  /// The default background of every inner page.
   static const ground = Color(0xFFF7F1E3);
 
+  /// The one inset ground: a passage tinted very slightly *into* the
+  /// paper, the way a printed panel sits on a page rather than floating
+  /// above it. For grouping that genuinely aids comprehension — never
+  /// for decoration, and never with a shadow.
+  ///
+  /// Deliberately darker than [ground] rather than lighter. A lighter
+  /// patch reads as a card hovering over the page; a darker one reads as
+  /// ink laid on it.
+  static const groundInset = Color(0xFFF0E9D8);
+
+  // ── Ink ───────────────────────────────────────────────────────────
+  //
+  // Three weights of ink and no pure black anywhere. Each is measured
+  // against [ground]: see `paper_tokens_test.dart`, which fails if any
+  // of them drifts below the contrast its role needs.
+
   /// Ink. Warm near-black rather than pure black, which on cream reads
-  /// as printing rather than as a screen.
+  /// as printing rather than as a screen. Titles and body copy.
   static const ink = Color(0xFF2B2720);
 
-  /// A quieter ink, for captions and secondary lines. Dark enough to
-  /// clear the body-text floor on the ground above, not merely the
-  /// graphical one.
+  /// A quieter ink, for captions, section labels and secondary lines.
+  /// Dark enough to clear the body-text floor on the ground above, not
+  /// merely the graphical one.
   static const inkMuted = Color(0xFF574F42);
 
-  /// The hairline a section rule is drawn in.
-  static const rule = Color(0xFF9A9080);
+  /// The faintest ink that is still real text: annotations, units, the
+  /// small print under a value. Clears the body floor (4.5:1) — "faint"
+  /// is about hierarchy, never about being hard to read.
+  static const inkFaint = Color(0xFF6B6253);
+
+  /// Ink for a control that cannot be used. Legible enough to read,
+  /// clearly too light to press — and never the only signal that
+  /// something is disabled.
+  static const inkDisabled = Color(0xFF8A8070);
+
+  // ── Rules ─────────────────────────────────────────────────────────
+
+  /// The hairline a section rule is drawn in — and the boundary of a
+  /// control that has one.
+  ///
+  /// Measured, not eyeballed: a line the reader has to *see* clears the
+  /// 3:1 graphical floor, on the paper and on the inset ground alike.
+  /// The previous value looked right and reached 2.79:1.
+  static const rule = Color(0xFF8A8070);
+
+  /// A quieter hairline, for a division that is felt more than seen —
+  /// between the rows of a list, or under a line of a table. Decorative
+  /// by definition: anything that must be *perceived* uses [rule].
+  static const softRule = Color(0xFFD8CEB8);
+
+  /// The wash behind a selected or focused element, under text that
+  /// keeps its own ink. A tint of the paper rather than a colour laid
+  /// over it, so selection never has to carry contrast on its own —
+  /// there is always a second, non-colour signal beside it.
+  static const selection = Color(0xFFE8DFC6);
 
   /// A seasonal colour, made safe to use on paper.
   ///
@@ -64,12 +115,14 @@ abstract final class AlmanacPaper {
     brightness: Brightness.light,
     background: ground,
     surface: ground,
-    // The one raised surface a paper page has: a shade whiter, as if a
-    // second sheet were laid on the first.
-    surfaceElevated: const Color(0xFFFDF9F0),
+    // The one inset surface a paper page has — tinted into the page
+    // rather than floated above it. See [groundInset].
+    surfaceElevated: groundInset,
     textPrimary: ink,
     textSecondary: inkMuted,
     border: rule,
+    disabled: groundInset,
+    onDisabled: inkDisabled,
     icon: accentOn(palette.icon),
     primary: accentOn(palette.primary),
     primarySoft: legibleOn(

@@ -215,8 +215,8 @@ class _CycleCollection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const AlmanacSectionDivider(spacing: AppSpacing.lg),
-        SectionHeader(
-          title: arrived
+        AlmanacSectionLabel(
+          label: arrived
               ? CookbookText.forYourPhase(phase)
               : CookbookText.forYourCycle,
         ),
@@ -340,7 +340,7 @@ class _RecipePage extends StatelessWidget {
         ],
 
         const SizedBox(height: AppSpacing.xl),
-        SectionHeader(title: CookbookText.ingredients),
+        AlmanacSectionLabel(label: CookbookText.ingredients),
         const SizedBox(height: AppSpacing.sm),
         for (final ingredient in recipe.ingredients)
           Padding(
@@ -349,7 +349,7 @@ class _RecipePage extends StatelessWidget {
           ),
 
         const SizedBox(height: AppSpacing.xl),
-        SectionHeader(title: CookbookText.method),
+        AlmanacSectionLabel(label: CookbookText.method),
         const SizedBox(height: AppSpacing.sm),
         for (final step in recipe.steps)
           Padding(

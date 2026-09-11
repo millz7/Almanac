@@ -35,14 +35,18 @@ class AlmanacButton extends ConsumerWidget {
       onPressed: () =>
           ref.read(almanacScaffoldKeyProvider).currentState?.openEndDrawer(),
       icon: const Icon(Icons.eco_outlined),
-      color: palette.icon,
-      tooltip: title,
       // The full title, so the control announces whose Almanac it opens
       // rather than "button".
+      tooltip: title,
+      // A thin ring rather than a filled disc. The reference's top-right
+      // control is drawn, not stamped: on an illustrated header a solid
+      // capsule is the one thing that reads as a toolbar.
       style: IconButton.styleFrom(
-        backgroundColor: palette.primarySoft,
-        foregroundColor: palette.onPrimarySoft,
+        backgroundColor: Colors.transparent,
+        foregroundColor: palette.icon,
+        side: BorderSide(color: palette.border.withValues(alpha: 0.8)),
         minimumSize: const Size.square(AppDimens.minTouchTarget),
+        iconSize: AppIconSize.sm + 2,
       ),
     );
   }

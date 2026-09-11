@@ -34,7 +34,7 @@ class MoonCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'The moon'),
+        const AlmanacSectionLabel(label: 'The moon'),
         const SizedBox(height: AppSpacing.md),
         // One node, so a screen reader hears the moon as a sentence and
         // is told it can be opened, rather than three fragments that

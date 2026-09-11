@@ -491,7 +491,7 @@ class _ActionChapter extends ConsumerWidget {
         for (final category in PlantCategory.values)
           if (suggestions.where((s) => s.plant.category == category)
               case final inCategory when inCategory.isNotEmpty) ...[
-            SectionHeader(title: category.plural),
+            AlmanacSectionLabel(label: category.plural),
             const SizedBox(height: AppSpacing.sm),
             for (final suggestion in inCategory)
               Padding(
@@ -592,7 +592,7 @@ class _PlantBookList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final category in PlantCategory.values) ...[
-          SectionHeader(title: category.plural),
+          AlmanacSectionLabel(label: category.plural),
           const SizedBox(height: AppSpacing.sm),
           for (final plant in PlantBook.ofCategory(category))
             Padding(
@@ -805,7 +805,7 @@ class _PlantSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(title: GardenText.sectionTitle(action)),
+          AlmanacSectionLabel(label: GardenText.sectionTitle(action)),
           const SizedBox(height: AppSpacing.sm),
           for (final rule in rules)
             if (rule.appliesIn(guide.region))
@@ -1029,7 +1029,7 @@ class _MyGardenList extends ConsumerWidget {
         for (final category in PlantCategory.values)
           if (mine.ofCategory(category) case final entries
               when entries.isNotEmpty) ...[
-            SectionHeader(title: category.plural),
+            AlmanacSectionLabel(label: category.plural),
             const SizedBox(height: AppSpacing.sm),
             for (final entry in entries)
               Padding(

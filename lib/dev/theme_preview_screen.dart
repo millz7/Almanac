@@ -45,7 +45,7 @@ class ThemePreviewScreen extends ConsumerWidget {
           Text(palette.name, style: textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.lg),
 
-          const SectionHeader(title: 'Season'),
+          const AlmanacSectionLabel(label: 'Season'),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
@@ -61,7 +61,7 @@ class ThemePreviewScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
 
-          const SectionHeader(title: 'Time of day'),
+          const AlmanacSectionLabel(label: 'Time of day'),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
@@ -87,17 +87,17 @@ class ThemePreviewScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
 
-          const SectionHeader(title: 'Detected environment'),
+          const AlmanacSectionLabel(label: 'Detected environment'),
           const SizedBox(height: AppSpacing.sm),
           const _DetectedEnvironmentCard(),
           const SizedBox(height: AppSpacing.xl),
 
-          const SectionHeader(title: 'Semantic tokens'),
+          const AlmanacSectionLabel(label: 'Semantic tokens'),
           const SizedBox(height: AppSpacing.sm),
           _TokenSwatches(palette: palette),
           const SizedBox(height: AppSpacing.xl),
 
-          const SectionHeader(title: 'Components'),
+          const AlmanacSectionLabel(label: 'Components'),
           const SizedBox(height: AppSpacing.sm),
           const _ComponentSamples(),
         ],

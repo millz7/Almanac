@@ -30,44 +30,54 @@ class AlmanacDrawer extends ConsumerWidget {
     final title = ref.watch(almanacTitleProvider);
 
     return Drawer(
-      backgroundColor: palette.background,
+      // The cover of the book, so it is the book's paper — not the
+      // season's surface, and not a settings panel's grey.
+      backgroundColor: AlmanacPaper.ground,
+      shape: const RoundedRectangleBorder(),
       // Wide enough to hold a switch and its description without
       // everything wrapping, and capped so it never fills a tablet.
       width: AppDimens.maxContentWidth * 0.72,
-      child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.xxl,
+      child: AlmanacPaperSurface(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.xxl,
+            ),
+            children: [
+              Semantics(
+                header: true,
+                child: Text(title, style: textTheme.pageTitle),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ExcludeSemantics(
+                child: SizedBox(
+                  width: 48,
+                  height: 1,
+                  child: ColoredBox(color: palette.border),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const AlmanacAnnotation('Yours alone, and kept on this device.'),
+
+              const SizedBox(height: AppSpacing.xl),
+              const AlmanacSectionLabel(label: 'Profile'),
+              const SizedBox(height: AppSpacing.md),
+              const NameSetting(),
+
+              const AlmanacRule(spacing: AppSpacing.lg),
+              const AlmanacSectionLabel(label: 'Location & Region'),
+              const SizedBox(height: AppSpacing.md),
+              const HemisphereSetting(),
+              const SizedBox(height: AppSpacing.xl),
+              const LocationSetting(),
+
+              const AlmanacRule(spacing: AppSpacing.lg),
+              const FeatureSetting(),
+            ],
           ),
-          children: [
-            Semantics(
-              header: true,
-              child: Text(title, style: textTheme.headlineSmall),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Yours alone, and kept on this device.',
-              style: textTheme.bodySmall,
-            ),
-
-            const SizedBox(height: AppSpacing.xl),
-            const SectionHeader(title: 'Profile'),
-            const SizedBox(height: AppSpacing.md),
-            const NameSetting(),
-
-            const SizedBox(height: AppSpacing.xl),
-            const SectionHeader(title: 'Location & Region'),
-            const SizedBox(height: AppSpacing.md),
-            const HemisphereSetting(),
-            const SizedBox(height: AppSpacing.xl),
-            const LocationSetting(),
-
-            const SizedBox(height: AppSpacing.xl),
-            const FeatureSetting(),
-          ],
         ),
       ),
     );

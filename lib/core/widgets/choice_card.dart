@@ -38,7 +38,11 @@ class ChoiceCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final foreground = enabled ? palette.textPrimary : palette.onDisabled;
-    final background = selected ? palette.primarySoft : palette.surface;
+    // Unselected options are the page itself with a hairline round them;
+    // only the chosen one is tinted. A page of filled boxes is a
+    // settings app, and the difference between "an option" and "the
+    // option you picked" should be the loudest thing here.
+    final background = selected ? palette.primarySoft : Colors.transparent;
 
     return Semantics(
       button: true,
@@ -49,9 +53,11 @@ class ChoiceCard extends StatelessWidget {
       child: Material(
         color: background,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           side: BorderSide(
-            color: selected ? palette.primary : palette.border,
+            color: selected
+                ? palette.primary
+                : palette.border.withValues(alpha: 0.6),
             width: selected ? 2 : 1,
           ),
         ),
@@ -75,7 +81,8 @@ class ChoiceCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: textTheme.titleLarge?.copyWith(
+                        style: textTheme.chapterTitle?.copyWith(
+                          fontSize: 20,
                           color: foreground,
                         ),
                       ),
@@ -91,7 +98,7 @@ class ChoiceCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(left: AppSpacing.sm),
                     child: Icon(
-                      Icons.check_circle,
+                      Icons.check_circle_outline,
                       color: palette.primary,
                       size: AppIconSize.md,
                     ),

@@ -83,17 +83,21 @@ class _AlmanacNavigationBarState extends State<AlmanacNavigationBar> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    // labelMedium rather than labelSmall: this is a primary control, and
-    // 10pt navigation text is the thing the short labels exist to avoid.
-    final style = Theme.of(context).textTheme.labelMedium!;
+    // The navigation role, not a raw Material slot: 13pt, because this
+    // is a primary control and 10pt navigation text is the thing the
+    // short labels exist to avoid.
+    final style = Theme.of(context).textTheme.navigationLabel!;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: palette.surface,
         // A hairline rather than a shadow: the app's depth comes from
-        // colour and space.
-        border: Border(top: BorderSide(color: palette.border)),
+        // colour and space, and this bar has to sit convincingly under
+        // both a painted landscape and a paper page.
+        border: Border(
+          top: BorderSide(color: palette.border.withValues(alpha: 0.6)),
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
@@ -174,31 +178,33 @@ class _NavigationItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // The selected state is carried by a filled pill, a
-              // different icon and a different text colour — three
-              // signals, so it never rests on colour alone.
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: 2,
+              // The selected state is carried by three things — a small
+              // rule above the destination, a filled rather than an
+              // outlined icon, and the ink — so it never rests on colour
+              // alone. The rule is a bookmark ribbon rather than the
+              // Material pill: on an illustrated bar a filled capsule
+              // reads as a control panel dropped over the page.
+              ExcludeSemantics(
+                child: SizedBox(
+                  width: 20,
+                  height: 2,
+                  child: ColoredBox(
+                    color: selected ? palette.primary : Colors.transparent,
+                  ),
                 ),
-                decoration: selected
-                    ? ShapeDecoration(
-                        color: palette.primarySoft,
-                        shape: const StadiumBorder(),
-                      )
-                    : null,
-                child: Icon(
-                  selected ? feature.selectedIcon : feature.icon,
-                  size: AppIconSize.md,
-                  color: selected ? palette.onPrimarySoft : palette.icon,
-                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Icon(
+                selected ? feature.selectedIcon : feature.icon,
+                size: AppIconSize.md,
+                color: selected ? palette.primary : palette.textSecondary,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 label,
                 style: labelStyle.copyWith(
                   color: selected ? palette.primary : palette.textSecondary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
                 maxLines: 1,
                 softWrap: false,

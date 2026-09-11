@@ -515,7 +515,7 @@ class _AroundNowList extends ConsumerWidget {
         for (final category in NatureCategory.values)
           if (around.ofCategory(category) case final found
               when found.isNotEmpty) ...[
-            SectionHeader(title: category.plural),
+            AlmanacSectionLabel(label: category.plural),
             const SizedBox(height: AppSpacing.sm),
             if (category == NatureCategory.fungi) ...[
               Text(NatureLogText.fungiNote, style: textTheme.bodySmall),
@@ -587,7 +587,7 @@ class _BookList extends StatelessWidget {
         for (final category in NatureCategory.values)
           if (NatureBook.ofCategory(category) case final items
               when items.isNotEmpty) ...[
-            SectionHeader(title: category.plural),
+            AlmanacSectionLabel(label: category.plural),
             const SizedBox(height: AppSpacing.sm),
             if (category == NatureCategory.fungi) ...[
               Text(NatureLogText.fungiNote, style: textTheme.bodySmall),
@@ -724,7 +724,7 @@ class _ItemPage extends ConsumerWidget {
 
         if (item.notes.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
-          SectionHeader(title: NatureLogText.aroundNow),
+          AlmanacSectionLabel(label: NatureLogText.aroundNow),
           const SizedBox(height: AppSpacing.sm),
           for (final note in item.notes)
             Padding(
@@ -1119,7 +1119,7 @@ class _ObservationsList extends ConsumerWidget {
 
         for (final (index, day) in days.entries.indexed) ...[
           if (index > 0) const SizedBox(height: AppSpacing.md),
-          SectionHeader(title: day.key),
+          AlmanacSectionLabel(label: day.key),
           const SizedBox(height: AppSpacing.sm),
           for (final observation in day.value)
             Padding(

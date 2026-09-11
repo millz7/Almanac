@@ -177,73 +177,71 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
     final season = ref.watch(currentSeasonProvider);
     final browsing = _browsing ?? today;
 
-    return AlmanacPaperSurface(
-      child: AppScaffold(
-        title: switch (page) {
-          CycleHome() => CycleText.title,
-          CycleCalendarPage() => CycleText.calendar,
-          CycleSyncingPage() => CycleText.syncing,
-          CycleMoonTypePage() => CycleText.moonCycleHeading,
-          CycleAdjustPage() => CycleText.adjust,
+    return AppScaffold(
+      title: switch (page) {
+        CycleHome() => CycleText.title,
+        CycleCalendarPage() => CycleText.calendar,
+        CycleSyncingPage() => CycleText.syncing,
+        CycleMoonTypePage() => CycleText.moonCycleHeading,
+        CycleAdjustPage() => CycleText.adjust,
+      },
+      subtitle: switch (page) {
+        CycleHome() => CycleText.context(today.month, season),
+        CycleCalendarPage() => formatMonth(browsing),
+        _ => null,
+      },
+      trailing: const AlmanacButton(),
+      body: [
+        // Above the content: a way back at the far end of a long page
+        // is a way back nobody reaches.
+        if (page is! CycleHome)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: _stack.length > 2 ? _back : _toHome,
+              child: const Text(CycleText.back),
+            ),
+          ),
+
+        switch (page) {
+          CycleHome() => _Home(
+            onCalendar: () => _open(const CycleCalendarPage()),
+            onSyncing: () => _open(const CycleSyncingPage()),
+            onMoonType: () => _open(const CycleMoonTypePage()),
+            onAdjust: () => _open(const CycleAdjustPage()),
+          ),
+
+          CycleCalendarPage() => _CalendarPage(
+            month: browsing,
+            onMonth: (next) => setState(() => _browsing = next),
+            onOpenDay: _editDay,
+          ),
+
+          CycleSyncingPage() => _SyncingPage(
+            onChoosePhase: (phase) =>
+                _saving(() => _cycle.setDisplayedPhase(phase)),
+          ),
+
+          CycleMoonTypePage() => const _MoonTypePage(),
+
+          CycleAdjustPage() => _AdjustPage(
+            onLength: (length) =>
+                _saving(() => _cycle.setAssumedLength(length)),
+            onDeleteAll: _deleteEverything,
+          ),
         },
-        subtitle: switch (page) {
-          CycleHome() => CycleText.context(today.month, season),
-          CycleCalendarPage() => formatMonth(browsing),
-          _ => null,
-        },
-        trailing: const AlmanacButton(),
-        body: [
-          // Above the content: a way back at the far end of a long page
-          // is a way back nobody reaches.
-          if (page is! CycleHome)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: _stack.length > 2 ? _back : _toHome,
-                child: const Text(CycleText.back),
-              ),
-            ),
 
-          switch (page) {
-            CycleHome() => _Home(
-              onCalendar: () => _open(const CycleCalendarPage()),
-              onSyncing: () => _open(const CycleSyncingPage()),
-              onMoonType: () => _open(const CycleMoonTypePage()),
-              onAdjust: () => _open(const CycleAdjustPage()),
+        if (_saveFailed)
+          Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(
+              CycleText.saveFailed,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: context.palette.error),
             ),
-
-            CycleCalendarPage() => _CalendarPage(
-              month: browsing,
-              onMonth: (next) => setState(() => _browsing = next),
-              onOpenDay: _editDay,
-            ),
-
-            CycleSyncingPage() => _SyncingPage(
-              onChoosePhase: (phase) =>
-                  _saving(() => _cycle.setDisplayedPhase(phase)),
-            ),
-
-            CycleMoonTypePage() => const _MoonTypePage(),
-
-            CycleAdjustPage() => _AdjustPage(
-              onLength: (length) =>
-                  _saving(() => _cycle.setAssumedLength(length)),
-              onDeleteAll: _deleteEverything,
-            ),
-          },
-
-          if (_saveFailed)
-            Semantics(
-              container: true,
-              liveRegion: true,
-              child: Text(
-                CycleText.saveFailed,
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: context.palette.error),
-              ),
-            ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -868,7 +866,6 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
@@ -876,12 +873,8 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            heading,
-            style: textTheme.journalLabel?.copyWith(
-              color: palette.textSecondary,
-            ),
-          ),
+          // The shared section language, not a private copy of it.
+          AlmanacSectionLabel(label: heading),
           const SizedBox(height: AppSpacing.sm),
           for (final line in lines)
             Padding(

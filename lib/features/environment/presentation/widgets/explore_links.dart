@@ -25,7 +25,7 @@ class ExploreLinks extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Elsewhere in your Almanac'),
+        const AlmanacSectionLabel(label: 'Elsewhere in your Almanac'),
         const SizedBox(height: AppSpacing.md),
         Wrap(
           spacing: AppSpacing.sm,

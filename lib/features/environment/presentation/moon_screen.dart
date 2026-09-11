@@ -43,57 +43,16 @@ class MoonScreen extends ConsumerWidget {
     final hemisphere = ref.watch(resolvedHemisphereProvider).hemisphere;
     final reflection = MoonReflections.forPhase(moon.phase);
 
-    return AlmanacPaperSurface(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            onPressed: () => context.pop(),
-            icon: const Icon(Icons.arrow_back),
-            tooltip: MoonText.back,
-            // An app bar's icon button is 40 by default, which is under
-            // the minimum. The way back off a page is not a control to
-            // make small.
-            constraints: const BoxConstraints(
-              minWidth: AppDimens.minTouchTarget,
-              minHeight: AppDimens.minTouchTarget,
-            ),
-          ),
-          actions: const [
-            AlmanacButton(),
-            SizedBox(width: AppSpacing.sm),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              AppSpacing.xxl,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppDimens.maxContentWidth,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _Facts(moon: moon, hemisphere: hemisphere),
-                    const AlmanacSectionDivider(),
-                    _Reflection(reflection: reflection),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return AlmanacPage(
+      title: MoonText.title,
+      onBack: () => context.pop(),
+      backLabel: MoonText.back,
+      trailing: const AlmanacButton(),
+      children: [
+        _Facts(moon: moon, hemisphere: hemisphere),
+        const AlmanacSectionDivider(spacing: AppSpacing.lg),
+        _Reflection(reflection: reflection),
+      ],
     );
   }
 }
@@ -119,13 +78,6 @@ class _Facts extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          MoonText.title,
-          textAlign: TextAlign.center,
-          style: textTheme.displaySmall,
-        ),
-        const SizedBox(height: AppSpacing.xl),
-
         // The one illustration on the page, and the only thing on it
         // that is allowed to be big.
         Center(
@@ -152,20 +104,27 @@ class _Facts extends StatelessWidget {
               Text(
                 moon.phase.label,
                 textAlign: TextAlign.center,
-                style: textTheme.headlineSmall,
+                style: textTheme.chapterTitle,
               ),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpacing.sm),
+              // The measured fact, set as a value rather than as a
+              // sentence: small and letter-spaced under the name, as in
+              // the reference. The words themselves are left alone —
+              // a typographic effect is not a reason to change what the
+              // page actually says.
               Text(
                 MoonText.illumination(moon.illuminatedPercent),
                 textAlign: TextAlign.center,
-                style: textTheme.bodyLarge,
+                style: textTheme.eyebrow?.copyWith(
+                  color: palette.textSecondary,
+                ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 MoonText.direction(moon.phase),
                 textAlign: TextAlign.center,
-                style: textTheme.journalLabel?.copyWith(
-                  color: palette.textSecondary,
+                style: textTheme.journalNote?.copyWith(
+                  color: palette.textPrimary,
                 ),
               ),
             ],
@@ -222,11 +181,11 @@ class _Reflection extends StatelessWidget {
         // guidance never depends on the destination existing — only the
         // doorway below does.
         Wrap(
-          spacing: AppSpacing.md,
-          runSpacing: AppSpacing.xs,
+          spacing: AppSpacing.lg,
+          runSpacing: AppSpacing.sm,
           children: [
             for (final practice in reflection.practices)
-              Text(practice.label, style: textTheme.bodyLarge),
+              Text(practice.label, style: textTheme.journalNote),
           ],
         ),
 
@@ -240,9 +199,15 @@ class _Reflection extends StatelessWidget {
             if (_intentFor(destination, reflection.phase) case final intent?)
               Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.lg),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: AlmanacDoorway(label: label, intent: intent),
+                child: AlmanacInset(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: AlmanacDoorway(label: label, intent: intent),
+                  ),
                 ),
               ),
 

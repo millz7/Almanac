@@ -30,17 +30,21 @@ class EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       child: Column(
         children: [
+          // A drawn mark rather than a filled badge: a thin ring on the
+          // paper, in the same language as the doorway's arrow.
           Container(
-            width: 88,
-            height: 88,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
               shape: BoxShape.circle,
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.6),
+              ),
             ),
             child: Icon(
               icon,
-              size: AppIconSize.xl,
-              color: theme.colorScheme.onPrimaryContainer,
+              size: AppIconSize.lg,
+              color: theme.colorScheme.onSurfaceVariant,
               semanticLabel: title,
             ),
           ),
@@ -48,7 +52,7 @@ class EmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleLarge,
+            style: theme.textTheme.chapterTitle,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(

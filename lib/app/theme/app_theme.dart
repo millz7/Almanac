@@ -8,7 +8,8 @@ export 'almanac_paper.dart';
 export 'app_spacing.dart';
 export 'app_typography.dart';
 export 'chakra_accents.dart';
-export 'journal_typography.dart';
+export 'almanac_fonts.dart';
+export 'almanac_text_roles.dart';
 export 'season_illustration.dart';
 export 'seasonal_palettes.dart';
 
@@ -63,8 +64,11 @@ abstract final class AppTheme {
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge,
       ),
+      // A card is a tinted passage on the page: no shadow, no tint
+      // overlay, and the inset ground rather than a whiter sheet. See
+      // `AlmanacPaper.groundInset`.
       cardTheme: CardThemeData(
-        color: palette.surface,
+        color: palette.surfaceElevated,
         surfaceTintColor: Colors.transparent,
         elevation: AppElevation.none,
         margin: EdgeInsets.zero,
@@ -79,21 +83,39 @@ abstract final class AppTheme {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
+        // Softly rounded rather than a stadium: a chip is a written
+        // option on the page, and a page of pills is a settings app.
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         side: BorderSide.none,
       ),
+      // ── Actions ──────────────────────────────────────────────────
+      //
+      // Three weights, and the quietest one is the default answer. A
+      // primary action is a soft natural fill; a secondary one is an
+      // outline in the same ink as a section rule; everything else is
+      // words with an underline's worth of emphasis and no box at all.
+      //
+      // Buttons size to their content rather than filling the width.
+      // `Size.fromHeight` — the previous value — is `Size(infinity, h)`,
+      // which is what made every action in the app a full-bleed Material
+      // pill. A button in a stretched column still stretches; one in a
+      // sentence no longer shoulders the page apart.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.primary,
           foregroundColor: palette.onPrimary,
           disabledBackgroundColor: palette.disabled,
           disabledForegroundColor: palette.onDisabled,
-          minimumSize: const Size.fromHeight(AppDimens.buttonHeight),
+          minimumSize: const Size(0, AppDimens.minTouchTarget),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
           textStyle: textTheme.labelLarge,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           elevation: AppElevation.none,
         ),
@@ -102,11 +124,15 @@ abstract final class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: palette.primary,
           disabledForegroundColor: palette.onDisabled,
-          minimumSize: const Size.fromHeight(AppDimens.buttonHeight),
+          minimumSize: const Size(0, AppDimens.minTouchTarget),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
           textStyle: textTheme.labelLarge,
           side: BorderSide(color: palette.border),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
         ),
       ),
@@ -114,6 +140,7 @@ abstract final class AppTheme {
         style: TextButton.styleFrom(
           foregroundColor: palette.primary,
           disabledForegroundColor: palette.onDisabled,
+          minimumSize: const Size(0, AppDimens.minTouchTarget),
           textStyle: textTheme.labelLarge,
         ),
       ),

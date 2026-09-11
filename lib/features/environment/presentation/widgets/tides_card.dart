@@ -21,7 +21,7 @@ class TidesCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: 'Tides'),
+        const AlmanacSectionLabel(label: 'Tides'),
         const SizedBox(height: AppSpacing.md),
         AppCard(
           child: Row(

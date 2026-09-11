@@ -39,6 +39,15 @@ class AlmanacPaperSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Theme(
     data: AppTheme.fromPalette(AlmanacPaper.reprint(context.palette)),
-    child: ColoredBox(color: AlmanacPaper.ground, child: child),
+    // The paper is painted first, and a transparent [Material] is laid
+    // directly on it. That order matters: Material widgets paint their
+    // ink on the nearest Material ancestor, and a ColoredBox *between* a
+    // list row and its Material would swallow every ripple — which is
+    // exactly what Flutter asserts about. Painting the ground outside
+    // the Material keeps the page a real surface to press.
+    child: ColoredBox(
+      color: AlmanacPaper.ground,
+      child: Material(type: MaterialType.transparency, child: child),
+    ),
   );
 }

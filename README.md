@@ -1514,13 +1514,57 @@ values are centralised in `lib/app/theme/`. Widgets should reference
 these tokens (via `Theme.of(context)`, `context.palette`, or the `App*`
 token classes) rather than hard-coding values.
 
+The full visual language — the rules a page is drawn to, not a mood
+board — is [`docs/almanac_visual_language.md`](docs/almanac_visual_language.md).
+The short version:
+
+- **ENVIRONMENT IS OUTSIDE. DETAIL PAGES ARE THE BOOK.** The two worlds
+  are separated in exactly one place, `screenForFeature`: every feature
+  except the Environment is wrapped in `AlmanacPaperSurface` there, so a
+  chapter cannot forget to be paper.
+- **Two grounds, three inks, two rules** (`AlmanacPaper`). No pure black;
+  the inset ground is darker than the paper, never lighter, because a
+  lighter patch reads as a card floating above the page.
+- **A screen asks for a role, never for a size** (`AlmanacTextRoles`):
+  `pageTitle`, `eyebrow`, `sectionLabel`, `journalNote`, `valueText`,
+  `navigationLabel` and the rest. No feature file constructs a
+  `TextStyle`.
+- **Two scaffolds, one composition**: `AppScaffold` opens a chapter,
+  `AlmanacPage` is a page inside one with a way back. Both put the title
+  over a short hairline and are tested at 2× text.
+- **A label, some space and a rule** before a box. `AlmanacInset` is the
+  only container, and it has no shadow.
+- **Actions size to their content.** Three weights, quietest by default;
+  48 dp minimum; selection never carried by colour alone.
+
+### Fonts: bundled or nothing
+
+The app previously depended on `google_fonts`, which **downloads its
+faces from `fonts.gstatic.com` at first use** unless the files are also
+bundled and runtime fetching is disabled — neither of which was true
+here. In an app whose architecture is "no network, nothing leaves the
+device", that was a real regression, and the source file next to it
+claimed in prose that fonts were never fetched.
+
+The dependency is gone. `lib/app/theme/almanac_fonts.dart` is the only
+place a typeface is chosen, it currently resolves to the platform's own
+serif and UI faces, and a test greps `pubspec.yaml` and `lib/` — with
+comments stripped, so an explanation cannot be mistaken for a dependency
+— to keep the claim and the code together.
+
+**To ship the hand-lettered display face the references are set in:**
+put the licensed files in `assets/fonts/`, complete the commented block
+in `pubspec.yaml`, and set `AlmanacFonts.bundledDisplay`. Nothing else
+changes. Body copy stays in the platform text face either way —
+readability is not something the Almanac trades for character.
+
 ## Testing
 
 ```
 flutter test
 ```
 
-1,559 tests. The ones worth knowing about:
+1,614 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.

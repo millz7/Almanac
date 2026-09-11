@@ -24,7 +24,12 @@ void main() {
       expect(theme.colorScheme.secondary, palette.secondary);
       expect(theme.colorScheme.tertiary, palette.accent);
       expect(theme.colorScheme.outline, palette.border);
-      expect(theme.cardTheme.color, palette.surface);
+      // A card is a passage tinted *into* the page, not a sheet laid on
+      // top of it — so it takes the inset surface, and carries no
+      // shadow and no surface tint of its own.
+      expect(theme.cardTheme.color, palette.surfaceElevated);
+      expect(theme.cardTheme.elevation, AppElevation.none);
+      expect(theme.cardTheme.surfaceTintColor, Colors.transparent);
     });
 
     test('brightness follows the palette, so system UI adapts', () {

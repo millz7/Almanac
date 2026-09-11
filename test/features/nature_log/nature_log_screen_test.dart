@@ -681,7 +681,7 @@ void main() {
       expect(find.text(NatureLogText.bookIsReference), findsOneWidget);
       for (final category in NatureCategory.values) {
         expect(
-          find.widgetWithText(SectionHeader, category.plural),
+          find.widgetWithText(AlmanacSectionLabel, category.plural),
           findsOneWidget,
           reason: category.name,
         );
@@ -811,7 +811,7 @@ void main() {
         // The shelf heading, not the word: "Other" is also the category
         // line on each of the tiles under it.
         expect(
-          find.widgetWithText(SectionHeader, category.plural),
+          find.widgetWithText(AlmanacSectionLabel, category.plural),
           findsOneWidget,
           reason: category.name,
         );
