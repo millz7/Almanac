@@ -5,7 +5,7 @@ import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/features/environment/presentation/widgets/explore_links.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
-import 'package:almanac/features/environment/presentation/widgets/sky_hero.dart';
+import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,7 +54,7 @@ void main() {
   /// inside the page rather than from a provider, so this asserts what
   /// the user sees.
   SeasonalPalette paletteOf(WidgetTester tester) =>
-      tester.element(find.byType(SkyHero)).palette;
+      tester.element(find.byType(AlmanacLandscapeView)).palette;
 
   group('every season, day and night', () {
     seasonDates.forEach((season, date) {
@@ -77,9 +77,13 @@ void main() {
           // The page is dressed by the season without any screen asking
           // which season it is, so every part of it must be present in
           // all eight.
-          expect(find.byType(SkyHero), findsOneWidget);
-          expect(find.text('The sun today'), findsOneWidget);
-          expect(find.text('The moon'), findsOneWidget);
+          // Step 18 replaced the four stacked sections with the
+          // reference's strip; what must be present in all eight states
+          // is unchanged.
+          expect(find.byType(AlmanacLandscapeView), findsOneWidget);
+          expect(find.text('Sunrise'), findsOneWidget);
+          expect(find.text('Sunset'), findsOneWidget);
+          expect(find.text('Moon'), findsOneWidget);
           expect(find.text('Tides'), findsOneWidget);
         });
 
@@ -113,8 +117,8 @@ void main() {
 
   group('nothing is hard-coded', () {
     testWidgets('the hero repaints when the season changes', (tester) async {
-      SkyHero heroFor(WidgetTester tester) =>
-          tester.widget<SkyHero>(find.byType(SkyHero));
+      AlmanacLandscapeView heroFor(WidgetTester tester) => tester
+          .widget<AlmanacLandscapeView>(find.byType(AlmanacLandscapeView));
 
       await openToday(
         tester,
@@ -157,7 +161,7 @@ void main() {
       final semantics = tester.widget<Semantics>(
         find
             .descendant(
-              of: find.byType(SkyHero),
+              of: find.byType(AlmanacLandscapeView),
               matching: find.byType(Semantics),
             )
             .first,
@@ -179,8 +183,9 @@ void main() {
         ),
         findsOneWidget,
       );
-      // The phase is a real, readable string, not only a picture.
-      expect(find.textContaining('% lit'), findsOneWidget);
+      // The phase is a real, readable string, not only a picture. Since
+      // Step 18 it is worded the same way the Moon page words it.
+      expect(find.textContaining('% illuminated'), findsOneWidget);
     });
 
     testWidgets('sunrise and sunset read as one label each', (tester) async {

@@ -221,11 +221,16 @@ void main() {
     // vanished entirely (it measured 1.01:1 before `lerp` was changed to
     // choose content colours instead of fading them).
     //
-    // 4.5:1 is not reachable at the very crossover with these palettes,
-    // so the floor here is the 3:1 bar for large text and graphical
-    // objects, checked at every point of the blend rather than only at
-    // the ends.
-    const blendMinimum = 3.0;
+    // **Step 18 raised this floor.** It used to read "4.5:1 is not
+    // reachable at the very crossover with these palettes", and it was
+    // true of the blend as it then was: the best *designed* colour was
+    // chosen and whatever ratio it gave was accepted — about 3.44:1 for
+    // body text at the midpoint of dawn and dusk. `lerp` now steps a
+    // colour away from the ground until it clears the bar its role
+    // needs, so text holds 4.5:1 and icons and outlines hold 3:1, at
+    // every point of the blend rather than only at the ends.
+    const blendTextMinimum = _textMinimum;
+    const blendUiMinimum = _uiMinimum;
 
     for (final season in Season.values) {
       group(season.label, () {
@@ -237,24 +242,44 @@ void main() {
               daylight: daylight,
             );
 
-            for (final (label, foreground, background) in [
+            for (final (label, foreground, background, minimum) in [
               (
                 'textPrimary on background',
                 palette.textPrimary,
                 palette.background,
+                blendTextMinimum,
               ),
-              ('textPrimary on surface', palette.textPrimary, palette.surface),
+              (
+                'textPrimary on surface',
+                palette.textPrimary,
+                palette.surface,
+                blendTextMinimum,
+              ),
               (
                 'textSecondary on background',
                 palette.textSecondary,
                 palette.background,
+                blendTextMinimum,
               ),
-              ('icon on background', palette.icon, palette.background),
+              // An icon is a graphical object, and the bar for one is 3:1.
+              (
+                'icon on background',
+                palette.icon,
+                palette.background,
+                blendUiMinimum,
+              ),
+              // A control's boundary — the Almanac ring, the bar's rule.
+              (
+                'border on background',
+                palette.border,
+                palette.background,
+                blendUiMinimum,
+              ),
             ]) {
               final ratio = contrastRatio(foreground, background);
               expect(
                 ratio,
-                greaterThanOrEqualTo(blendMinimum),
+                greaterThanOrEqualTo(minimum),
                 reason:
                     '${season.label} at daylight '
                     '${daylight.toStringAsFixed(3)}: $label is '
@@ -282,7 +307,7 @@ void main() {
               final ratio = contrastRatio(foreground, background);
               expect(
                 ratio,
-                greaterThanOrEqualTo(blendMinimum),
+                greaterThanOrEqualTo(blendTextMinimum),
                 reason:
                     '${season.label} at daylight '
                     '${daylight.toStringAsFixed(3)}: $label is '

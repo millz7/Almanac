@@ -111,3 +111,66 @@ String describeLight(NaturalEnvironment environment) {
       estimated ? 'Night, by the clock' : 'Dark, and the world is resting',
   };
 }
+
+/// The Almanac's masthead and its standing line.
+///
+/// The tagline is approved copy and is used **exactly** as written. It is
+/// a constant rather than a literal in a widget so that a paraphrase
+/// cannot creep in, and so a test can assert the exact words.
+abstract final class EnvironmentText {
+  static const masthead = 'Almanac';
+  static const mastheadRule = 'NATURE · RHYTHM · YOU';
+  static const tagline = 'In tune with the natural world and yourself';
+  static const today = 'TODAY';
+
+  static const sunLabel = 'The sun';
+  static const sunriseLabel = 'Sunrise';
+  static const sunsetLabel = 'Sunset';
+  static const moonLabel = 'Moon';
+  static const tidesLabel = 'Tides';
+
+  /// What the tides strip says until real tide prediction exists.
+  ///
+  /// There are deliberately no times here and no chart: tide prediction
+  /// needs harmonic constituents for a particular port, which this app
+  /// does not have, and a plausible-looking made-up tide is worse than no
+  /// tide at all — somebody might plan a walk around it.
+  static const tidesValue = 'Not here yet';
+  static const tidesNote =
+      'High and low water for your nearest coast will appear here. Until '
+      'the app can look them up properly, it would rather show nothing '
+      'than a guess.';
+
+  /// A value with no value: shown where a time genuinely does not exist.
+  static const noValue = '—';
+
+  /// What the strip says on a day the sun does not cross the horizon.
+  /// Never a time, because there is not one.
+  static String polarSunValue(SolarDayKind kind) => switch (kind) {
+    SolarDayKind.sunNeverSets => 'Never sets today',
+    SolarDayKind.sunNeverRises => 'Never rises today',
+    SolarDayKind.risesAndSets => noValue,
+  };
+
+  /// The line under the strip when the sun's times are not simply times.
+  /// Null when they are, so nothing is said that need not be.
+  static String? sunNote(NaturalEnvironment environment) =>
+      switch (environment.solarEvents.kind) {
+        SolarDayKind.sunNeverSets =>
+          'The sun stays above the horizon all day where you are.',
+        SolarDayKind.sunNeverRises =>
+          'The sun stays below the horizon all day where you are.',
+        SolarDayKind.risesAndSets =>
+          environment.solarEvents.hasTimes
+              ? null
+              : 'Sunrise and sunset need a rough idea of where you are. '
+                    'Everything else on this page works without it.',
+      };
+
+  /// How long the light lasts, when that is genuinely known.
+  static String? dayLengthNote(NaturalEnvironment environment) {
+    final length = environment.solarEvents.dayLength;
+    if (length == null) return null;
+    return '${formatSpan(length)} of light';
+  }
+}

@@ -331,6 +331,74 @@ graphic is marked decorative and states nothing to a screen reader.
 
 ## The Environment screen
 
+**One place, painted for the day.** The Environment is the app's single
+immersive surface and the only screen with a landscape on it — every
+other feature is a page of the book, on cream paper. Its composition
+follows the approved Home reference: the masthead, the date with the
+season under it and the standing line beside it, the painting edge to
+edge, the four facts as a strip of medallions, one line about today, and
+the way on into the rest of the Almanac.
+
+The standing line is fixed copy, used exactly:
+**"In tune with the natural world and yourself"**.
+
+### THE LANDSCAPE IS ONE PLACE
+
+> The geometry stays fixed; the environment changes.
+
+Across spring, summer, autumn, winter, dawn, day, dusk and night, the
+mountains, hills, headlands, islands, shoreline, horizon and water
+boundary are **identical**. A viewer can point at the same hill in
+January and July.
+
+That is enforced structurally rather than promised:
+
+- `AlmanacLandscape` (`features/environment/domain/`) holds the place as
+  normalised unit-square coordinates and **cannot** know the season — a
+  test greps it for `Season`, `DayPhase`, `daylight`, `Palette`,
+  `Appearance`, `Color` and `material.dart`, and fails on any of them.
+- `LandscapeAppearance` holds the season and the hour, and *carries*
+  `AlmanacLandscape.form` rather than making one. The geometry test takes
+  the form out of all sixteen season × light combinations and compares
+  every feature's projected bounds.
+- There is **one** painter. `SpringLandscapePainter` and its siblings do
+  not exist.
+
+Season and light change the sky, the haze, the rock, the water, the
+foliage, how much of the bank is standing and what is flowering on it —
+summer's fuller foreground hides more of the same shoreline than
+winter's, and the shoreline underneath is byte-identical.
+
+**Flowers are silhouettes, not one icon recoloured**: umbel, daisy,
+forget-me-not cluster, seed head. Summer carries the forget-me-nots, at a
+minority share of the bank so they stay an accent.
+
+**Autumn daylight is not sunset.** A daytime autumn sky is blue-led like
+summer's; only real dusk gets dusk. And dusk is not dawn reversed — it
+runs warmer and more saturated overhead, where dawn keeps its colour low.
+
+Nothing in the painting is invented: the sun's height is the app's own
+`dayProgress`, from the one solar service, and the moon is the real
+phase. Their left-to-right placement and the stars are composition, which
+is why the whole painting is decorative and every fact it hints at is
+written in words beneath it. The painter has no clock, no second sun and
+no way to ask for a location — all three are grepped.
+
+### Twilight contrast
+
+The chrome never sits on the painting: the reference puts the words and
+the bar on the page's own ground, with the picture as a band between
+them, so no scrim or opaque panel was needed. Inside the palette blend,
+three changes took body text from about **3.44:1** at the midpoint of
+dawn and dusk to a guaranteed **4.5:1**, with icons and control
+boundaries at **3:1** — an ink that misses its floor is stepped rather
+than accepted; the ground is nudged out of the narrow band where no ink
+can reach 4.5:1; and at the crossover the surfaces are tied to the
+background instead of drifting to opposite sides of the mid-tone. Tested
+at forty steps per season.
+
+
+
 The order of the page is the design: the date and season, then a large
 wordless picture of the sky, then the few facts worth knowing. No score,
 no streak, no chart.
@@ -1564,7 +1632,7 @@ readability is not something the Almanac trades for character.
 flutter test
 ```
 
-1,614 tests. The ones worth knowing about:
+1,660 tests. The ones worth knowing about:
 
 - `moon_calculator_test.dart` checks the phase against twelve published
   new and full moons across three years.

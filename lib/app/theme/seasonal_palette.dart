@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'colour_contrast.dart';
+
 /// The app's semantic colour tokens for one season at one point in the day.
 ///
 /// This is the layer that keeps seasons out of the rest of the app. Widgets
@@ -196,7 +198,39 @@ class SeasonalPalette extends ThemeExtension<SeasonalPalette> {
               _contrastRatio(b, ground) > _contrastRatio(a, ground) ? b : a,
         );
 
-    final background = mix(this.background, other.background);
+    // ── The page's grounds ────────────────────────────────────────
+    //
+    // Two things happen here, and both are the Step 18 twilight fix.
+    //
+    // First the background is nudged out of the narrow mid-tone band
+    // where *no* ink can be read at 4.5:1 — see [groundReadableAt]. That
+    // band is about 0.1775 to 0.1833 in relative luminance, so escaping
+    // it costs a hair of lightness for a few seconds twice a day.
+    //
+    // Then the surfaces are **tied to it** rather than interpolated
+    // separately. Blended independently they drift apart at the
+    // crossover — measured at 0.159, 0.183 and higher in one frame of
+    // spring's dawn — and grounds that straddle the mid-tone cannot all
+    // be served by one ink: whichever way the text goes, one of them
+    // fails. Off the crossover the designed surfaces are used exactly as
+    // drawn.
+    final background = groundReadableAt(mix(this.background, other.background));
+    final crossing = (t - 0.5).abs() < 0.25;
+
+    final surface = crossing
+        ? background
+        : groundReadableAt(mix(this.surface, other.surface));
+    // The inset surface leans the way the page already leans — further
+    // from the mid-tone, never across it. Stepping it the other way puts
+    // the two grounds on opposite sides of the crossover, and then no
+    // single ink can clear 4.5:1 on both: whichever way the text goes,
+    // one of them fails.
+    final surfaceElevated = crossing
+        ? _shifted(
+            background,
+            background.computeLuminance() < 0.18 ? -0.05 : 0.05,
+          )
+        : groundReadableAt(mix(this.surfaceElevated, other.surfaceElevated));
     final primary = mix(this.primary, other.primary);
     final primarySoft = mix(this.primarySoft, other.primarySoft);
     final secondary = mix(this.secondary, other.secondary);
@@ -212,17 +246,59 @@ class SeasonalPalette extends ThemeExtension<SeasonalPalette> {
         ? other
         : this;
 
-    /// The colour to put on [ground]: the better of the two designed
-    /// options, or — when a mid-tone ground defeats both, which is
-    /// exactly what happens at the crossover — the strongest content
-    /// colour either palette has.
-    Color legibleOn(Color ground, Color mine, Color theirs) {
+    /// The colour to put on [ground], **guaranteed** to clear [floor].
+    ///
+    /// The better of the two designed options where that is enough; the
+    /// strongest content colour either palette has where it is not; and,
+    /// when a mid-tone ground defeats even that, the strongest option
+    /// stepped away from the ground until it clears the bar (see
+    /// [legibleOn] in `colour_contrast.dart`).
+    ///
+    /// **This last step is the Step 18 twilight fix.** Before it, the
+    /// blend picked the best *designed* colour and accepted whatever
+    /// ratio that gave — which at the midpoint of dawn and dusk was about
+    /// 3.44:1 for body text, 3.11:1 for content on a card and 3.00:1 for
+    /// icons. Readable-ish, and below the bar for twenty minutes twice a
+    /// day. A colour is now moved rather than shrugged at, and it gives
+    /// up as little of its hue as the ground demands.
+    Color legibleFor(
+      Color ground,
+      Color mine,
+      Color theirs, {
+      double floor = _minimumContentContrast,
+    }) {
       final designed = mostLegibleOn(ground, [mine, theirs]);
-      if (_contrastRatio(designed, ground) >= _minimumContentContrast) {
-        return designed;
-      }
-      return mostLegibleOn(ground, [textPrimary, other.textPrimary]);
+      if (_contrastRatio(designed, ground) >= floor) return designed;
+
+      final strongest = mostLegibleOn(ground, [
+        textPrimary,
+        other.textPrimary,
+        designed,
+      ]);
+      if (_contrastRatio(strongest, ground) >= floor) return strongest;
+
+      return legibleOn(strongest, ground, minimum: floor);
     }
+
+    /// An ink that clears the body floor on **every** ground it will be
+    /// seen on, not just the first.
+    ///
+    /// The page has three: the background, the surface and the inset
+    /// surface. They are close but not equal, and fixing text against the
+    /// background alone left it at 4.47:1 on the surface at one point of
+    /// spring's dawn. See [legibleOnAll], which picks a direction once
+    /// rather than chasing each ground in turn.
+    Color inkOn(List<Color> grounds, Color mine, Color theirs) => legibleOnAll(
+      mostLegibleOn(grounds.first, [
+        mine,
+        theirs,
+        textPrimary,
+        other.textPrimary,
+      ]),
+      grounds,
+    );
+
+    final pageGrounds = [background, surface, surfaceElevated];
 
     return SeasonalPalette(
       // The name and the brightness describe which palette is really in
@@ -231,33 +307,63 @@ class SeasonalPalette extends ThemeExtension<SeasonalPalette> {
       name: pageContent.name,
       brightness: pageContent.brightness,
       background: background,
-      surface: mix(surface, other.surface),
-      surfaceElevated: mix(surfaceElevated, other.surfaceElevated),
+      surface: surface,
+      surfaceElevated: surfaceElevated,
       primary: primary,
-      onPrimary: legibleOn(primary, onPrimary, other.onPrimary),
+      onPrimary: legibleFor(
+        primary,
+        onPrimary,
+        other.onPrimary,
+        floor: kBodyTextContrast,
+      ),
       primarySoft: primarySoft,
-      onPrimarySoft: legibleOn(primarySoft, onPrimarySoft, other.onPrimarySoft),
+      onPrimarySoft: legibleFor(
+        primarySoft,
+        onPrimarySoft,
+        other.onPrimarySoft,
+        floor: kBodyTextContrast,
+      ),
       secondary: secondary,
-      onSecondary: legibleOn(secondary, onSecondary, other.onSecondary),
+      onSecondary: legibleFor(
+        secondary,
+        onSecondary,
+        other.onSecondary,
+        floor: kBodyTextContrast,
+      ),
       accent: accent,
-      onAccent: legibleOn(accent, onAccent, other.onAccent),
-      textPrimary: pageContent.textPrimary,
+      onAccent: legibleFor(
+        accent,
+        onAccent,
+        other.onAccent,
+        floor: kBodyTextContrast,
+      ),
+      // The page's own words. Stepped if the crossover ground
+      // defeats both designed inks: the Environment's masthead, date and
+      // tagline are all set in this.
+      textPrimary: inkOn(pageGrounds, textPrimary, other.textPrimary),
       // Supporting text and icons are only quieter shades of the same
       // idea, so at the crossover — where a mid-tone ground defeats even
       // the better designed colour — they give up their quietness and
       // borrow the primary. A few minutes of flatter hierarchy beats a
       // few minutes of unreadable captions.
-      textSecondary: legibleOn(background, textSecondary, other.textSecondary),
-      border: pageContent.border,
-      icon: legibleOn(background, icon, other.icon),
+      textSecondary: inkOn(pageGrounds, textSecondary, other.textSecondary),
+      // A control boundary — the Almanac ring, the bar's hairline —
+      // so it holds the graphical floor rather than following the page.
+      border: legibleFor(background, border, other.border),
+      icon: legibleFor(background, icon, other.icon),
       // Decorative, and never carrying meaning on their own, so these are
       // free to fade.
       water: mix(water, other.water),
       earth: mix(earth, other.earth),
       disabled: disabled,
-      onDisabled: legibleOn(disabled, onDisabled, other.onDisabled),
+      onDisabled: legibleFor(disabled, onDisabled, other.onDisabled),
       error: error,
-      onError: legibleOn(error, onError, other.onError),
+      onError: legibleFor(
+        error,
+        onError,
+        other.onError,
+        floor: kBodyTextContrast,
+      ),
     );
   }
 
@@ -273,6 +379,15 @@ class SeasonalPalette extends ThemeExtension<SeasonalPalette> {
 /// is what is actually achievable at the moment a light palette and a
 /// dark one cross over; see the note on [SeasonalPalette.lerp].
 const _minimumContentContrast = 3.0;
+
+/// Moves a colour's lightness by [by], clamped.
+///
+/// Used during the twilight blend to place the inset surface a fixed step
+/// from the page rather than letting it drift to its own mid-tone.
+Color _shifted(Color colour, double by) {
+  final hsl = HSLColor.fromColor(colour);
+  return hsl.withLightness((hsl.lightness + by).clamp(0.0, 1.0)).toColor();
+}
 
 /// WCAG relative-luminance contrast ratio, 1:1 to 21:1.
 ///

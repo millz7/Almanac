@@ -14,7 +14,7 @@ import 'package:almanac/features/environment/domain/moon_reflection.dart';
 import 'package:almanac/features/environment/presentation/moon_screen.dart';
 import 'package:almanac/features/environment/presentation/moon_text.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
-import 'package:almanac/features/environment/presentation/widgets/sky_hero.dart';
+import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
 import 'package:almanac/features/meditation/domain/moon_meditation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -132,11 +132,11 @@ void main() {
       await openEnvironment(tester);
 
       expect(moonCard(), findsOneWidget);
-      // Its own composition is unchanged: the same words in the same
-      // section, now with a tap on them.
-      expect(find.text('The moon'), findsOneWidget);
+      // The same words, now in the Step 18 fact strip, still with a tap
+      // on them and still one semantic node.
+      expect(find.text('Moon'), findsOneWidget);
       expect(find.text('Waxing Crescent'), findsOneWidget);
-      expect(find.text('34% lit'), findsOneWidget);
+      expect(find.text('34% illuminated'), findsWidgets);
     });
 
     testWidgets('and tapping it opens the Moon page', (tester) async {
@@ -151,17 +151,15 @@ void main() {
       await openEnvironment(tester);
 
       // The same page, in the same order, as before the moon became a
-      // door: date, sky, sun, moon, tides.
+      // door: the painting, then the facts, left to right.
       double topOf(Finder finder) => tester.getTopLeft(finder.first).dy;
+      double leftOf(Finder finder) => tester.getTopLeft(finder.first).dx;
       expect(
-        topOf(find.byType(SkyHero)),
-        lessThan(topOf(find.text('The sun today'))),
+        topOf(find.byType(AlmanacLandscapeView)),
+        lessThan(topOf(find.text('Sunrise'))),
       );
-      expect(
-        topOf(find.text('The sun today')),
-        lessThan(topOf(find.text('The moon'))),
-      );
-      expect(topOf(find.text('The moon')), lessThan(topOf(find.text('Tides'))));
+      expect(leftOf(find.text('Sunrise')), lessThan(leftOf(find.text('Moon'))));
+      expect(leftOf(find.text('Moon')), lessThan(leftOf(find.text('Tides'))));
       // No new section, and no feature-card grid.
       expect(find.text(MoonText.forThisMoon), findsNothing);
     });
@@ -441,7 +439,7 @@ void main() {
       // Environment is the app's one living painting. This page does not
       // duplicate it — which is the rule that stops every future screen
       // needing four seasonal paintings and two day/night versions.
-      expect(find.byType(SkyHero), findsNothing);
+      expect(find.byType(AlmanacLandscapeView), findsNothing);
       expect(find.byType(Image), findsNothing);
     });
 
@@ -455,7 +453,7 @@ void main() {
       expect(find.byType(MoonDisc), findsOneWidget);
       expect(find.byType(CustomPaint).evaluate(), isNotEmpty);
       // Nothing botanical has been drawn around it.
-      expect(find.byType(SkyHero), findsNothing);
+      expect(find.byType(AlmanacLandscapeView), findsNothing);
     });
 
     testWidgets('and the moon is the biggest thing on it', (tester) async {
@@ -477,7 +475,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MoonScreen), findsNothing);
-      expect(find.text('The moon'), findsOneWidget);
+      expect(find.text('Moon'), findsOneWidget);
       expect(moonCard(), findsOneWidget);
     });
 
@@ -489,7 +487,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MoonScreen), findsNothing);
-      expect(find.text('The moon'), findsOneWidget);
+      expect(find.text('Moon'), findsOneWidget);
     });
 
     testWidgets('opening and leaving twice leaves no stack behind', (
@@ -505,7 +503,7 @@ void main() {
         expect(find.byType(MoonScreen), findsNothing, reason: 'closed $i');
       }
       // One Environment, not four stacked on each other.
-      expect(find.text('The moon'), findsOneWidget);
+      expect(find.text('Moon'), findsOneWidget);
     });
 
     testWidgets('the Almanac stays reachable from the Moon', (tester) async {

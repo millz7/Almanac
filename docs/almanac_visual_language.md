@@ -321,6 +321,57 @@ like **one painting changing through time** rather than eight different
 pictures. A viewer should be able to point at the same hill in January
 and July.
 
+### How it is built (Step 18)
+
+Two files, and the separation between them *is* the rule:
+
+- `domain/almanac_landscape.dart` — the place. Normalised unit-square
+  coordinates for the two mountain ranges, both headlands, the spur,
+  three islands, the bank, the boulder, the twelve planting positions and
+  the framing bough. **It knows nothing about the season**: a test greps
+  it for `Season`, `DayPhase`, `daylight`, `Palette`, `Appearance`,
+  `Color` and `material.dart` and fails if any appears. There is no
+  parameter a future edit could branch a winter mountain on without first
+  importing something the file is not allowed to import.
+- `domain/landscape_appearance.dart` — the season and the hour. Sky
+  stops, haze, rock, foliage, water, vegetation density, flower forms,
+  what the bough is wearing. It **carries** `AlmanacLandscape.form`
+  rather than making one, so the geometry test can take the form out of
+  all sixteen season × light combinations and assert they are the same
+  object.
+
+`LandscapePainter` reads an appearance and mixes no colour of its own —
+also grepped, for `Color(0x` and `Colors.`.
+
+**There is one scene, not four painters.** `SpringLandscapePainter` and
+its siblings do not exist and must not.
+
+### Responsive geometry
+
+The scene is normalised 0…1 and painted into a band of **fixed aspect
+ratio** (3:2), so projecting a point is one uniform multiply. Stretching
+the band to whatever height was going would change the apparent angle of
+every slope, which is the one thing the rule forbids. The band spans the
+full width edge to edge; the words around it keep the page margins.
+
+### Flowers are silhouettes, not one icon recoloured
+
+Four forms with genuinely different outlines — `umbel`, `daisy`,
+`forgetMeNot`, `seedHead` — because a season should be readable from the
+shape before the colour. **Summer's approved accent is the forget-me-not
+cluster**: five tiny five-petal flowers with a pale eye, drawn as a
+cluster and never as one large bloom, and held to a minority share of the
+bank so it stays an accent rather than a floral border. They belong to
+the Environment only; a detail page has no flowers on it.
+
+### Autumn daylight is not sunset
+
+A daytime autumn sky is a daytime sky, with the blue channel leading
+overhead exactly as summer's does. Only real dusk gets dusk. Dawn and
+dusk are separate states rather than one twilight reversed: dusk runs
+warmer and more saturated overhead, dawn keeps the colour low and the top
+of the sky cool. Both are tested.
+
 ---
 
 ## 10. Detail pages are paper, not scenery
@@ -506,11 +557,30 @@ adopted.
   semantic tree and summarised in words — one node that reads as a
   sentence, not thirty fragments.
 
-**Environment chrome.** The bar and the header sit over a painting that
-changes all day. They take their colour from the contrast-tested palette
-tokens, never from a decorative colour sampled out of the scene. The
-known twilight-contrast concern belongs to the landscape rebuild and is
-recorded in §14.
+**Environment chrome.** The bar and the header take their colour from the
+contrast-tested palette tokens, never from a decorative colour sampled
+out of the scene. Chrome is never laid over the painting: the reference
+puts the masthead, the date, the facts and the bar on the page's own
+ground, with the painting as a band between them — which is why no scrim
+and no opaque white rectangle was needed anywhere.
+
+**The twilight fix (Step 18).** The blend used to pick the best
+*designed* colour and accept whatever ratio it gave: about 3.44:1 for
+body text, 3.11:1 on a card and 3.00:1 for icons at the midpoint of dawn
+and dusk. Three things changed, all inside `SeasonalPalette.lerp`:
+
+1. an ink that still misses its floor is **stepped** away from the ground
+   rather than shrugged at, giving up as little hue as the ground demands;
+2. the page's ground is nudged out of the narrow mid-tone band where no
+   ink at all can reach 4.5:1;
+3. at the crossover the surface and the inset surface are **tied to the
+   background** instead of being blended separately. Blended apart they
+   straddle the mid-tone — 0.159, 0.183 and higher in one frame of
+   spring's dawn — and grounds on opposite sides cannot be served by one
+   ink: whichever way the text goes, one of them fails.
+
+Body text now holds **4.5:1** and icons and control boundaries **3:1** at
+every point of every season's blend, tested at forty steps per season.
 
 ---
 
@@ -538,12 +608,18 @@ Rules for reading a reference:
   moonset times; the app shows what it actually calculates.
 - **Not every object in a reference is a requirement.**
 
-### Deferred to the Environment rebuild (Step 18)
+### Built in Step 18
 
-The landscape itself — mountains, hills, islands, shoreline, horizon,
-seasonal vegetation, the sunrise and sunset paintings, the sky hero and
-the twilight contrast of the scene behind the chrome. Step 17 built the
-system those will be drawn against and deliberately did not touch them.
+The landscape itself — the fixed geometry, the four seasons, dawn, day,
+dusk and night, the forget-me-nots, and the twilight contrast repair.
+Step 17 built the system it was drawn against.
+
+### Still deferred
+
+Real tide prediction; the Environment's season, sunrise, sunset and tide
+detail pages; water movement; and the bundled display face. The Home
+reference's page dots under the TODAY panel imply a carousel of several
+cards; there is one card and one thing to say, so there are no dots.
 
 ## 15. One Almanac: context, guidance, doorway
 

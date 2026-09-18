@@ -8,7 +8,7 @@ import 'package:almanac/core/environment/moon_service.dart';
 import 'package:almanac/core/environment/solar_service.dart';
 import 'package:almanac/features/environment/presentation/widgets/explore_links.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
-import 'package:almanac/features/environment/presentation/widgets/sky_hero.dart';
+import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -238,7 +238,7 @@ void main() {
 
       // Season and moon need no coordinates, so they must not disappear
       // along with the sun times.
-      expect(find.text('The moon'), findsOneWidget);
+      expect(find.text('Moon'), findsOneWidget);
       expect(find.textContaining('summer'), findsOneWidget);
     });
   });
@@ -300,7 +300,7 @@ void main() {
       );
 
       expect(find.text('Waxing Crescent'), findsOneWidget);
-      expect(find.text('15% lit'), findsOneWidget);
+      expect(find.text('15% illuminated'), findsOneWidget);
     });
 
     testWidgets('is drawn, not fetched as a picture', (tester) async {
@@ -356,17 +356,25 @@ void main() {
       );
 
       double topOf(Finder finder) => tester.getTopLeft(finder.first).dy;
+      double leftOf(Finder finder) => tester.getTopLeft(finder.first).dx;
 
+      // The day first, then the painting, then the facts. Since Step 18
+      // the four facts are one strip rather than four stacked sections,
+      // so within them the order is left to right: sunrise, sunset,
+      // moon, tides.
       final date = topOf(find.text('Tuesday 15 July'));
-      final hero = topOf(find.byType(SkyHero));
-      final sun = topOf(find.text('The sun today'));
-      final moon = topOf(find.text('The moon'));
-      final tides = topOf(find.text('Tides'));
+      final hero = topOf(find.byType(AlmanacLandscapeView));
+      final sunrise = topOf(find.text('Sunrise'));
 
       expect(date, lessThan(hero));
-      expect(hero, lessThan(sun));
-      expect(sun, lessThan(moon));
-      expect(moon, lessThan(tides));
+      expect(hero, lessThan(sunrise));
+
+      expect(
+        leftOf(find.text('Sunrise')),
+        lessThan(leftOf(find.text('Sunset'))),
+      );
+      expect(leftOf(find.text('Sunset')), lessThan(leftOf(find.text('Moon'))));
+      expect(leftOf(find.text('Moon')), lessThan(leftOf(find.text('Tides'))));
     });
 
     testWidgets('the hero is the biggest thing on the page', (tester) async {
@@ -376,7 +384,7 @@ void main() {
         surface: phoneSurface,
       );
 
-      final hero = tester.getSize(find.byType(SkyHero));
+      final hero = tester.getSize(find.byType(AlmanacLandscapeView));
       final screen = tester.getSize(find.byType(MaterialApp));
 
       // Dominant, but not the whole screen — the day still reads as a

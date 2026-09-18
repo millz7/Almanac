@@ -13,6 +13,13 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/fake_environment_services.dart';
 import '../../support/test_overrides.dart';
 
+/// A destination in the bottom bar, rather than anywhere its name
+/// happens to appear.
+Finder navTab(String name) => find.descendant(
+  of: find.byType(AlmanacNavigationBar),
+  matching: find.bySemanticsLabel(name),
+);
+
 void main() {
   setUpAll(useTimeZoneDatabase);
 
@@ -754,7 +761,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Meditation'));
+      // Scoped to the bar: since Step 18 the Environment's own links
+      // onward are built with the rest of its (short) page, so the name
+      // of a feature appears both there and in the navigation.
+      await tester.tap(navTab('Meditation'));
       await tester.pumpAndSettle();
       await choose(tester, 'Focus');
       await beginAndSettle(tester);
@@ -764,13 +774,13 @@ void main() {
       // first — which is exactly what tapping the orb does.
       await tester.tap(endSession);
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Garden'));
+      await tester.tap(navTab('Garden'));
       await tester.pumpAndSettle();
 
       expect(container.read(immersiveModeProvider), isFalse);
       expect(tester.binding.transientCallbackCount, 0);
 
-      await tester.tap(find.bySemanticsLabel('Meditation'));
+      await tester.tap(navTab('Meditation'));
       await tester.pumpAndSettle();
       expect(begin, findsOneWidget);
     });
