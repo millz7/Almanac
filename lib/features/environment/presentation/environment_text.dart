@@ -119,7 +119,10 @@ String describeLight(NaturalEnvironment environment) {
 /// cannot creep in, and so a test can assert the exact words.
 abstract final class EnvironmentText {
   static const masthead = 'Almanac';
-  static const mastheadRule = 'NATURE · RHYTHM · YOU';
+
+  // There is no second line under the masthead. The mock-ups carried
+  // one; it is not product copy, and the constant that held it was
+  // deleted so it cannot quietly come back.
   static const tagline = 'In tune with the natural world and yourself';
   static const today = 'TODAY';
 

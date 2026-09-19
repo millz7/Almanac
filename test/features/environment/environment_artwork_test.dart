@@ -186,6 +186,18 @@ void main() {
     });
   });
 
+  group('the masthead says only what it should', () {
+    test('the mock-ups\' second line is not in the app at all', () {
+      final copy = File(
+        'lib/features/environment/presentation/environment_text.dart',
+      ).readAsStringSync();
+      expect(copy, contains(EnvironmentText.masthead));
+      expect(copy, contains(EnvironmentText.tagline));
+      expect(copy.contains('NATURE'), isFalse);
+      expect(copy.contains('Steady days'), isFalse);
+    });
+  });
+
   group('warming the next plate', () {
     test('the light states run in the order a day runs', () {
       // The plate kept warm is the next light state in the *same*
