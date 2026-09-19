@@ -8,9 +8,11 @@ import '../../../app/almanac_button.dart';
 import '../../../app/navigation/immersive_session.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../app/context/cycle_phase_context.dart';
+import '../../../app/context/festival_context.dart';
 import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/cycle_meditation.dart';
+import '../domain/festival_meditation.dart';
 import '../domain/meditation_technique.dart';
 import '../domain/moon_meditation.dart';
 import 'meditation_text.dart';
@@ -104,6 +106,13 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
   /// both at once without ever combining them into one claim.
   CyclePhase? _arrivedForPhase;
 
+  /// The festival the user arrived with, when they came from the Wheel
+  /// of the Year's reflective suggestion.
+  ///
+  /// A third, independent observation about the same day — see
+  /// [_arrivedFromMoon] and [_arrivedForPhase].
+  FestivalId? _arrivedForFestival;
+
   @override
   void initState() {
     super.initState();
@@ -147,15 +156,18 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
     if (!TickerMode.valuesOf(context).enabled) {
       _arrivedFromMoon = null;
       _arrivedForPhase = null;
+      _arrivedForFestival = null;
       return;
     }
 
     final intent = ref.read(almanacIntentProvider);
-    // Two doors into the same room, and each is remembered separately.
+    // Three doors into the same room, and each is remembered separately.
     if (intent is MoonMeditationIntent) {
       _arrivedFromMoon = intent.phase;
     } else if (intent is CycleMeditationIntent) {
       _arrivedForPhase = intent.phase;
+    } else if (intent is FestivalMeditationIntent) {
+      _arrivedForFestival = intent.festival;
     } else {
       return;
     }
@@ -295,6 +307,7 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
               _TodayContext(
                 arrivedFromMoon: _arrivedFromMoon,
                 arrivedForPhase: _arrivedForPhase,
+                arrivedForFestival: _arrivedForFestival,
                 onChoose: _chooseTechnique,
               ),
               TechniqueChooser(onChosen: _chooseTechnique),
@@ -332,22 +345,27 @@ class _TodayContext extends ConsumerWidget {
   const _TodayContext({
     required this.arrivedFromMoon,
     required this.arrivedForPhase,
+    required this.arrivedForFestival,
     required this.onChoose,
   });
 
   final MoonPhase? arrivedFromMoon;
   final CyclePhase? arrivedForPhase;
+  final FestivalId? arrivedForFestival;
   final ValueChanged<MeditationTechnique> onChoose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cyclePhase = ref.watch(almanacCyclePhaseProvider(arrivedForPhase));
-    // The moon is always available; a cycle phase may not be — and if
-    // Cycle has been switched off since they walked in, the phase they
-    // arrived with is gone too, so this is no longer an arrival.
+    final festival = ref.watch(almanacFestivalProvider(arrivedForFestival));
+    // The moon is always available; a cycle phase and a festival may not
+    // be — and if either feature has been switched off since they
+    // walked in, whatever they arrived with is gone too, so this is no
+    // longer an arrival.
     final arrived =
         arrivedFromMoon != null ||
-        (arrivedForPhase != null && cyclePhase != null);
+        (arrivedForPhase != null && cyclePhase != null) ||
+        (arrivedForFestival != null && festival != null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,7 +387,48 @@ class _TodayContext extends ConsumerWidget {
             arrived: arrivedForPhase != null,
             onChoose: onChoose,
           ),
+        if (festival case final active?)
+          _FestivalContext(
+            active: active,
+            arrived: arrivedForFestival != null,
+            onChoose: onChoose,
+          ),
       ],
+    );
+  }
+}
+
+/// A festival on the Wheel of the Year, and the practice that suits its
+/// reflective theme.
+///
+/// Reads the festival from the app's shared seam, so Meditation never
+/// imports the Wheel of the Year and never learns anything about
+/// solstices or cross-quarter dates.
+class _FestivalContext extends StatelessWidget {
+  const _FestivalContext({
+    required this.active,
+    required this.arrived,
+    required this.onChoose,
+  });
+
+  final ActiveFestival active;
+
+  /// Whether the user came through the Wheel's own door, which decides
+  /// only how the heading reads.
+  final bool arrived;
+
+  final ValueChanged<MeditationTechnique> onChoose;
+
+  @override
+  Widget build(BuildContext context) {
+    final suggestion = FestivalMeditations.forFestival(active.id);
+    return MoonContextCard(
+      heading: arrived
+          ? FestivalMeditationIntent(active.id).heading
+          : active.id.label,
+      technique: FestivalMeditations.techniqueFor(active.id),
+      invitation: suggestion.invitation,
+      onBegin: () => onChoose(FestivalMeditations.techniqueFor(active.id)),
     );
   }
 }

@@ -74,7 +74,7 @@ void main() {
       ]);
     });
 
-    testWidgets('everything chosen gives all eight destinations', (
+    testWidgets('everything chosen gives all nine destinations', (
       tester,
     ) async {
       await pumpApp(
@@ -91,6 +91,7 @@ void main() {
         'Cookbook',
         'Garden',
         'Nature Log',
+        'Wheel of the Year',
       ]);
     });
 
@@ -382,7 +383,7 @@ void main() {
       }
     });
 
-    testWidgets('a bar too narrow for eight scrolls rather than shrinking', (
+    testWidgets('a bar too narrow for nine scrolls rather than shrinking', (
       tester,
     ) async {
       await pumpApp(
@@ -400,7 +401,7 @@ void main() {
 
       // ...and still holds every destination, at full size, with nothing
       // folded into an overflow menu.
-      expect(barOf(tester).destinations.length, 8);
+      expect(barOf(tester).destinations.length, 9);
       for (final feature in FeatureRegistry.all) {
         await tester.scrollUntilVisible(
           find.bySemanticsLabel(feature.name),
@@ -426,7 +427,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('…'), findsNothing);
       // Everything is still reachable.
-      expect(barOf(tester).destinations.length, 8);
+      expect(barOf(tester).destinations.length, 9);
     });
   });
 }

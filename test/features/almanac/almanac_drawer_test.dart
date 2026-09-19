@@ -279,8 +279,8 @@ void main() {
         );
       }
 
-      // Seven switches, not eight: the Environment has no decision to make.
-      expect(find.byType(SwitchListTile), findsNWidgets(7));
+      // Eight switches, not nine: the Environment has no decision to make.
+      expect(find.byType(SwitchListTile), findsNWidgets(8));
       expect(find.text('Always here'), findsOneWidget);
     });
 

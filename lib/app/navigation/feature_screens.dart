@@ -9,6 +9,7 @@ import '../../features/environment/presentation/environment_screen.dart';
 import '../../features/garden/presentation/garden_screen.dart';
 import '../../features/nature_log/presentation/nature_log_screen.dart';
 import '../../features/meditation/presentation/meditation_screen.dart';
+import '../../features/wheel/presentation/wheel_screen.dart';
 import '../../features/yoga/presentation/yoga_screen.dart';
 
 /// The screen a feature opens, on the paper it belongs on.
@@ -49,4 +50,5 @@ Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.cookbook => const AlmanacPaperSurface(child: CookbookScreen()),
   FeatureId.garden => const AlmanacPaperSurface(child: GardenScreen()),
   FeatureId.natureLog => const AlmanacPaperSurface(child: NatureLogScreen()),
+  FeatureId.wheel => const AlmanacPaperSurface(child: WheelScreen()),
 };

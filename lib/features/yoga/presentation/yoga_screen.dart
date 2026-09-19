@@ -6,9 +6,11 @@ import '../../../app/almanac_button.dart';
 import '../../../app/navigation/immersive_session.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../app/context/cycle_phase_context.dart';
+import '../../../app/context/festival_context.dart';
 import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/cycle_yoga.dart';
+import '../domain/festival_yoga.dart';
 import '../domain/yoga_practices.dart';
 import 'widgets/cycle_context_card.dart';
 import 'widgets/pose_figure.dart';
@@ -90,6 +92,10 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
   /// journey that created it.
   CyclePhase? _arrivedForPhase;
 
+  /// The festival the user arrived with, when they came from the Wheel
+  /// of the Year's movement suggestion. Independent of [_arrivedForPhase].
+  FestivalId? _arrivedForFestival;
+
   @override
   void initState() {
     super.initState();
@@ -123,13 +129,19 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
   void _syncArrival() {
     if (!TickerMode.valuesOf(context).enabled) {
       _arrivedForPhase = null;
+      _arrivedForFestival = null;
       return;
     }
 
     final intent = ref.read(almanacIntentProvider);
-    if (intent is! CycleYogaIntent) return;
+    if (intent is CycleYogaIntent) {
+      _arrivedForPhase = intent.phase;
+    } else if (intent is FestivalYogaIntent) {
+      _arrivedForFestival = intent.festival;
+    } else {
+      return;
+    }
 
-    _arrivedForPhase = intent.phase;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(almanacIntentProvider.notifier).take(FeatureId.yoga);
@@ -245,6 +257,10 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
               // Above the usual choices, and it changes none of them.
               _CycleContext(
                 arrivedFor: _arrivedForPhase,
+                onChoose: _choosePractice,
+              ),
+              _FestivalContext(
+                arrivedFor: _arrivedForFestival,
                 onChoose: _choosePractice,
               ),
               PracticeChooser(onChosen: _choosePractice),
@@ -513,12 +529,43 @@ class _CycleContext extends ConsumerWidget {
     // No Cycle in the Almanac, or nothing for it to say.
     if (phase == null) return const SizedBox.shrink();
 
+    final suggestion = CycleYoga.forPhase(phase);
     return CycleContextCard(
       heading: arrivedFor == null
           ? YogaText.forToday
           : CycleYogaIntent(arrivedFor!).heading,
-      suggestion: CycleYoga.forPhase(phase),
+      practice: CycleYoga.practiceFor(phase),
+      invitation: suggestion.invitation,
       onBegin: () => onChoose(CycleYoga.practiceFor(phase)),
+    );
+  }
+}
+
+/// A festival on the Wheel of the Year, and the practice that suits it.
+///
+/// Reads the festival from the app's shared seam, so Yoga never imports
+/// the Wheel of the Year and never learns anything about solstices or
+/// cross-quarter dates.
+class _FestivalContext extends ConsumerWidget {
+  const _FestivalContext({required this.arrivedFor, required this.onChoose});
+
+  final FestivalId? arrivedFor;
+  final ValueChanged<YogaPractice> onChoose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(almanacFestivalProvider(arrivedFor));
+    // No Wheel of the Year in the Almanac, or nothing for it to say.
+    if (active == null) return const SizedBox.shrink();
+
+    final suggestion = FestivalYoga.forFestival(active.id);
+    return CycleContextCard(
+      heading: arrivedFor == null
+          ? YogaText.forToday
+          : FestivalYogaIntent(arrivedFor!).heading,
+      practice: FestivalYoga.practiceFor(active.id),
+      invitation: suggestion.invitation,
+      onBegin: () => onChoose(FestivalYoga.practiceFor(active.id)),
     );
   }
 }

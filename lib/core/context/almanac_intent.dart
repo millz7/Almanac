@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../environment/moon_phase.dart';
 import '../features/feature_id.dart';
 import 'cycle_phase.dart';
+import 'festival_id.dart';
 
 export '../features/feature_id.dart';
 export 'cycle_phase.dart';
+export 'festival_id.dart';
 
 /// Why the user is going somewhere.
 ///
@@ -126,6 +128,99 @@ final class CycleMeditationIntent extends CyclePhaseIntent {
 
   @override
   FeatureId get destination => FeatureId.meditation;
+}
+
+/// Somewhere the user is going from a festival on the Wheel of the Year,
+/// carrying which one.
+///
+/// **One payload, several destinations.** The Wheel's own page, the
+/// Cookbook, Meditation, Yoga, Garden and Nature Log each answer
+/// differently for a festival, so each gets its own class — but all of
+/// them carry the same typed [FestivalId] and none carries a string. The
+/// Wheel knows *that* it is asking for a festival's recipes, practice or
+/// reading; the destination decides *what* that means, and the Wheel
+/// never learns.
+sealed class FestivalIntent extends AlmanacIntent {
+  const FestivalIntent(this.festival);
+
+  final FestivalId festival;
+
+  @override
+  String get heading => 'For ${festival.label}';
+
+  @override
+  bool operator ==(Object other) =>
+      other.runtimeType == runtimeType &&
+      other is FestivalIntent &&
+      other.festival == festival;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, festival);
+
+  @override
+  String toString() => '$runtimeType(${festival.name})';
+}
+
+/// The Wheel of the Year's own festival page, entered from the
+/// Environment's contextual line or from any other festival doorway.
+final class FestivalWheelIntent extends FestivalIntent {
+  const FestivalWheelIntent(super.festival);
+
+  @override
+  FeatureId get destination => FeatureId.wheel;
+}
+
+/// The Cookbook, entered from a festival's food and drink suggestions.
+final class FestivalCookbookIntent extends FestivalIntent {
+  const FestivalCookbookIntent(super.festival);
+
+  @override
+  FeatureId get destination => FeatureId.cookbook;
+}
+
+/// Meditation, entered from a festival's reflective suggestion.
+///
+/// Independent of [MoonMeditationIntent] and [CycleMeditationIntent]:
+/// the moon, the cycle and a festival are three separate observations
+/// about the same day, and Meditation may hold all three at once without
+/// ever combining them into one claim.
+final class FestivalMeditationIntent extends FestivalIntent {
+  const FestivalMeditationIntent(super.festival);
+
+  @override
+  FeatureId get destination => FeatureId.meditation;
+}
+
+/// Yoga, entered from a festival's movement suggestion.
+final class FestivalYogaIntent extends FestivalIntent {
+  const FestivalYogaIntent(super.festival);
+
+  @override
+  FeatureId get destination => FeatureId.yoga;
+}
+
+/// Garden, entered from a festival's in-nature guidance.
+///
+/// Carries only which festival; Garden's own regional and seasonal rules
+/// decide everything it actually shows. The Wheel never invents a
+/// planting instruction.
+final class FestivalGardenIntent extends FestivalIntent {
+  const FestivalGardenIntent(super.festival);
+
+  @override
+  FeatureId get destination => FeatureId.garden;
+}
+
+/// Nature Log, entered from a festival's in-nature guidance.
+///
+/// Carries only which festival; Nature Log's own regional rules decide
+/// everything it actually shows, and it says nothing about local species
+/// without a location, exactly as it does everywhere else.
+final class FestivalNatureLogIntent extends FestivalIntent {
+  const FestivalNatureLogIntent(super.festival);
+
+  @override
+  FeatureId get destination => FeatureId.natureLog;
 }
 
 /// The intent the user is currently travelling with, if any.

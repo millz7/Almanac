@@ -112,6 +112,22 @@ abstract final class FeatureRegistry {
       placeholderMessage:
           'What you see, hear and notice outdoors will be recorded here.',
     ),
+    FeatureDefinition(
+      id: FeatureId.wheel,
+      name: 'Wheel of the Year',
+      // The page, the drawer and onboarding all say "Wheel of the Year";
+      // only the crowded bottom bar shortens it, first to "Holidays" and
+      // then, if it still will not fit, to "Hols".
+      navLabel: 'Holidays',
+      shortName: 'Hols',
+      icon: Icons.donut_large_outlined,
+      selectedIcon: Icons.donut_large,
+      route: '/wheel',
+      description: 'Seasonal festivals, traditions and ways to celebrate',
+      placeholderMessage:
+          'The eight festivals of the Wheel of the Year will live here, '
+          'turning with your own hemisphere.',
+    ),
   ];
 
   /// Every feature, core first.

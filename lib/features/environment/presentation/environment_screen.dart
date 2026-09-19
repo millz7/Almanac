@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/almanac_button.dart';
+import '../../../app/context/festival_context.dart';
+import '../../../app/navigation/widgets/almanac_doorway.dart';
 import '../../../app/router.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/context/almanac_context.dart';
 import '../../../core/environment/environment_providers.dart';
 import '../../../core/environment/natural_environment.dart';
 import '../../../core/environment/season.dart';
@@ -177,15 +180,18 @@ class _DateLine extends StatelessWidget {
 /// A journal label, a fine rule and a written line — the Step 17 section
 /// language — rather than the raised white rectangle the first pass put
 /// here. Nothing to press: there is no page behind it to go to.
-class _Today extends StatelessWidget {
+class _Today extends ConsumerWidget {
   const _Today({required this.environment});
 
   final NaturalEnvironment environment;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
+    // Direct entry: nothing carried in, so this asks for whatever the
+    // Wheel currently thinks is worth mentioning, if anything.
+    final festival = ref.watch(almanacFestivalProvider(null));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,6 +208,23 @@ class _Today extends StatelessWidget {
         AlmanacAnnotation(
           describeNextSeason(environment.season, environment.resolvedAt),
         ),
+        // A quiet, additional line — never a replacement for the light
+        // description or the season countdown above. Absent entirely
+        // when the Wheel is switched off, or when no festival is close.
+        if (festival case final active?) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            active.state == FestivalTimingState.today
+                ? 'Today is ${active.id.label}'
+                : '${active.id.label} is approaching · ${active.daysUntil} '
+                      '${active.daysUntil == 1 ? 'day' : 'days'}',
+            style: textTheme.bodyQuiet?.copyWith(color: palette.textSecondary),
+          ),
+          AlmanacDoorway(
+            label: 'See ${active.id.label}',
+            intent: FestivalWheelIntent(active.id),
+          ),
+        ],
       ],
     );
   }

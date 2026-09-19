@@ -102,6 +102,9 @@ void main() {
         FeatureId.cookbook: 'Suggested recipes for each season',
         FeatureId.garden: 'What to sow, tend and harvest',
         FeatureId.natureLog: 'The flora and fauna around you',
+        FeatureId.wheel:
+            'Seasonal festivals, traditions and ways to '
+            'celebrate',
       };
 
       for (final feature in FeatureRegistry.optional) {
@@ -213,7 +216,7 @@ void main() {
       ]);
     });
 
-    testWidgets('all seven are stored', (tester) async {
+    testWidgets('all eight are stored', (tester) async {
       final store = InMemorySettingsStore(atFeatureQuestion());
       await pumpApp(tester, store: store);
 
@@ -230,7 +233,7 @@ void main() {
       final bar = tester.widget<AlmanacNavigationBar>(
         find.byType(AlmanacNavigationBar),
       );
-      expect(bar.destinations.length, 8);
+      expect(bar.destinations.length, 9);
     });
 
     testWidgets('a choice can be un-chosen before continuing', (tester) async {

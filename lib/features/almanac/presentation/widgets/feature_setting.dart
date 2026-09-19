@@ -54,7 +54,7 @@ class _FeatureSettingState extends ConsumerState<FeatureSetting> {
         const SizedBox(height: AppSpacing.xs),
         Text(
           'Add or remove parts whenever you like. Each one becomes its own '
-          'place at the bottom of the screen.',
+          'category at the bottom of the screen.',
           style: textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.md),

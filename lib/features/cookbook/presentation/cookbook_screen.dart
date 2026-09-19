@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/almanac_button.dart';
 import '../../../app/context/cycle_phase_context.dart';
+import '../../../app/context/festival_context.dart';
 import '../../../core/context/almanac_context.dart';
 import '../domain/cycle_recipes.dart';
 import '../../../app/theme/app_theme.dart';
@@ -51,6 +52,13 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
   /// not, because a contextual intent belongs to the journey that
   /// created it.
   CyclePhase? _arrivedForPhase;
+
+  /// The festival the user arrived with, when they came from the Wheel
+  /// of the Year's food and drink suggestions.
+  ///
+  /// Independent of [_arrivedForPhase]: a cycle phase and a festival are
+  /// two separate observations about the same day.
+  FestivalId? _arrivedForFestival;
 
   /// The recipe being read, or null for the collection.
   Recipe? _open;
@@ -102,13 +110,20 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     // longer the visible branch.
     if (!TickerMode.valuesOf(context).enabled) {
       _arrivedForPhase = null;
+      _arrivedForFestival = null;
       return;
     }
 
     final intent = ref.read(almanacIntentProvider);
-    if (intent is! CycleCookbookIntent) return;
+    // Two doors into the same room, and each is remembered separately.
+    if (intent is CycleCookbookIntent) {
+      _arrivedForPhase = intent.phase;
+    } else if (intent is FestivalCookbookIntent) {
+      _arrivedForFestival = intent.festival;
+    } else {
+      return;
+    }
 
-    _arrivedForPhase = intent.phase;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(almanacIntentProvider.notifier).take(FeatureId.cookbook);
@@ -149,6 +164,9 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     // Null when Cycle is not part of their Almanac or has nothing to
     // say, and then there is simply no cycle collection.
     final cyclePhase = ref.watch(almanacCyclePhaseProvider(_arrivedForPhase));
+    // The same shape for the Wheel of the Year: null when it is switched
+    // off, or when no festival is close enough to be worth mentioning.
+    final festival = ref.watch(almanacFestivalProvider(_arrivedForFestival));
 
     return AppScaffold(
       title: CookbookText.title,
@@ -173,6 +191,12 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
             arrived: _arrivedForPhase != null,
             growth: _growth,
             onOpen: (recipe) => setState(() => _open = recipe),
+          ),
+        // And, underneath that, suggestions for an approaching festival.
+        if (festival case final active?)
+          _FestivalCollection(
+            active: active,
+            arrived: _arrivedForFestival != null,
           ),
       ],
     );
@@ -236,6 +260,100 @@ class _CycleCollection extends StatelessWidget {
           if (recipe != recipes.last) const SizedBox(height: AppSpacing.md),
         ],
       ],
+    );
+  }
+}
+
+/// A small set of suggestions for an approaching or current festival.
+///
+/// **Not a recipe collection.** Unlike the seasonal and cycle
+/// collections, these are the Wheel of the Year's own suggestion ideas
+/// for a meal, a treat and a drink — not full recipes drawn from the
+/// catalogue — and the section says so plainly rather than implying they
+/// are the same kind of thing as the cards above.
+class _FestivalCollection extends StatelessWidget {
+  const _FestivalCollection({required this.active, required this.arrived});
+
+  final ActiveFestival active;
+
+  /// Whether the user came through the Wheel's own door, which decides
+  /// only how the heading reads.
+  final bool arrived;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final textTheme = Theme.of(context).textTheme;
+    final heading = arrived
+        ? FestivalCookbookIntent(active.id).heading
+        : (active.state == FestivalTimingState.today
+              ? 'Today is ${active.id.label}'
+              : '${active.id.label} is approaching');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AlmanacSectionDivider(spacing: AppSpacing.lg),
+        AlmanacSectionLabel(label: heading),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'A few suggestion ideas for the day, not full recipes.',
+          style: textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _FestivalIdea(
+          label: 'Meal',
+          value: active.food.meal,
+          textTheme: textTheme,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _FestivalIdea(
+          label: 'Treat',
+          value: active.food.treat,
+          textTheme: textTheme,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _FestivalIdea(
+          label: 'Drink',
+          value: active.food.drink,
+          textTheme: textTheme,
+        ),
+      ],
+    );
+  }
+}
+
+class _FestivalIdea extends StatelessWidget {
+  const _FestivalIdea({
+    required this.label,
+    required this.value,
+    required this.textTheme,
+  });
+
+  final String label;
+  final String value;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Semantics(
+      container: true,
+      label: '$label: $value',
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: textTheme.labelMedium?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          Text(value, style: textTheme.bodyLarge),
+        ],
+      ),
     );
   }
 }

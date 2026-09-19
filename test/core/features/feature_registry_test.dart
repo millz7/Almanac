@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('the catalogue', () {
-    test('holds the Environment and the seven choosable features', () {
-      expect(FeatureRegistry.all.length, 8);
-      expect(FeatureRegistry.optional.length, 7);
+    test('holds the Environment and the eight choosable features', () {
+      expect(FeatureRegistry.all.length, 9);
+      expect(FeatureRegistry.optional.length, 8);
       expect(FeatureRegistry.all.first, same(FeatureRegistry.environment));
     });
 
@@ -18,6 +18,7 @@ void main() {
         'Cookbook',
         'Garden',
         'Nature Log',
+        'Wheel of the Year',
       ]);
     });
 
@@ -36,8 +37,16 @@ void main() {
           'Cookbook': 'Cook',
           'Garden': 'Garden',
           'Nature Log': 'Nature',
+          'Wheel of the Year': 'Hols',
         },
       );
+    });
+
+    test('the Wheel of the Year uses a distinct full nav label', () {
+      final wheel = FeatureRegistry.byId(FeatureId.wheel);
+      expect(wheel.name, 'Wheel of the Year');
+      expect(wheel.navLabel, 'Holidays');
+      expect(wheel.shortName, 'Hols');
     });
 
     test('every short name is a word, never a truncation', () {

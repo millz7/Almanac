@@ -14,6 +14,7 @@ class FeatureDefinition {
   const FeatureDefinition({
     required this.id,
     required this.name,
+    this.navLabel,
     required this.shortName,
     required this.icon,
     required this.selectedIcon,
@@ -25,10 +26,17 @@ class FeatureDefinition {
 
   final FeatureId id;
 
-  /// The full, proper name: "Nature Log". Used everywhere there is room,
-  /// and always used as the accessibility label — even when the visible
-  /// navigation label has been shortened.
+  /// The full, proper name: "Nature Log". Used as the page title, the
+  /// drawer/onboarding title, and always as the accessibility label —
+  /// even when the visible navigation label has been shortened, or
+  /// differs from this name entirely (see [navLabel]).
   final String name;
+
+  /// The full-width navigation-bar label, when it must differ from
+  /// [name] — "Holidays" for a feature whose page is titled "Wheel of
+  /// the Year". Null for every feature whose bar label is simply its
+  /// name, which is the normal case.
+  final String? navLabel;
 
   /// The deliberate short form for a crowded navigation bar: "Nature".
   ///

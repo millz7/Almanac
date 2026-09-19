@@ -35,7 +35,7 @@ class NavigationLayout {
 
   /// The label to show for a feature under this layout.
   String labelFor(FeatureDefinition feature) =>
-      useShortLabels ? feature.shortName : feature.name;
+      useShortLabels ? feature.shortName : (feature.navLabel ?? feature.name);
 
   @override
   String toString() =>
@@ -80,7 +80,7 @@ NavigationLayout resolveNavigationLayout({
   double widestLabel({required bool short}) => destinations
       .map(
         (feature) => _measureLabel(
-          short ? feature.shortName : feature.name,
+          short ? feature.shortName : (feature.navLabel ?? feature.name),
           style,
           textScaler,
         ).width,

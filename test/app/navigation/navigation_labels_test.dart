@@ -78,10 +78,10 @@ void main() {
     });
 
     test('a full Almanac uses the agreed short names', () {
-      final destinations = almanacOf(7);
+      final destinations = almanacOf(8);
       final layout = layoutFor(
         destinations,
-        available: neededPerItem(destinations, short: true) * 8,
+        available: neededPerItem(destinations, short: true) * 9,
       );
 
       expect(layout.useShortLabels, isTrue);
@@ -95,14 +95,15 @@ void main() {
         'Cook',
         'Garden',
         'Nature',
+        'Hols',
       ]);
     });
 
     test('too tight for even the short names scrolls, hiding nothing', () {
-      final destinations = almanacOf(7);
+      final destinations = almanacOf(8);
       final layout = layoutFor(
         destinations,
-        available: neededPerItem(destinations, short: true) * 8 - 1,
+        available: neededPerItem(destinations, short: true) * 9 - 1,
       );
 
       expect(layout.scrollable, isTrue);
