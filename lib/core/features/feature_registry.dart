@@ -36,7 +36,7 @@ abstract final class FeatureRegistry {
       icon: Icons.self_improvement_outlined,
       selectedIcon: Icons.self_improvement,
       route: '/meditation',
-      description: 'Sitting quietly, with the season for company.',
+      description: 'Create stillness, reflect',
       placeholderMessage:
           'Space to sit still will live here — practices that follow the '
           'light rather than a clock.',
@@ -48,7 +48,7 @@ abstract final class FeatureRegistry {
       icon: Icons.accessibility_new_outlined,
       selectedIcon: Icons.accessibility_new,
       route: '/yoga',
-      description: 'Moving with the season and the time of day.',
+      description: 'Movement that connects your body to the world around you',
       placeholderMessage:
           'Sequences to move through will live here, gentler in winter and '
           'brighter in summer.',
@@ -72,7 +72,7 @@ abstract final class FeatureRegistry {
       icon: Icons.brightness_3_outlined,
       selectedIcon: Icons.brightness_3,
       route: '/cycle',
-      description: 'Your own rhythm, alongside the moon\'s.',
+      description: 'Track your period, in connection with the moon',
       placeholderMessage:
           'Your cycle will live here, kept on this device and set beside '
           'the moon rather than a chart.',
@@ -84,7 +84,7 @@ abstract final class FeatureRegistry {
       icon: Icons.restaurant_outlined,
       selectedIcon: Icons.restaurant,
       route: '/cookbook',
-      description: 'Cooking with what is in season.',
+      description: 'Suggested recipes for each season',
       placeholderMessage:
           'Things to cook will live here, led by what is actually in season '
           'where you are.',
@@ -96,7 +96,7 @@ abstract final class FeatureRegistry {
       icon: Icons.local_florist_outlined,
       selectedIcon: Icons.local_florist,
       route: '/garden',
-      description: 'What to sow, tend and gather.',
+      description: 'What to sow, tend and harvest',
       placeholderMessage:
           'Sowing, tending and harvesting will live here, timed to your '
           'hemisphere rather than to a generic calendar.',
@@ -108,7 +108,7 @@ abstract final class FeatureRegistry {
       icon: Icons.forest_outlined,
       selectedIcon: Icons.forest,
       route: '/nature-log',
-      description: 'A record of what you notice outside.',
+      description: 'The flora and fauna around you',
       placeholderMessage:
           'What you see, hear and notice outdoors will be recorded here.',
     ),

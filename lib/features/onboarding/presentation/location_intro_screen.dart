@@ -28,10 +28,10 @@ class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
   /// What location would eventually unlock. Deliberately phrased as
   /// things the app could show, not things the user is missing out on.
   static const _benefits = <String>[
-    'Sunrise and sunset where you are',
-    'How much daylight your day actually has',
-    "The season's nature near you",
-    'Tides on your stretch of coast',
+    'Match the seasons around you',
+    'Real sunrise and sunset times',
+    'Tide forecasts from your nearest coast',
+    'Flora and fauna in your area',
   ];
 
   Future<void> _allow() async {
@@ -76,9 +76,7 @@ class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
 
     return OnboardingPage(
       heading: 'Let your Almanac follow the world around you',
-      supporting:
-          'With location, the app can show you what the world is doing right '
-          'where you are:',
+      supporting: 'We can use your real location to personalise your Almanac',
       children: [
         for (final benefit in _benefits)
           Padding(

@@ -1,6 +1,7 @@
 import 'package:almanac/app/almanac_button.dart';
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
+import 'package:almanac/app/theme/almanac_paper.dart';
 import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/location_state.dart';
@@ -15,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/contrast.dart';
 import '../../support/fake_environment_services.dart';
 import '../../support/test_overrides.dart';
 
@@ -419,6 +421,75 @@ void main() {
       expect(find.textContaining('-41.2'), findsNothing);
       expect(find.textContaining('174.7'), findsNothing);
       expect(find.text('Allowed'), findsOneWidget);
+    });
+  });
+
+  group('contrast', () {
+    /// The colour a [Text] widget actually paints, following a null
+    /// style up to the nearest [DefaultTextStyle] the way the framework
+    /// does at paint time.
+    Color? resolvedColor(WidgetTester tester, Finder finder) {
+      final text = tester.widget<Text>(finder);
+      if (text.style?.color case final color?) return color;
+      return tester
+          .widget<DefaultTextStyle>(
+            find.ancestor(of: finder, matching: find.byType(DefaultTextStyle)),
+          )
+          .style
+          .color;
+    }
+
+    testWidgets('the title is paper ink, not white, even by day', (
+      tester,
+    ) async {
+      await openAlmanac(tester, name: 'Millie');
+
+      final color = resolvedColor(tester, find.text("Millie's Almanac"));
+      expect(color, isNotNull);
+      expect(
+        contrastRatio(color!, AlmanacPaper.ground),
+        greaterThanOrEqualTo(4.5),
+      );
+      // Never the Environment's own light-on-dark foreground.
+      expect(color, isNot(Colors.white));
+    });
+
+    testWidgets(
+      'the title stays readable paper ink when the Environment is in a '
+      'night state',
+      (tester) async {
+        await openAlmanac(
+          tester,
+          overrides: environmentOverrides(
+            now: DateTime.utc(2025, 7, 15, 23),
+            name: 'Millie',
+          ),
+        );
+
+        final color = resolvedColor(tester, find.text("Millie's Almanac"));
+        expect(color, isNotNull);
+        // Readable on the warm paper ground, exactly as it is by day —
+        // never the night palette's own light foreground colour.
+        expect(
+          contrastRatio(color!, AlmanacPaper.ground),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(color, isNot(Colors.white));
+      },
+    );
+
+    testWidgets('a section label is readable ink at night too', (tester) async {
+      await openAlmanac(
+        tester,
+        overrides: environmentOverrides(now: DateTime.utc(2025, 7, 15, 23)),
+      );
+
+      final color = resolvedColor(tester, find.text('Profile'));
+      expect(color, isNotNull);
+      expect(
+        contrastRatio(color!, AlmanacPaper.ground),
+        greaterThanOrEqualTo(3),
+      );
     });
   });
 }

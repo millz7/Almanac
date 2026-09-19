@@ -54,8 +54,6 @@ class _HemisphereScreenState extends ConsumerState<HemisphereScreen> {
 
     return OnboardingPage(
       heading: 'Where are you in the world?',
-      supporting:
-          'We use your hemisphere to follow the seasons where you live.',
       children: [
         for (final hemisphere in Hemisphere.values) ...[
           ChoiceCard(

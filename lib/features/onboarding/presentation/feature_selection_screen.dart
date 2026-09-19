@@ -69,9 +69,9 @@ class _FeatureSelectionScreenState
     return OnboardingPage(
       heading: 'What would you like in your Almanac?',
       supporting:
-          'Choose the parts you are interested in. Each one becomes its own '
-          'place at the bottom of the screen, and you can add or remove them '
-          'whenever you like.',
+          'Choose the parts you are interested in. Each one has its own '
+          'category at the bottom of the screen, and you can add or remove '
+          'them whenever you like.',
       children: [
         for (final feature in FeatureRegistry.optional) ...[
           ChoiceCard(

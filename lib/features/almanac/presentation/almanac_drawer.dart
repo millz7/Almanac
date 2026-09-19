@@ -25,8 +25,6 @@ class AlmanacDrawer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = context.palette;
-    final textTheme = Theme.of(context).textTheme;
     final title = ref.watch(almanacTitleProvider);
 
     return Drawer(
@@ -38,46 +36,61 @@ class AlmanacDrawer extends ConsumerWidget {
       // everything wrapping, and capped so it never fills a tablet.
       width: AppDimens.maxContentWidth * 0.72,
       child: AlmanacPaperSurface(
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.xxl,
-            ),
-            children: [
-              Semantics(
-                header: true,
-                child: Text(title, style: textTheme.pageTitle),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ExcludeSemantics(
-                child: SizedBox(
-                  width: 48,
-                  height: 1,
-                  child: ColoredBox(color: palette.border),
+        // A fresh context here, taken from inside the paper theme rather
+        // than the one the drawer was built with. The title and its rule
+        // are painted with it, so they read in the Almanac's own paper
+        // ink even when the Environment behind the drawer is in a night
+        // state — never in whatever foreground that night palette chose
+        // for its own, much darker, ground.
+        child: Builder(
+          builder: (context) {
+            final palette = context.palette;
+            final textTheme = Theme.of(context).textTheme;
+
+            return SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.xxl,
                 ),
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(title, style: textTheme.pageTitle),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ExcludeSemantics(
+                    child: SizedBox(
+                      width: 48,
+                      height: 1,
+                      child: ColoredBox(color: palette.border),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const AlmanacAnnotation(
+                    'Yours alone, and kept on this device.',
+                  ),
+
+                  const SizedBox(height: AppSpacing.xl),
+                  const AlmanacSectionLabel(label: 'Profile'),
+                  const SizedBox(height: AppSpacing.md),
+                  const NameSetting(),
+
+                  const AlmanacRule(spacing: AppSpacing.lg),
+                  const AlmanacSectionLabel(label: 'Location & Region'),
+                  const SizedBox(height: AppSpacing.md),
+                  const HemisphereSetting(),
+                  const SizedBox(height: AppSpacing.xl),
+                  const LocationSetting(),
+
+                  const AlmanacRule(spacing: AppSpacing.lg),
+                  const FeatureSetting(),
+                ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              const AlmanacAnnotation('Yours alone, and kept on this device.'),
-
-              const SizedBox(height: AppSpacing.xl),
-              const AlmanacSectionLabel(label: 'Profile'),
-              const SizedBox(height: AppSpacing.md),
-              const NameSetting(),
-
-              const AlmanacRule(spacing: AppSpacing.lg),
-              const AlmanacSectionLabel(label: 'Location & Region'),
-              const SizedBox(height: AppSpacing.md),
-              const HemisphereSetting(),
-              const SizedBox(height: AppSpacing.xl),
-              const LocationSetting(),
-
-              const AlmanacRule(spacing: AppSpacing.lg),
-              const FeatureSetting(),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

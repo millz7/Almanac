@@ -140,6 +140,24 @@ void main() {
       expect(hemisphereQuestion, findsOneWidget);
     });
 
+    testWidgets('the name question has no explanatory paragraph', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        overrides: environmentOverrides(settingsStore: InMemorySettingsStore()),
+      );
+
+      expect(nameQuestion, findsOneWidget);
+      expect(
+        find.textContaining('Only to give your Almanac a name'),
+        findsNothing,
+      );
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Continue'), findsOneWidget);
+      expect(find.text('Skip'), findsOneWidget);
+    });
+
     testWidgets('a supplied name is kept and titles their Almanac', (
       tester,
     ) async {
@@ -176,7 +194,7 @@ void main() {
           'We use your hemisphere to follow the seasons where '
           'you live.',
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(northernChoice, findsOneWidget);
       expect(southernChoice, findsOneWidget);
@@ -390,7 +408,17 @@ void main() {
       expect(locationIntro, findsOneWidget);
       expect(find.text('Allow Location'), findsOneWidget);
       expect(find.text('Not Now'), findsOneWidget);
-      expect(find.text('Sunrise and sunset where you are'), findsOneWidget);
+      expect(
+        find.text('We can use your real location to personalise your Almanac'),
+        findsOneWidget,
+      );
+      expect(find.text('Match the seasons around you'), findsOneWidget);
+      expect(find.text('Real sunrise and sunset times'), findsOneWidget);
+      expect(
+        find.text('Tide forecasts from your nearest coast'),
+        findsOneWidget,
+      );
+      expect(find.text('Flora and fauna in your area'), findsOneWidget);
       // No pressure, no dead end.
       expect(find.textContaining('must'), findsNothing);
     });

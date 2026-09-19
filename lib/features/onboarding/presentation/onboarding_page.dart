@@ -17,12 +17,16 @@ class OnboardingPage extends StatelessWidget {
   const OnboardingPage({
     super.key,
     required this.heading,
-    required this.supporting,
+    this.supporting,
     required this.children,
   });
 
   final String heading;
-  final String supporting;
+
+  /// An explanatory paragraph under the heading. Optional: a screen whose
+  /// question is self-explanatory need not invent one just to fill the
+  /// space.
+  final String? supporting;
   final List<Widget> children;
 
   @override
@@ -49,8 +53,10 @@ class OnboardingPage extends StatelessWidget {
                     header: true,
                     child: Text(heading, style: textTheme.displaySmall),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(supporting, style: textTheme.bodyLarge),
+                  if (supporting case final supporting?) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Text(supporting, style: textTheme.bodyLarge),
+                  ],
                   const SizedBox(height: AppSpacing.xl),
                   ...children,
                 ],

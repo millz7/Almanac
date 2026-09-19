@@ -56,9 +56,6 @@ class _NameScreenState extends ConsumerState<NameScreen> {
 
     return OnboardingPage(
       heading: 'What should we call you?',
-      supporting:
-          'Only to give your Almanac a name. It stays on this device, it is '
-          'never sent anywhere, and you can skip it.',
       children: [
         TextField(
           controller: _controller,

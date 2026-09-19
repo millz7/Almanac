@@ -79,6 +79,45 @@ void main() {
         find.textContaining('you can add or remove them whenever you like'),
         findsOneWidget,
       );
+      expect(
+        find.textContaining(
+          'Each one has its own category at the bottom of the screen',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('own place at the bottom'), findsNothing);
+    });
+
+    testWidgets('shows the agreed description for each feature', (
+      tester,
+    ) async {
+      await pumpApp(tester);
+
+      final descriptions = <FeatureId, String>{
+        FeatureId.meditation: 'Create stillness, reflect',
+        FeatureId.yoga:
+            'Movement that connects your body to the world '
+            'around you',
+        FeatureId.cycle: 'Track your period, in connection with the moon',
+        FeatureId.cookbook: 'Suggested recipes for each season',
+        FeatureId.garden: 'What to sow, tend and harvest',
+        FeatureId.natureLog: 'The flora and fauna around you',
+      };
+
+      for (final feature in FeatureRegistry.optional) {
+        if (descriptions[feature.id] case final expected?) {
+          expect(feature.description, expected);
+          expect(
+            find.widgetWithText(ChoiceCard, expected),
+            findsOneWidget,
+            reason: '${feature.name} should show its new description',
+          );
+        }
+      }
+
+      // Chakras is deliberately untouched by this correction.
+      final chakras = FeatureRegistry.byId(FeatureId.chakras);
+      expect(chakras.description, "The body's centres of energy.");
     });
 
     testWidgets('offers the seven choosable features and not the eighth', (

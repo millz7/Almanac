@@ -1,12 +1,12 @@
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/almanac_button.dart';
+import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/environment/moon_service.dart';
 import 'package:almanac/core/environment/solar_service.dart';
-import 'package:almanac/features/environment/presentation/widgets/explore_links.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
 import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:flutter/material.dart';
@@ -406,39 +406,33 @@ void main() {
       expect(hero.height, lessThan(screen.height * 0.5));
     });
 
-    testWidgets('links onward to the parts of the Almanac they chose', (
+    testWidgets(
+      'there is no "Elsewhere in your Almanac" section, whatever is chosen',
+      (tester) async {
+        // Enough destinations that the bar would have had to scroll —
+        // exactly the case the old footnote used to appear for.
+        await openToday(
+          tester,
+          overrides: environmentOverrides(
+            features: const {
+              FeatureId.meditation,
+              FeatureId.yoga,
+              FeatureId.chakras,
+              FeatureId.cycle,
+              FeatureId.cookbook,
+              FeatureId.garden,
+              FeatureId.natureLog,
+            },
+          ),
+        );
+
+        expect(find.text('Elsewhere in your Almanac'), findsNothing);
+      },
+    );
+
+    testWidgets('removing the section leaves the bottom navigation untouched', (
       tester,
     ) async {
-      // Every feature chosen on a narrow phone: the bar has to scroll,
-      // so some destinations are off the side and the footnote earns
-      // its place.
-      await openToday(
-        tester,
-        overrides: environmentOverrides(
-          features: const {
-            FeatureId.meditation,
-            FeatureId.yoga,
-            FeatureId.chakras,
-            FeatureId.cycle,
-            FeatureId.cookbook,
-            FeatureId.garden,
-            FeatureId.natureLog,
-          },
-        ),
-      );
-
-      expect(find.text('Elsewhere in your Almanac'), findsOneWidget);
-      // The full name here; the bar has had to shorten its own.
-      expect(find.text('Nature Log'), findsOneWidget);
-      expect(find.text('Cookbook'), findsOneWidget);
-    });
-
-    testWidgets('and says nothing when the bar already shows them all', (
-      tester,
-    ) async {
-      // Two destinations plus the Environment fit comfortably, so
-      // repeating them directly above the bar would be duplication
-      // rather than a way onward.
       await openToday(
         tester,
         overrides: environmentOverrides(
@@ -446,52 +440,18 @@ void main() {
         ),
       );
 
-      expect(find.text('Elsewhere in your Almanac'), findsNothing);
-      // Once each, in the navigation bar.
-      expect(find.text('Yoga'), findsOneWidget);
-      expect(find.text('Garden'), findsOneWidget);
-      // Nothing they did not choose.
-      expect(find.text('Cookbook'), findsNothing);
-      expect(find.text('Meditation'), findsNothing);
-    });
-
-    testWidgets('the links are absent entirely when nothing was chosen', (
-      tester,
-    ) async {
-      await openToday(tester, overrides: environmentOverrides());
-
-      expect(find.byType(ExploreLinks), findsOneWidget);
-      expect(find.text('Elsewhere in your Almanac'), findsNothing);
-    });
-
-    testWidgets('a link goes to that feature', (tester) async {
-      // Enough destinations that the bar scrolls, which is when the
-      // footnote is shown at all.
-      await openToday(
-        tester,
-        overrides: environmentOverrides(
-          features: const {
-            FeatureId.meditation,
-            FeatureId.yoga,
-            FeatureId.chakras,
-            FeatureId.cycle,
-            FeatureId.cookbook,
-            FeatureId.garden,
-            FeatureId.natureLog,
-          },
-        ),
+      final bar = tester.widget<AlmanacNavigationBar>(
+        find.byType(AlmanacNavigationBar),
       );
+      expect(bar.destinations.map((feature) => feature.name), [
+        'Environment',
+        'Yoga',
+        'Garden',
+      ]);
 
-      await tester.tap(
-        find.descendant(
-          of: find.byType(ExploreLinks),
-          matching: find.text('Nature Log'),
-        ),
-      );
+      await tester.tap(find.bySemanticsLabel('Yoga'));
       await tester.pumpAndSettle();
-
-      // The link landed on the Nature Log's own screen.
-      expect(find.text('Around now'), findsWidgets);
+      expect(find.byType(AlmanacNavigationBar), findsOneWidget);
     });
 
     testWidgets('the Almanac is one tap away from the top right', (

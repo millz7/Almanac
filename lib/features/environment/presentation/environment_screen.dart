@@ -15,7 +15,6 @@ import '../domain/environment_artwork.dart';
 import 'environment_text.dart';
 import 'widgets/environment_artwork_view.dart';
 import 'widgets/environment_facts.dart';
-import 'widgets/explore_links.dart';
 import 'widgets/location_invitation.dart';
 
 /// The Environment screen: what the world outside is doing, right now.
@@ -289,9 +288,6 @@ class _EnvironmentViewState extends State<_EnvironmentView> {
                     const SizedBox(height: AppSpacing.lg),
                     const _Column(child: LocationInvitation()),
                   ],
-
-                  const SizedBox(height: AppSpacing.xl),
-                  const _Column(child: ExploreLinks()),
                 ],
               ),
             ),

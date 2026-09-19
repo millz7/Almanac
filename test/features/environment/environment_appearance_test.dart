@@ -2,8 +2,6 @@ import 'package:almanac/app/app.dart';
 import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/location_state.dart';
-import 'package:almanac/core/features/feature_registry.dart';
-import 'package:almanac/features/environment/presentation/widgets/explore_links.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
 import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:flutter/material.dart';
@@ -217,35 +215,6 @@ void main() {
       expect(find.bySemanticsLabel('Sunset 9:41 PM'), findsOneWidget);
 
       handle.dispose();
-    });
-
-    testWidgets('every link is a comfortable tap target', (tester) async {
-      await openToday(
-        tester,
-        overrides: environmentOverrides(
-          features: const {
-            FeatureId.meditation,
-            FeatureId.yoga,
-            FeatureId.garden,
-            FeatureId.natureLog,
-          },
-        ),
-      );
-
-      for (final section in ['Meditation', 'Yoga', 'Garden', 'Nature Log']) {
-        final pill = find.ancestor(
-          of: find.descendant(
-            of: find.byType(ExploreLinks),
-            matching: find.text(section),
-          ),
-          matching: find.byType(InkWell),
-        );
-        expect(
-          tester.getSize(pill.first).height,
-          greaterThanOrEqualTo(48),
-          reason: '$section link is too short to tap comfortably',
-        );
-      }
     });
 
     testWidgets('doubling the text size does not break the page', (
