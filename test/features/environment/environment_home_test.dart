@@ -1,13 +1,11 @@
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/theme/app_theme.dart';
-import 'package:almanac/core/environment/day_night.dart';
 import 'package:almanac/core/environment/location_state.dart';
-import 'package:almanac/core/environment/moon_phase.dart';
 import 'package:almanac/core/environment/season.dart';
 import 'package:almanac/core/widgets/widgets.dart';
-import 'package:almanac/features/environment/domain/landscape_appearance.dart';
+import 'package:almanac/features/environment/domain/environment_artwork.dart';
 import 'package:almanac/features/environment/presentation/environment_text.dart';
-import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
+import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,11 +51,14 @@ void main() {
   }
 
   group('the masthead and the standing line', () {
-    testWidgets('the book names itself', (tester) async {
+    testWidgets('the book names itself, and says nothing else', (tester) async {
       await openHome(tester);
 
       expect(find.text(EnvironmentText.masthead), findsOneWidget);
-      expect(find.text(EnvironmentText.mastheadRule), findsOneWidget);
+      // Slogans out of the generated mockups are not product copy.
+      expect(find.textContaining('NATURE'), findsNothing);
+      expect(find.textContaining('RHYTHM'), findsNothing);
+      expect(find.textContaining('wilder you'), findsNothing);
     });
 
     testWidgets('and the approved tagline is used exactly', (tester) async {
@@ -84,42 +85,59 @@ void main() {
       );
       expect(
         topOf(find.text('Tuesday 15 July')),
-        lessThan(topOf(find.byType(AlmanacLandscapeView))),
+        lessThan(topOf(find.byType(EnvironmentArtworkView))),
       );
     });
   });
 
-  group('ENVIRONMENT IS OUTSIDE', () {
-    testWidgets('the landscape is there, and it is decorative', (tester) async {
+  group('the artwork is the scene', () {
+    testWidgets('the artwork is there, and it is decorative', (tester) async {
       await openHome(tester);
 
-      expect(find.byType(AlmanacLandscapeView), findsOneWidget);
-      // Everything it hints at is written in words underneath it, so it
+      expect(find.byType(EnvironmentArtworkView), findsOneWidget);
+      // Everything it shows is written in words underneath it, so it
       // says nothing to a screen reader.
       expect(
         find.descendant(
-          of: find.byType(AlmanacLandscapeView),
+          of: find.byType(EnvironmentArtworkView),
           matching: find.byType(ExcludeSemantics),
         ),
-        findsNothing,
+        findsWidgets,
       );
-      final semantics = tester.widget<Semantics>(
-        find
-            .ancestor(
-              of: find.byType(AlmanacLandscapeView),
-              matching: find.byType(Semantics),
+      expect(
+        tester
+            .widget<Image>(
+              find.descendant(
+                of: find.byType(EnvironmentArtworkView),
+                matching: find.byType(Image),
+              ),
             )
-            .first,
+            .excludeFromSemantics,
+        isTrue,
       );
-      expect(semantics.properties.label, isNull);
     });
 
-    testWidgets('and the page is not on the book\'s paper', (tester) async {
+    testWidgets('and the page around it is the Almanac\'s own paper', (
+      tester,
+    ) async {
       await openHome(tester);
 
-      // The one screen that is allowed to follow the sky. Every other
-      // feature is wrapped in the paper surface; this one must not be.
-      expect(find.byType(AlmanacPaperSurface), findsNothing);
+      // Only the artwork changes with the season and the hour. The page
+      // it is mounted on is the same warm cream as every inner page.
+      expect(find.byType(AlmanacPaperSurface), findsOneWidget);
+      expect(
+        tester
+            .widget<ColoredBox>(
+              find
+                  .descendant(
+                    of: find.byType(AlmanacPaperSurface),
+                    matching: find.byType(ColoredBox),
+                  )
+                  .first,
+            )
+            .color,
+        AlmanacPaper.ground,
+      );
     });
 
     testWidgets('the painting is dominant but not the whole page', (
@@ -127,7 +145,7 @@ void main() {
     ) async {
       await openHome(tester);
 
-      final painting = tester.getSize(find.byType(AlmanacLandscapeView));
+      final painting = tester.getSize(find.byType(EnvironmentArtworkView));
       final screen = tester.getSize(find.byType(MaterialApp));
 
       expect(painting.height, greaterThan(screen.height * 0.2));
@@ -148,35 +166,37 @@ void main() {
     ) async {
       await openHome(tester, reducedMotion: true);
 
-      expect(find.byType(AlmanacLandscapeView), findsOneWidget);
+      expect(find.byType(EnvironmentArtworkView), findsOneWidget);
       expect(tester.binding.transientCallbackCount, 0);
     });
 
-    test('the painter does no work when nothing has changed', () {
-      // A static scene should cost nothing to keep on screen.
-      LandscapePainter painterFor(DayPhase phase) => LandscapePainter(
-        appearance: LandscapeAppearance.resolve(
-          season: Season.summer,
-          dayNight: DayNightState(phase: phase, daylight: 1),
-          palette: SeasonalPalettes.resolve(season: Season.summer, daylight: 1),
-        ),
-        dayProgress: 0.5,
-        moon: const MoonPhaseState(
-          phase: MoonPhase.waxingCrescent,
-          elongationDegrees: 60,
-          illuminatedFraction: 0.34,
-        ),
-        southern: false,
-      );
+    testWidgets('the artwork crossfades rather than flashing', (tester) async {
+      await openHome(tester);
 
-      expect(
-        painterFor(DayPhase.day).shouldRepaint(painterFor(DayPhase.day)),
-        isFalse,
+      final view = tester.widget<EnvironmentArtworkView>(
+        find.byType(EnvironmentArtworkView),
       );
       expect(
-        painterFor(DayPhase.day).shouldRepaint(painterFor(DayPhase.night)),
-        isTrue,
+        view.asset,
+        EnvironmentArtwork.forState(
+          season: Season.summer,
+          light: EnvironmentLightState.day,
+        ),
       );
+      // One plate on screen, and a switcher able to hold two during a
+      // change — never sixteen.
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.byType(AnimatedSwitcher), findsOneWidget);
+    });
+
+    testWidgets('and reduced motion changes the plate at once', (tester) async {
+      await openHome(tester, reducedMotion: true);
+
+      final switcher = tester.widget<AnimatedSwitcher>(
+        find.byType(AnimatedSwitcher),
+      );
+      expect(switcher.duration, Duration.zero);
+      expect(tester.binding.transientCallbackCount, 0);
     });
   });
 

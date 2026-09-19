@@ -8,22 +8,28 @@ import '../../../app/router.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/environment/environment_providers.dart';
 import '../../../core/environment/natural_environment.dart';
+import '../../../core/environment/season.dart';
 import '../../../core/environment/solar_service.dart';
 import '../../../core/widgets/widgets.dart';
-import '../domain/landscape_appearance.dart';
+import '../domain/environment_artwork.dart';
 import 'environment_text.dart';
-import 'widgets/almanac_landscape_view.dart';
+import 'widgets/environment_artwork_view.dart';
 import 'widgets/environment_facts.dart';
 import 'widgets/explore_links.dart';
 import 'widgets/location_invitation.dart';
 
 /// The Environment screen: what the world outside is doing, right now.
 ///
-/// **ENVIRONMENT IS OUTSIDE. DETAIL PAGES ARE THE BOOK.** This is the
-/// exception in the app — the one immersive surface, and the only screen
-/// with a landscape on it. It is deliberately *not* on
-/// `AlmanacPaper.ground`: its ground is the season's own, and it follows
-/// the sky from dawn to dark while every inner page stays cream.
+/// **The artwork is the scene; the page is the book.** The landscape is
+/// sixteen approved painted plates — one per season at each of the four
+/// light states — and the app selects one and crossfades between them.
+/// Nothing draws over them: no plants, no mountains, no stars, and no
+/// second sun or moon. The code-drawn landscape that used to be here was
+/// retired when the paintings arrived, and its classes were deleted
+/// rather than left switched off underneath.
+///
+/// The page around the painting is the Almanac's own paper, stable in
+/// every season and at every hour. Only the artwork changes.
 ///
 /// The composition follows the approved Home reference, top to bottom:
 /// the masthead; the date and the season with the standing line beside
@@ -58,7 +64,6 @@ class _Masthead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
@@ -80,13 +85,6 @@ class _Masthead extends StatelessWidget {
                   Text(
                     EnvironmentText.masthead,
                     style: textTheme.pageTitle?.copyWith(fontSize: 36),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    EnvironmentText.mastheadRule,
-                    style: textTheme.eyebrow?.copyWith(
-                      color: palette.textSecondary,
-                    ),
                   ),
                 ],
               ),
@@ -176,6 +174,10 @@ class _DateLine extends StatelessWidget {
 }
 
 /// One line about today, in the page's own voice, under the strip.
+///
+/// A journal label, a fine rule and a written line — the Step 17 section
+/// language — rather than the raised white rectangle the first pass put
+/// here. Nothing to press: there is no page behind it to go to.
 class _Today extends StatelessWidget {
   const _Today({required this.environment});
 
@@ -186,109 +188,140 @@ class _Today extends StatelessWidget {
     final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      child: AlmanacInset(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              EnvironmentText.today,
-              style: textTheme.eyebrow?.copyWith(color: palette.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(describeLight(environment), style: textTheme.journalNote),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              describeNextSeason(environment.season, environment.resolvedAt),
-              style: textTheme.annotation?.copyWith(
-                color: palette.textSecondary,
-              ),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AlmanacRule(spacing: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          EnvironmentText.today,
+          style: textTheme.eyebrow?.copyWith(color: palette.textSecondary),
         ),
-      ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(describeLight(environment), style: textTheme.journalNote),
+        const SizedBox(height: AppSpacing.xs),
+        AlmanacAnnotation(
+          describeNextSeason(environment.season, environment.resolvedAt),
+        ),
+      ],
     );
   }
 }
 
-class _EnvironmentView extends StatelessWidget {
+class _EnvironmentView extends StatefulWidget {
   const _EnvironmentView({required this.environment});
 
   final NaturalEnvironment environment;
 
   @override
+  State<_EnvironmentView> createState() => _EnvironmentViewState();
+}
+
+class _EnvironmentViewState extends State<_EnvironmentView> {
+  String? _warmed;
+
+  Season get _season => widget.environment.season.season;
+  EnvironmentLightState get _light =>
+      EnvironmentLightState.of(widget.environment.dayNight);
+
+  /// The plate for right now: the real season, and the real day/night
+  /// state, mapped onto the four the artwork is painted for.
+  String get _artwork =>
+      EnvironmentArtwork.forState(season: _season, light: _light);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Keep the next plate warm, and only that one: two images decoded,
+    // never a gallery of sixteen.
+    final current = _artwork;
+    if (_warmed == current) return;
+    _warmed = current;
+    precacheAdjacentArtwork(context, season: _season, light: _light);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final environment = widget.environment;
     final local = environment.timeZone.wallTimeAt(environment.resolvedAt);
-    final appearance = LandscapeAppearance.resolve(
-      season: environment.season.season,
-      dayNight: environment.dayNight,
-      palette: context.palette,
-    );
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppDimens.maxContentWidth,
-            ),
-            // The page scrolls with no horizontal padding of its own, so
-            // the painting can run to both edges the way the reference
-            // has it while the words keep their margins.
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-              children: [
-                const _Masthead(),
-                _DateLine(
-                  date: formatLongDate(local),
-                  season: describeSeason(
-                    environment.season,
-                    environment.resolvedAt,
+    return AlmanacPaperSurface(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              // The artwork is allowed a wider column than the words: a
+              // wider Almanac page on a tablet, rather than a phone
+              // layout stranded in the middle of one.
+              constraints: const BoxConstraints(maxWidth: _artworkColumn),
+              child: ListView(
+                padding: EdgeInsets.only(
+                  // Clear of the navigation bar and the home indicator,
+                  // so the last line of the page is never sliced.
+                  bottom: AppDimens.navBarHeight + bottomInset + AppSpacing.xl,
+                ),
+                children: [
+                  const _Masthead(),
+                  _DateLine(
+                    date: formatLongDate(local),
+                    season: describeSeason(
+                      environment.season,
+                      environment.resolvedAt,
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                AlmanacLandscapeView(
-                  environment: environment,
-                  appearance: appearance,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                  ),
-                  child: EnvironmentFacts(environment: environment),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                _Today(environment: environment),
-
-                // The offer, only when there is genuinely nothing to
-                // show. Never a prompt the app raised by itself.
-                if (!environment.solarEvents.hasTimes &&
-                    environment.solarEvents.kind ==
-                        SolarDayKind.risesAndSets) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                    child: LocationInvitation(),
-                  ),
-                ],
 
-                const SizedBox(height: AppSpacing.xl),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                  child: ExploreLinks(),
-                ),
-              ],
+                  EnvironmentArtworkView(asset: _artwork),
+
+                  const SizedBox(height: AppSpacing.lg),
+                  _Column(child: EnvironmentFacts(environment: environment)),
+                  const SizedBox(height: AppSpacing.lg),
+                  _Column(child: _Today(environment: environment)),
+
+                  // The offer, only when there is genuinely nothing to
+                  // show. Never a prompt the app raised by itself.
+                  if (!environment.solarEvents.hasTimes &&
+                      environment.solarEvents.kind ==
+                          SolarDayKind.risesAndSets) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    const _Column(child: LocationInvitation()),
+                  ],
+
+                  const SizedBox(height: AppSpacing.xl),
+                  const _Column(child: ExploreLinks()),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// How wide the painting may run. Wider than a reading column, so a
+/// tablet gets a larger picture rather than a wider paragraph.
+const _artworkColumn = 900.0;
+
+/// The reading column the words keep, centred under the wider artwork.
+class _Column extends StatelessWidget {
+  const _Column({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: AppDimens.maxContentWidth),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: child,
+      ),
+    ),
+  );
 }
 
 /// The first moment of the app's life, before sunrise and sunset have
@@ -307,7 +340,7 @@ class _EnvironmentSettling extends ConsumerWidget {
         Semantics(
           label: 'Looking outside',
           child: AspectRatio(
-            aspectRatio: AlmanacLandscapeView.aspectRatio,
+            aspectRatio: EnvironmentArtworkView.aspectRatio,
             child: ColoredBox(color: context.palette.surface),
           ),
         ),

@@ -8,7 +8,7 @@ import 'package:almanac/core/environment/moon_service.dart';
 import 'package:almanac/core/environment/solar_service.dart';
 import 'package:almanac/features/environment/presentation/widgets/explore_links.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
-import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
+import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -307,8 +307,18 @@ void main() {
       await openToday(tester, overrides: environmentOverrides());
 
       expect(find.byType(MoonDisc), findsOneWidget);
-      // No network image and no bundled artwork.
-      expect(find.byType(Image), findsNothing);
+      // The moon fact is drawn from the real phase, not cropped out of
+      // the painting: no image inside it, and no network image anywhere.
+      // (The landscape itself *is* a bundled plate — that is the
+      // artwork — but it is not where the facts come from.)
+      expect(
+        find.descendant(
+          of: find.byType(MoonDisc),
+          matching: find.byType(Image),
+        ),
+        findsNothing,
+      );
+      expect(find.byType(NetworkImage), findsNothing);
     });
 
     testWidgets('the lit side turns over in the southern hemisphere', (
@@ -358,23 +368,26 @@ void main() {
       double topOf(Finder finder) => tester.getTopLeft(finder.first).dy;
       double leftOf(Finder finder) => tester.getTopLeft(finder.first).dx;
 
-      // The day first, then the painting, then the facts. Since Step 18
-      // the four facts are one strip rather than four stacked sections,
-      // so within them the order is left to right: sunrise, sunset,
-      // moon, tides.
+      // The day first, then the painting, then the facts, then today.
       final date = topOf(find.text('Tuesday 15 July'));
-      final hero = topOf(find.byType(AlmanacLandscapeView));
+      final artwork = topOf(find.byType(EnvironmentArtworkView));
       final sunrise = topOf(find.text('Sunrise'));
 
-      expect(date, lessThan(hero));
-      expect(hero, lessThan(sunrise));
+      expect(date, lessThan(artwork));
+      expect(artwork, lessThan(sunrise));
+      expect(sunrise, lessThan(topOf(find.text('TODAY'))));
 
+      // Sunrise reads before sunset, and the moon before the tides —
+      // whether the strip is one row or, on a narrow phone, two.
       expect(
         leftOf(find.text('Sunrise')),
         lessThan(leftOf(find.text('Sunset'))),
       );
-      expect(leftOf(find.text('Sunset')), lessThan(leftOf(find.text('Moon'))));
       expect(leftOf(find.text('Moon')), lessThan(leftOf(find.text('Tides'))));
+      expect(
+        topOf(find.text('Sunrise')),
+        lessThanOrEqualTo(topOf(find.text('Moon'))),
+      );
     });
 
     testWidgets('the hero is the biggest thing on the page', (tester) async {
@@ -384,7 +397,7 @@ void main() {
         surface: phoneSurface,
       );
 
-      final hero = tester.getSize(find.byType(AlmanacLandscapeView));
+      final hero = tester.getSize(find.byType(EnvironmentArtworkView));
       final screen = tester.getSize(find.byType(MaterialApp));
 
       // Dominant, but not the whole screen — the day still reads as a
@@ -396,6 +409,36 @@ void main() {
     testWidgets('links onward to the parts of the Almanac they chose', (
       tester,
     ) async {
+      // Every feature chosen on a narrow phone: the bar has to scroll,
+      // so some destinations are off the side and the footnote earns
+      // its place.
+      await openToday(
+        tester,
+        overrides: environmentOverrides(
+          features: const {
+            FeatureId.meditation,
+            FeatureId.yoga,
+            FeatureId.chakras,
+            FeatureId.cycle,
+            FeatureId.cookbook,
+            FeatureId.garden,
+            FeatureId.natureLog,
+          },
+        ),
+      );
+
+      expect(find.text('Elsewhere in your Almanac'), findsOneWidget);
+      // The full name here; the bar has had to shorten its own.
+      expect(find.text('Nature Log'), findsOneWidget);
+      expect(find.text('Cookbook'), findsOneWidget);
+    });
+
+    testWidgets('and says nothing when the bar already shows them all', (
+      tester,
+    ) async {
+      // Two destinations plus the Environment fit comfortably, so
+      // repeating them directly above the bar would be duplication
+      // rather than a way onward.
       await openToday(
         tester,
         overrides: environmentOverrides(
@@ -403,10 +446,10 @@ void main() {
         ),
       );
 
-      expect(find.text('Elsewhere in your Almanac'), findsOneWidget);
-      // Once as a link here, once in the navigation bar.
-      expect(find.text('Yoga'), findsNWidgets(2));
-      expect(find.text('Garden'), findsNWidgets(2));
+      expect(find.text('Elsewhere in your Almanac'), findsNothing);
+      // Once each, in the navigation bar.
+      expect(find.text('Yoga'), findsOneWidget);
+      expect(find.text('Garden'), findsOneWidget);
       // Nothing they did not choose.
       expect(find.text('Cookbook'), findsNothing);
       expect(find.text('Meditation'), findsNothing);
@@ -422,9 +465,21 @@ void main() {
     });
 
     testWidgets('a link goes to that feature', (tester) async {
+      // Enough destinations that the bar scrolls, which is when the
+      // footnote is shown at all.
       await openToday(
         tester,
-        overrides: environmentOverrides(features: const {FeatureId.natureLog}),
+        overrides: environmentOverrides(
+          features: const {
+            FeatureId.meditation,
+            FeatureId.yoga,
+            FeatureId.chakras,
+            FeatureId.cycle,
+            FeatureId.cookbook,
+            FeatureId.garden,
+            FeatureId.natureLog,
+          },
+        ),
       );
 
       await tester.tap(

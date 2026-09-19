@@ -14,7 +14,7 @@ import 'package:almanac/features/environment/domain/moon_reflection.dart';
 import 'package:almanac/features/environment/presentation/moon_screen.dart';
 import 'package:almanac/features/environment/presentation/moon_text.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
-import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
+import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:almanac/features/meditation/domain/moon_meditation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -155,7 +155,7 @@ void main() {
       double topOf(Finder finder) => tester.getTopLeft(finder.first).dy;
       double leftOf(Finder finder) => tester.getTopLeft(finder.first).dx;
       expect(
-        topOf(find.byType(AlmanacLandscapeView)),
+        topOf(find.byType(EnvironmentArtworkView)),
         lessThan(topOf(find.text('Sunrise'))),
       );
       expect(leftOf(find.text('Sunrise')), lessThan(leftOf(find.text('Moon'))));
@@ -439,7 +439,7 @@ void main() {
       // Environment is the app's one living painting. This page does not
       // duplicate it — which is the rule that stops every future screen
       // needing four seasonal paintings and two day/night versions.
-      expect(find.byType(AlmanacLandscapeView), findsNothing);
+      expect(find.byType(EnvironmentArtworkView), findsNothing);
       expect(find.byType(Image), findsNothing);
     });
 
@@ -453,7 +453,7 @@ void main() {
       expect(find.byType(MoonDisc), findsOneWidget);
       expect(find.byType(CustomPaint).evaluate(), isNotEmpty);
       // Nothing botanical has been drawn around it.
-      expect(find.byType(AlmanacLandscapeView), findsNothing);
+      expect(find.byType(EnvironmentArtworkView), findsNothing);
     });
 
     testWidgets('and the moon is the biggest thing on it', (tester) async {

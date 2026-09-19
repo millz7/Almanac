@@ -123,15 +123,38 @@ class _AlmanacNavigationBarState extends State<AlmanacNavigationBar> {
                 ),
             ];
 
+            if (!layout.scrollable) {
+              return SizedBox(
+                height: layout.height,
+                child: Row(children: items),
+              );
+            }
+
+            // A static fade at both edges, so a destination that runs
+            // off the side reads as more to come rather than as a word
+            // that was cut in half. No arrow and no button: the bar
+            // scrolls, and the fade is the only thing that says so.
             return SizedBox(
               height: layout.height,
-              child: layout.scrollable
-                  ? ListView(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      children: items,
-                    )
-                  : Row(children: items),
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0x00FFFFFF),
+                    Color(0xFFFFFFFF),
+                    Color(0xFFFFFFFF),
+                    Color(0x00FFFFFF),
+                  ],
+                  stops: [0, 0.045, 0.955, 1],
+                ).createShader(bounds),
+                child: ListView(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  children: items,
+                ),
+              ),
             );
           },
         ),

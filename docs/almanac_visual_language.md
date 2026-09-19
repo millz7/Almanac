@@ -285,92 +285,62 @@ list. Every setting and every behaviour in it is unchanged.
 
 The Environment screen is the app's anchor and the one place that carries
 a full landscape. Its composition is settled. Do not move its sections,
-change its order, replace its landscape, add a feature-card grid, or
+change its order, replace its artwork, add a feature-card grid, or
 reinterpret its layout.
 
-### The landscape geometry rule (hard)
+### The artwork is supplied, not drawn
 
-**The landscape is ONE PLACE.**
+**The landscape is sixteen approved paintings.**
 
-Across spring, summer, autumn, winter, sunrise, day, sunset and night,
-the underlying land geometry is **identical**. These must not change
-shape between states:
+Four seasons at four light states — sunrise, day, sunset, night — shipped
+as `assets/environment/<season>_<light>.webp` and shown exactly as
+delivered. They are not recreated, redrawn, reinterpreted or traced, and
+there is no code-drawn alternative kept alongside them.
 
-- mountains
-- mountain angle
-- hills
-- islands
-- shoreline
-- land mass
-- horizon
-- water boundary
+### How it is built
 
-Season and day/night may change:
+- `domain/environment_artwork.dart` — the one authoritative mapping.
+  `EnvironmentLightState` is the four states the artwork is painted for,
+  and `EnvironmentLightState.of` adapts the app's own `DayNightState`
+  onto them: dawn is sunrise, day is day, dusk is sunset, night is night.
+  `EnvironmentArtwork.forState` names the plate. Both are total by
+  construction — enums with no default branch — so there is no state the
+  app can be in with no plate to show, and no fallback image to hide one.
+- `presentation/widgets/environment_artwork_view.dart` — how a plate is
+  shown. One plate at a time, keyed by its asset so a change is a
+  crossfade between two approved paintings and never a blend of two
+  seasons into a third. Reduced motion makes that duration zero rather
+  than removing the change.
+- The retired painter — `AlmanacLandscape`, `LandscapeAppearance`,
+  `LandscapePainter`, `AlmanacLandscapeView` — was **deleted**, not left
+  switched off underneath the images. A test greps `lib/` for those names
+  and fails if any returns.
 
-- palette
-- light
-- sky colour
-- water colour
-- foreground vegetation
-- density of foreground growth
-- flowers and leaves
-- how much foreground visually overlaps the distant landscape
+### The plates are never distorted
 
-But the land underneath stays fixed. This is what makes the scene feel
-like **one painting changing through time** rather than eight different
-pictures. A viewer should be able to point at the same hill in January
-and July.
+The frame holds the plates' own aspect ratio and fits with
+`BoxFit.cover`, so the fit has nothing to stretch and nothing to crop.
+The artwork is never squashed to fill a gap, never stretched to a height
+that was going spare, and never letterboxed with a band of a colour that
+is not in the painting. On a phone it is the visually dominant element;
+on a wider screen it is allowed a wider column than the reading text, so
+a tablet gets a larger picture rather than a phone layout stranded in the
+middle of one.
 
-### How it is built (Step 18)
+### Nothing is drawn on top of a plate
 
-Two files, and the separation between them *is* the rule:
+No live sun, no live moon, no stars, no plants, no weather, no scrim, no
+gradient, no text. **The painting is the illustration; the facts are the
+facts** — and the facts are stated in words beneath it, as live Flutter
+UI, from the app's own astronomy. Putting a calculated sun over a painted
+one would give the screen two suns, one of which is wrong.
 
-- `domain/almanac_landscape.dart` — the place. Normalised unit-square
-  coordinates for the two mountain ranges, both headlands, the spur,
-  three islands, the bank, the boulder, the twelve planting positions and
-  the framing bough. **It knows nothing about the season**: a test greps
-  it for `Season`, `DayPhase`, `daylight`, `Palette`, `Appearance`,
-  `Color` and `material.dart` and fails if any appears. There is no
-  parameter a future edit could branch a winter mountain on without first
-  importing something the file is not allowed to import.
-- `domain/landscape_appearance.dart` — the season and the hour. Sky
-  stops, haze, rock, foliage, water, vegetation density, flower forms,
-  what the bough is wearing. It **carries** `AlmanacLandscape.form`
-  rather than making one, so the geometry test can take the form out of
-  all sixteen season × light combinations and assert they are the same
-  object.
+### Only the artwork changes
 
-`LandscapePainter` reads an appearance and mixes no colour of its own —
-also grepped, for `Color(0x` and `Colors.`.
-
-**There is one scene, not four painters.** `SpringLandscapePainter` and
-its siblings do not exist and must not.
-
-### Responsive geometry
-
-The scene is normalised 0…1 and painted into a band of **fixed aspect
-ratio** (3:2), so projecting a point is one uniform multiply. Stretching
-the band to whatever height was going would change the apparent angle of
-every slope, which is the one thing the rule forbids. The band spans the
-full width edge to edge; the words around it keep the page margins.
-
-### Flowers are silhouettes, not one icon recoloured
-
-Four forms with genuinely different outlines — `umbel`, `daisy`,
-`forgetMeNot`, `seedHead` — because a season should be readable from the
-shape before the colour. **Summer's approved accent is the forget-me-not
-cluster**: five tiny five-petal flowers with a pale eye, drawn as a
-cluster and never as one large bloom, and held to a minority share of the
-bank so it stays an accent rather than a floral border. They belong to
-the Environment only; a detail page has no flowers on it.
-
-### Autumn daylight is not sunset
-
-A daytime autumn sky is a daytime sky, with the blue channel leading
-overhead exactly as summer's does. Only real dusk gets dusk. Dawn and
-dusk are separate states rather than one twilight reversed: dusk runs
-warmer and more saturated overhead, dawn keeps the colour low and the top
-of the sky cool. Both are tested.
+The page around the painting is the Almanac's own paper, `#F7F1E3`, in
+every season and at every hour. The masthead, the rules, the fact strip,
+the words and the navigation do not re-tint themselves to match the
+plate. The world outside changes; the book does not.
 
 ---
 
@@ -384,10 +354,10 @@ of the sky cool. Both are tested.
 This is a locked rule, and it is the one people are most likely to break
 by being helpful.
 
-**Environment / Home** is the living painting. It responds strongly to
-the astronomical season, to sunrise, day, sunset and night, to sky
-colour, landscape lighting, water colour and foreground vegetation. That
-is its job.
+**Environment / Home** is the living painting. It answers the
+astronomical season and the four light states by showing the plate
+painted for them — a different sky, a different light on the water and a
+different foreground. That is its job.
 
 **Inner / detail pages** are pages *of* the Almanac. They stay on the
 **same warm cream paper** through spring, summer, autumn, winter,
@@ -610,9 +580,10 @@ Rules for reading a reference:
 
 ### Built in Step 18
 
-The landscape itself — the fixed geometry, the four seasons, dawn, day,
-dusk and night, the forget-me-nots, and the twilight contrast repair.
-Step 17 built the system it was drawn against.
+The Environment's composition, the fact strip, the twilight contrast
+repair, and the page the painting sits on. Step 17 built the system it
+was drawn against. The painting itself then arrived as approved artwork,
+and the code-drawn landscape that had stood in for it was retired.
 
 ### Still deferred
 

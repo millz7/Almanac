@@ -84,8 +84,11 @@ class _Facts extends StatelessWidget {
           child: MoonDisc(
             moon: moon,
             size: 220,
-            litColor: palette.textPrimary,
-            unlitColor: palette.textPrimary.withValues(alpha: 0.10),
+            // The same convention as the Environment's moon fact:
+            // illuminated is light, unilluminated is dark.
+            litColor: AlmanacPaper.moonlight,
+            unlitColor: palette.textPrimary.withValues(alpha: 0.88),
+            outlineColor: palette.border,
             // Which way round the light falls depends on where you are
             // standing on the planet.
             mirrored: hemisphere == Hemisphere.southern,

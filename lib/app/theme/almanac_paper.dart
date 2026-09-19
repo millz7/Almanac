@@ -44,6 +44,10 @@ abstract final class AlmanacPaper {
   /// ink laid on it.
   static const groundInset = Color(0xFFF0E9D8);
 
+  /// The lit face of the moon: a shade brighter than the page, so a full
+  /// moon reads as light *on* paper rather than as a hole in it.
+  static const moonlight = Color(0xFFFFFBF0);
+
   // ── Ink ───────────────────────────────────────────────────────────
   //
   // Three weights of ink and no pure black anywhere. Each is measured

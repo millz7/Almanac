@@ -41,75 +41,81 @@ class EnvironmentFacts extends StatelessWidget {
     final note = EnvironmentText.sunNote(environment);
     final dayLength = EnvironmentText.dayLengthNote(environment);
 
+    final facts = <Widget>[
+      // On a polar day there is no sunrise and no sunset, so the strip
+      // does not offer two empty slots where times would go: it says
+      // what the sun is doing instead. A dash where a time belongs still
+      // invites somebody to read it as a time that failed to load.
+      if (events.kind != SolarDayKind.risesAndSets)
+        _Fact(
+          label: EnvironmentText.sunLabel,
+          value: EnvironmentText.polarSunValue(events.kind),
+          mark: _SunMark(rising: events.kind == SolarDayKind.sunNeverSets),
+        )
+      // With no position there is no sunrise to show, so the strip does
+      // not carry an empty one. The invitation under the page is the
+      // whole answer, and it is only ever an offer.
+      else if (events.hasTimes) ...[
+        _Fact(
+          label: EnvironmentText.sunriseLabel,
+          value: solar(events.sunrise),
+          mark: const _SunMark(rising: true),
+        ),
+        _Fact(
+          label: EnvironmentText.sunsetLabel,
+          value: solar(events.sunset),
+          mark: const _SunMark(rising: false),
+        ),
+      ],
+
+      // The one fact with somewhere to go: the Moon has a page.
+      _Fact(
+        label: EnvironmentText.moonLabel,
+        value: moon.phase.label,
+        detail: MoonText.illumination(moon.illuminatedPercent),
+        spoken: MoonText.spokenFacts(moon),
+        onTap: () => context.push(kMoonRoute),
+        mark: _MoonMark(environment: environment),
+      ),
+
+      _Fact(
+        label: EnvironmentText.tidesLabel,
+        value: EnvironmentText.tidesValue,
+        spoken: '${EnvironmentText.tidesLabel}. ${EnvironmentText.tidesNote}',
+        mark: const _TideMark(),
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // On a polar day there is no sunrise and no sunset, so the
-              // strip does not offer two empty slots where times would
-              // go: it says what the sun is doing instead. A dash where
-              // a time belongs still invites somebody to read it as a
-              // time that failed to load.
-              if (events.kind != SolarDayKind.risesAndSets) ...[
-                Expanded(
-                  child: _Fact(
-                    label: EnvironmentText.sunLabel,
-                    value: EnvironmentText.polarSunValue(events.kind),
-                    mark: _SunMark(
-                      rising: events.kind == SolarDayKind.sunNeverSets,
-                    ),
-                  ),
-                ),
-                const _Divider(),
-              ] else if (events.hasTimes) ...[
-                Expanded(
-                  child: _Fact(
-                    label: EnvironmentText.sunriseLabel,
-                    value: solar(events.sunrise),
-                    mark: const _SunMark(rising: true),
-                  ),
-                ),
-                const _Divider(),
-                Expanded(
-                  child: _Fact(
-                    label: EnvironmentText.sunsetLabel,
-                    value: solar(events.sunset),
-                    mark: const _SunMark(rising: false),
-                  ),
-                ),
-                const _Divider(),
-              ],
-              // With no position there is no sunrise to show, so the
-              // strip does not carry an empty one. The invitation under
-              // the page is the whole answer, and it is only ever an
-              // offer.
-              Expanded(
-                // The one fact with somewhere to go: the Moon has a page.
-                child: _Fact(
-                  label: EnvironmentText.moonLabel,
-                  value: moon.phase.label,
-                  detail: MoonText.illumination(moon.illuminatedPercent),
-                  spoken: MoonText.spokenFacts(moon),
-                  onTap: () => context.push(kMoonRoute),
-                  mark: _MoonMark(environment: environment),
-                ),
-              ),
-              const _Divider(),
-              Expanded(
-                child: _Fact(
-                  label: EnvironmentText.tidesLabel,
-                  value: EnvironmentText.tidesValue,
-                  spoken:
-                      '${EnvironmentText.tidesLabel}. '
-                      '${EnvironmentText.tidesNote}',
-                  mark: const _TideMark(),
-                ),
-              ),
-            ],
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Four narrow columns on a phone squeezed "Waning Gibbous"
+            // into two lines and left the dividers stretched to the
+            // tallest of them. Below the threshold the strip wraps into
+            // rows of two, which is wide enough for any value the app
+            // can produce at any text size.
+            final scaled = MediaQuery.textScalerOf(context).scale(16) / 16;
+            final perColumn = constraints.maxWidth / facts.length;
+            final wide = perColumn >= 116 * scaled;
+
+            return wide
+                ? _Row(facts: facts)
+                : Column(
+                    children: [
+                      for (var i = 0; i < facts.length; i += 2) ...[
+                        if (i > 0) const AlmanacRule(spacing: AppSpacing.xs),
+                        _Row(
+                          facts: facts.sublist(
+                            i,
+                            (i + 2).clamp(0, facts.length),
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+          },
         ),
 
         if (note != null) ...[
@@ -122,6 +128,26 @@ class EnvironmentFacts extends StatelessWidget {
       ],
     );
   }
+}
+
+/// One row of facts, with a hairline between each pair.
+class _Row extends StatelessWidget {
+  const _Row({required this.facts});
+
+  final List<Widget> facts;
+
+  @override
+  Widget build(BuildContext context) => IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (index, fact) in facts.indexed) ...[
+          if (index > 0) const _Divider(),
+          Expanded(child: fact),
+        ],
+      ],
+    ),
+  );
 }
 
 /// One medallion: mark, word, value.
@@ -289,8 +315,12 @@ class _MoonMark extends StatelessWidget {
     return MoonDisc(
       moon: environment.moon,
       size: 22,
-      litColor: palette.textPrimary,
-      unlitColor: palette.textPrimary.withValues(alpha: 0.14),
+      // Illuminated is light and unilluminated is dark — the way a moon
+      // actually looks. It used to be inked the other way round, which
+      // put a solid black disc next to the words "Full Moon".
+      litColor: AlmanacPaper.moonlight,
+      unlitColor: palette.textPrimary.withValues(alpha: 0.88),
+      outlineColor: palette.border,
       // Which way round the light falls depends on where you are
       // standing on the planet.
       mirrored: environment.hemisphere == Hemisphere.southern,

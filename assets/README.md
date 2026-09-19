@@ -1,9 +1,22 @@
 # Asset strategy
 
-This folder is organised ahead of the illustrations and imagery described in
-the app concept. Nothing is populated yet — no placeholder graphics have
-been added — but the structure and `pubspec.yaml` wiring are ready so real
-assets can be dropped in without further setup.
+This folder holds the app's bundled artwork. Everything here ships inside
+the APK: nothing is fetched from a network, a CDN or an image API at
+runtime, and nothing is generated on a server.
+
+- `environment/` — **the Environment's sixteen approved plates**, the only
+  populated folder. One painting per season per light state, named
+  `<season>_<light>.webp` (`spring_sunrise`, `spring_day`,
+  `spring_sunset`, `spring_night`, and the same four for summer, autumn
+  and winter). They are the supplied production artwork and are shown
+  exactly as delivered — not recreated, redrawn, reinterpreted or
+  re-exported. The file names are the contract: `EnvironmentArtwork`
+  builds a path from a season and a light state, and a test asserts that
+  the sixteen files on disk and the sixteen paths the app can ask for are
+  the same set. Renaming one breaks that test rather than silently
+  showing nothing.
+
+The folders below are structure ahead of the artwork that will fill them:
 
 - `illustrations/` — custom botanical/atmospheric illustrations (moon
   phases, mountains, ocean, flora, fauna, chakras, Wheel of the Year, yoga
@@ -14,6 +27,6 @@ assets can be dropped in without further setup.
 - `icons/` — custom icon assets that go beyond Material's built-in icon set.
 
 When assets are added, declare their folders under `flutter: assets:` in
-`pubspec.yaml` (see the commented example there) and reference them through
-a small `AppImages`/`AppIllustrations` constants class rather than inline
-string paths, so a renamed or moved file only needs updating in one place.
+`pubspec.yaml` and reference them through a small constants class — as
+`EnvironmentArtwork` does — rather than inline string paths, so a renamed
+or moved file only needs updating in one place.

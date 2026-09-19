@@ -145,9 +145,9 @@ nothing to leak, and there are no coordinates in it at all.
 
 The visual and animation rules the whole app follows are written down in
 [`docs/almanac_visual_language.md`](docs/almanac_visual_language.md) —
-including the landscape geometry rule (the landscape is one place, and
-its land never changes shape between seasons or between day and night)
-and the animation principle: **nature moves, interface stays still.**
+including how the Environment's supplied artwork is used (sixteen
+approved plates, shown as delivered and never drawn over) and the
+animation principle: **nature moves, interface stays still.**
 
 ## Architecture
 
@@ -335,54 +335,53 @@ graphic is marked decorative and states nothing to a screen reader.
 immersive surface and the only screen with a landscape on it — every
 other feature is a page of the book, on cream paper. Its composition
 follows the approved Home reference: the masthead, the date with the
-season under it and the standing line beside it, the painting edge to
-edge, the four facts as a strip of medallions, one line about today, and
-the way on into the rest of the Almanac.
+season under it and the standing line beside it, the painting, the four
+facts as a strip of medallions, one line about today, and the way on
+into the rest of the Almanac.
+
+The page around the painting is the Almanac's own paper — `#F7F1E3`, the
+same in every season and at every hour. **Only the artwork changes.**
 
 The standing line is fixed copy, used exactly:
 **"In tune with the natural world and yourself"**.
 
-### THE LANDSCAPE IS ONE PLACE
+### The landscape is sixteen painted plates
 
-> The geometry stays fixed; the environment changes.
+> Supplied artwork, shown as supplied.
 
-Across spring, summer, autumn, winter, dawn, day, dusk and night, the
-mountains, hills, headlands, islands, shoreline, horizon and water
-boundary are **identical**. A viewer can point at the same hill in
-January and July.
+The landscape is not drawn in code. It is sixteen approved paintings —
+each of the four seasons at each of four light states — bundled under
+`assets/environment/` as `<season>_<light>.webp` and shown exactly as
+delivered. They are not recreated, redrawn, reinterpreted or traced.
 
-That is enforced structurally rather than promised:
+- `EnvironmentArtwork` (`features/environment/domain/`) is the one
+  authoritative mapping from season and light state to a plate. It is
+  total by construction — two enums and a name, with no default branch —
+  and a test names all sixteen results explicitly.
+- `EnvironmentLightState.of` adapts the app's own `DayNightState`:
+  dawn is sunrise, day is day, dusk is sunset, night is night. There is
+  no second astronomy calculation, and no clock threshold of its own.
+- `EnvironmentArtworkView` crossfades between plates, or changes
+  instantly when the system asks for reduced motion. It holds the
+  plates' own aspect ratio and fits with `BoxFit.cover`, so a plate is
+  never stretched or squashed, and it shows exactly one plate at a time:
+  two seasons are never blended into a third.
+- There is no permanent ticker. The artwork changes when the environment
+  the app already resolves changes, and then stays still.
+- The code-drawn landscape was **retired**, not hidden underneath the
+  images: `AlmanacLandscape`, `LandscapeAppearance`, `LandscapePainter`
+  and `AlmanacLandscapeView` were deleted, and a test greps `lib/` to
+  keep them gone.
 
-- `AlmanacLandscape` (`features/environment/domain/`) holds the place as
-  normalised unit-square coordinates and **cannot** know the season — a
-  test greps it for `Season`, `DayPhase`, `daylight`, `Palette`,
-  `Appearance`, `Color` and `material.dart`, and fails on any of them.
-- `LandscapeAppearance` holds the season and the hour, and *carries*
-  `AlmanacLandscape.form` rather than making one. The geometry test takes
-  the form out of all sixteen season × light combinations and compares
-  every feature's projected bounds.
-- There is **one** painter. `SpringLandscapePainter` and its siblings do
-  not exist.
+**Nothing is drawn on top of a painting.** No live sun, no live moon, no
+stars, no plants, no weather. The painting is the illustration; the
+facts are the facts, and they are stated in words beneath it as live
+Flutter UI. The artwork itself is decorative and says nothing to a
+screen reader, because everything it shows is written out below.
 
-Season and light change the sky, the haze, the rock, the water, the
-foliage, how much of the bank is standing and what is flowering on it —
-summer's fuller foreground hides more of the same shoreline than
-winter's, and the shoreline underneath is byte-identical.
-
-**Flowers are silhouettes, not one icon recoloured**: umbel, daisy,
-forget-me-not cluster, seed head. Summer carries the forget-me-nots, at a
-minority share of the bank so they stay an accent.
-
-**Autumn daylight is not sunset.** A daytime autumn sky is blue-led like
-summer's; only real dusk gets dusk. And dusk is not dawn reversed — it
-runs warmer and more saturated overhead, where dawn keeps its colour low.
-
-Nothing in the painting is invented: the sun's height is the app's own
-`dayProgress`, from the one solar service, and the moon is the real
-phase. Their left-to-right placement and the stars are composition, which
-is why the whole painting is decorative and every fact it hints at is
-written in words beneath it. The painter has no clock, no second sun and
-no way to ask for a location — all three are grepped.
+**Everything is local.** Sixteen bundled files, no network, no CDN and
+no image API. Only the plate on screen and the next one are kept warm —
+two images decoded, never a gallery of sixteen.
 
 ### Twilight contrast
 

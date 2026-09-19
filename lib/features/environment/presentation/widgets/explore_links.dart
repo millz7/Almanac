@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/features/feature_registry.dart';
+import '../../../../app/navigation/navigation_labels.dart';
 import '../../../../core/settings/settings_providers.dart';
 import '../../../../core/widgets/widgets.dart';
 
@@ -12,8 +13,13 @@ import '../../../../core/widgets/widgets.dart';
 /// Only the parts they have actually chosen, taken from the same
 /// preferences the navigation bar reads, and absent entirely for somebody
 /// who chose none — an empty "Elsewhere" heading would be worse than no
-/// heading. They are small pills rather than cards so they read as a
-/// footnote to the day, not as a second navigation bar.
+/// heading.
+///
+/// **And absent when the bar already shows them all.** On a wide screen
+/// every destination is visible along the bottom, and listing the same
+/// seven names again directly above it is duplication, not a way
+/// onward. The bar is the navigation; this is a footnote for when the
+/// bar has had to hide some of it behind a scroll.
 class ExploreLinks extends ConsumerWidget {
   const ExploreLinks({super.key});
 
@@ -21,6 +27,16 @@ class ExploreLinks extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final chosen = ref.watch(userSettingsProvider).chosenFeatures;
     if (chosen.isEmpty) return const SizedBox.shrink();
+
+    // The bar carries the Environment plus every chosen feature. If it
+    // can show them all at once, this section has nothing to add.
+    final layout = resolveNavigationLayout(
+      destinations: [FeatureRegistry.byId(FeatureId.environment), ...chosen],
+      available: MediaQuery.sizeOf(context).width,
+      style: Theme.of(context).textTheme.navigationLabel ?? const TextStyle(),
+      textScaler: MediaQuery.textScalerOf(context),
+    );
+    if (!layout.scrollable) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

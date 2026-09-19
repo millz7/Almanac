@@ -25,6 +25,7 @@ class MoonDisc extends StatelessWidget {
     required this.size,
     required this.litColor,
     required this.unlitColor,
+    this.outlineColor,
     this.mirrored = false,
   });
 
@@ -39,6 +40,14 @@ class MoonDisc extends StatelessWidget {
   /// The part in shadow. Kept visible but quiet, so the moon reads as a
   /// whole sphere with a shadow rather than as a floating sliver.
   final Color unlitColor;
+
+  /// A hairline round the sphere.
+  ///
+  /// Needed once the convention became *illuminated = light*: a full
+  /// moon is then a pale disc, and on pale paper a pale disc with no
+  /// edge is nothing at all. The outline is the sphere's boundary, not
+  /// decoration.
+  final Color? outlineColor;
 
   /// Flips the lit side, for a southern-hemisphere observer.
   final bool mirrored;
@@ -57,6 +66,7 @@ class MoonDisc extends StatelessWidget {
             mirrored: mirrored,
             litColor: litColor,
             unlitColor: unlitColor,
+            outlineColor: outlineColor,
           ),
         ),
       ),
@@ -82,6 +92,7 @@ void paintMoon(
   required bool mirrored,
   required Color litColor,
   required Color unlitColor,
+  Color? outlineColor,
 }) {
   if (radius <= 0) return;
 
@@ -101,6 +112,16 @@ void paintMoon(
     mirrored: mirrored,
   );
   if (lit != null) canvas.drawPath(lit, Paint()..color = litColor);
+
+  if (outlineColor case final outline?) {
+    canvas.drawPath(
+      disc,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = radius * 0.06
+        ..color = outline,
+    );
+  }
 }
 
 /// The lit region of the disc, or null when nothing is lit.
@@ -166,6 +187,7 @@ class _MoonPainter extends CustomPainter {
     required this.mirrored,
     required this.litColor,
     required this.unlitColor,
+    this.outlineColor,
   });
 
   final double illuminatedFraction;
@@ -173,6 +195,7 @@ class _MoonPainter extends CustomPainter {
   final bool mirrored;
   final Color litColor;
   final Color unlitColor;
+  final Color? outlineColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -186,6 +209,7 @@ class _MoonPainter extends CustomPainter {
       mirrored: mirrored,
       litColor: litColor,
       unlitColor: unlitColor,
+      outlineColor: outlineColor,
     );
   }
 
@@ -195,5 +219,6 @@ class _MoonPainter extends CustomPainter {
       old.waxing != waxing ||
       old.mirrored != mirrored ||
       old.litColor != litColor ||
-      old.unlitColor != unlitColor;
+      old.unlitColor != unlitColor ||
+      old.outlineColor != outlineColor;
 }

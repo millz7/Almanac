@@ -5,7 +5,7 @@ import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/features/environment/presentation/widgets/explore_links.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
-import 'package:almanac/features/environment/presentation/widgets/almanac_landscape_view.dart';
+import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,7 +54,7 @@ void main() {
   /// inside the page rather than from a provider, so this asserts what
   /// the user sees.
   SeasonalPalette paletteOf(WidgetTester tester) =>
-      tester.element(find.byType(AlmanacLandscapeView)).palette;
+      tester.element(find.byType(EnvironmentArtworkView)).palette;
 
   group('every season, day and night', () {
     seasonDates.forEach((season, date) {
@@ -80,7 +80,7 @@ void main() {
           // Step 18 replaced the four stacked sections with the
           // reference's strip; what must be present in all eight states
           // is unchanged.
-          expect(find.byType(AlmanacLandscapeView), findsOneWidget);
+          expect(find.byType(EnvironmentArtworkView), findsOneWidget);
           expect(find.text('Sunrise'), findsOneWidget);
           expect(find.text('Sunset'), findsOneWidget);
           expect(find.text('Moon'), findsOneWidget);
@@ -116,24 +116,24 @@ void main() {
   });
 
   group('nothing is hard-coded', () {
-    testWidgets('the hero repaints when the season changes', (tester) async {
-      AlmanacLandscapeView heroFor(WidgetTester tester) => tester
-          .widget<AlmanacLandscapeView>(find.byType(AlmanacLandscapeView));
+    testWidgets('the artwork changes when the season changes', (tester) async {
+      String plateFor(WidgetTester tester) => tester
+          .widget<EnvironmentArtworkView>(find.byType(EnvironmentArtworkView))
+          .asset;
 
       await openToday(
         tester,
         overrides: environmentOverrides(now: DateTime.utc(2025, 7, 15, 11)),
       );
-      final summer = paletteOf(tester).background;
-      expect(heroFor(tester).environment.season.season.label, 'Summer');
+      expect(plateFor(tester), contains('summer'));
 
       await openToday(
         tester,
         overrides: environmentOverrides(now: DateTime.utc(2025, 1, 15, 11)),
       );
-      final winter = paletteOf(tester).background;
 
-      expect(winter, isNot(summer));
+      // The season is authoritative, and the painting follows it.
+      expect(plateFor(tester), contains('winter'));
     });
 
     testWidgets('the same date is a different season south of the equator', (
@@ -158,17 +158,27 @@ void main() {
     testWidgets('the sky is decorative and says nothing', (tester) async {
       await openToday(tester, overrides: environmentOverrides());
 
-      final semantics = tester.widget<Semantics>(
-        find
-            .descendant(
-              of: find.byType(AlmanacLandscapeView),
-              matching: find.byType(Semantics),
-            )
-            .first,
+      // The painting is decorative: everything it shows is written in
+      // words on the page, so a screen reader loses nothing by skipping
+      // it. Excluded at the view, and again on the image itself.
+      expect(
+        find.descendant(
+          of: find.byType(EnvironmentArtworkView),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsWidgets,
       );
-
-      expect(semantics.excludeSemantics, isTrue);
-      expect(semantics.properties.label, isNull);
+      expect(
+        tester
+            .widget<Image>(
+              find.descendant(
+                of: find.byType(EnvironmentArtworkView),
+                matching: find.byType(Image),
+              ),
+            )
+            .excludeFromSemantics,
+        isTrue,
+      );
     });
 
     testWidgets('the drawn moon is decorative, and the words carry it', (
@@ -290,16 +300,13 @@ void main() {
         ),
       );
 
-      final animations = tester
-          .widgetList<TweenAnimationBuilder<double>>(
-            find.byType(TweenAnimationBuilder<double>),
-          )
-          .toList();
-
-      expect(animations, isNotEmpty);
-      for (final animation in animations) {
-        expect(animation.duration, Duration.zero);
-      }
+      // The artwork changes at once rather than fading, and nothing is
+      // left ticking behind the page.
+      expect(
+        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
+        Duration.zero,
+      );
+      expect(tester.binding.transientCallbackCount, 0);
     });
   });
 }
