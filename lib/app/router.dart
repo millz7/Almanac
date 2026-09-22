@@ -39,6 +39,11 @@ const kThemePreviewRoute = '/dev/theme';
 /// explored the Environment page.
 const kMoonRoute = '/environment/moon';
 
+/// The Tides detail page — the same kind of page as the Moon's, and
+/// reached the same way: a child of the Environment branch, tapped from
+/// the Environment page's own fact strip.
+const kTidesRoute = '/environment/tides';
+
 /// The app's router.
 ///
 /// **Every feature has a route, always.** The user's choices decide what

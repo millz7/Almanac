@@ -1,9 +1,14 @@
+import 'dart:math' as math;
+
 import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/local_time_zone.dart';
 import 'package:almanac/core/environment/location_service.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/solar_service.dart';
+import 'package:almanac/core/environment/tide.dart';
+import 'package:almanac/core/environment/tide_extrema.dart';
+import 'package:almanac/core/environment/tide_service.dart';
 import 'package:almanac/core/environment/time_zone_service.dart';
 import 'package:almanac/core/environment/weather.dart';
 import 'package:almanac/core/environment/weather_service.dart';
@@ -178,6 +183,75 @@ WeatherSnapshot testWeatherSnapshot({
   ),
   hourly: const [],
 );
+
+/// A tide source a test controls completely: returns a fixed result, or
+/// throws, and counts how many times [fetch] was actually called — the
+/// same shape as [FakeWeatherService].
+class FakeTideService implements TideService {
+  FakeTideService({this.result, this.failWith});
+
+  TideFetchResult Function({
+    required GeoLocation location,
+    required LocalTimeZone timeZone,
+    required DateTime now,
+  })?
+  result;
+
+  /// When set, every call throws this instead of returning [result].
+  Object? failWith;
+
+  int fetchCount = 0;
+
+  @override
+  Future<TideFetchResult> fetch({
+    required GeoLocation location,
+    required LocalTimeZone timeZone,
+    required DateTime now,
+  }) async {
+    fetchCount++;
+    if (failWith case final error?) throw error;
+    return result!(location: location, timeZone: timeZone, now: now);
+  }
+}
+
+/// A semidiurnal-shaped curve of hourly samples around [obtainedAt]: a
+/// smooth sine wave with a real high and low roughly every twelve and a
+/// half hours, which is what a genuine tide looks like — for tests that
+/// only need *a* believable curve, not a specific one.
+List<TideSample> testTideCurve({
+  required DateTime obtainedAt,
+  double meanMetres = 1.5,
+  double rangeMetres = 1.2,
+  Duration period = const Duration(hours: 12, minutes: 25),
+  int pastHours = 24,
+  int totalHours = 72,
+}) {
+  final start = obtainedAt.toUtc().subtract(Duration(hours: pastHours));
+  final periodHours = period.inMinutes / 60;
+  return [
+    for (var i = 0; i < totalHours; i++)
+      TideSample(
+        time: start.add(Duration(hours: i)),
+        heightMetres:
+            meanMetres + rangeMetres * math.sin(2 * math.pi * i / periodHours),
+      ),
+  ];
+}
+
+/// A ready-made snapshot built from [testTideCurve], for tests that only
+/// care that *a* tide curve came back.
+TideSnapshot testTideSnapshot({
+  required GeoLocation location,
+  required DateTime obtainedAt,
+}) {
+  final samples = testTideCurve(obtainedAt: obtainedAt);
+  return TideSnapshot(
+    location: location,
+    obtainedAt: obtainedAt,
+    samples: samples,
+    extrema: extractTideExtrema(samples),
+  );
+}
 
 /// A few real places, for hemisphere and time-zone coverage.
 ///

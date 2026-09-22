@@ -3,6 +3,11 @@ import 'package:almanac/app/app.dart';
 import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/environment/location_state.dart';
+import 'package:almanac/core/environment/tide.dart';
+import 'package:almanac/core/environment/tide_extrema.dart';
+import 'package:almanac/core/environment/tide_service.dart';
+import 'package:almanac/core/environment/weather.dart';
+import 'package:almanac/core/environment/weather_service.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/widgets/widgets.dart';
 import 'package:almanac/features/nature_log/application/nature_log_providers.dart';
@@ -76,6 +81,8 @@ void main() {
     bool reducedMotion = false,
     Size surface = const Size(420, 3200),
     Set<FeatureId> features = const {FeatureId.natureLog},
+    WeatherService? weatherService,
+    TideService? tideService,
   }) async {
     tester.view.physicalSize = surface * 2;
     tester.view.devicePixelRatio = 2;
@@ -99,6 +106,8 @@ void main() {
         locationState: locationState,
         features: features,
         natureLogStore: store ?? InMemoryNatureLogStore(),
+        weatherService: weatherService,
+        tideService: tideService,
       ),
     );
     addTearDown(container.dispose);
@@ -970,6 +979,80 @@ void main() {
       expect(find.text('Birds'), findsOneWidget);
       // A long name wraps rather than being cut down.
       expect(find.text('Tūī'), findsOneWidget);
+    });
+  });
+
+  group('weather and tide notes stay separate observations', () {
+    testWidgets('both can appear at once, as two distinct lines', (
+      tester,
+    ) async {
+      final now = october;
+      final windyWeather = CurrentWeather(
+        temperatureC: 15,
+        apparentTemperatureC: 15,
+        condition: WeatherCondition.partlyCloudy,
+        precipitationMm: 0,
+        cloudCoverPercent: 40,
+        windSpeedKmh: 30,
+      );
+      final nearLowSamples = [
+        TideSample(
+          time: now.subtract(const Duration(hours: 2)),
+          heightMetres: 1.6,
+        ),
+        TideSample(
+          time: now.subtract(const Duration(hours: 1)),
+          heightMetres: 1.0,
+        ),
+        TideSample(time: now, heightMetres: 0.7),
+        TideSample(time: now.add(const Duration(hours: 1)), heightMetres: 1.0),
+        TideSample(time: now.add(const Duration(hours: 2)), heightMetres: 1.6),
+      ];
+
+      await openNatureLog(
+        tester,
+        weatherService: FakeWeatherService(
+          result: ({required location, required timeZone, required now}) =>
+              WeatherSnapshot(
+                location: location,
+                obtainedAt: now,
+                current: windyWeather,
+                today: const DailySummary(
+                  highC: 18,
+                  lowC: 9,
+                  precipitationProbabilityPercent: 10,
+                ),
+                hourly: const [],
+              ),
+        ),
+        tideService: FakeTideService(
+          result: ({required location, required timeZone, required now}) =>
+              TideFetchData(
+                TideSnapshot(
+                  location: location,
+                  obtainedAt: now,
+                  samples: nearLowSamples,
+                  extrema: extractTideExtrema(
+                    nearLowSamples,
+                    minSeparation: Duration.zero,
+                  ),
+                ),
+              ),
+        ),
+      );
+
+      // Two separate lines — never merged into one sentence about both
+      // the wind and the tide together.
+      expect(
+        find.text(
+          'A windy day — look for how the plants and trees are moving.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Low tide can reveal more of the shoreline to explore.'),
+        findsOneWidget,
+      );
     });
   });
 }

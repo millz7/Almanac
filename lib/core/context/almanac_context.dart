@@ -4,6 +4,8 @@ import '../environment/day_night.dart';
 import '../environment/daypart.dart';
 import '../environment/environment_providers.dart';
 import '../environment/moon_phase.dart';
+import '../environment/tide.dart';
+import '../environment/tide_providers.dart';
 import '../environment/weather.dart';
 import '../environment/weather_providers.dart';
 import '../time/clock_providers.dart';
@@ -12,6 +14,17 @@ import 'almanac_moment.dart';
 export '../environment/daypart.dart' show Daypart;
 export '../environment/environment_providers.dart'
     show currentSeasonProvider, resolvedHemisphereProvider;
+export '../environment/tide.dart'
+    show
+        TideAvailable,
+        TideDirection,
+        TideExtreme,
+        TideExtremeType,
+        TideLocationRequired,
+        TideProviderUnavailable,
+        TideSnapshot,
+        TideState,
+        TideUnavailableForLocation;
 export '../environment/weather.dart' show WeatherCondition, WeatherSnapshot;
 export '../time/clock_providers.dart' show todayProvider;
 export 'almanac_moment.dart';
@@ -59,6 +72,20 @@ final currentDaylightProvider = Provider<DayNightState?>(
 /// weather alongside the rest of the moment reads both providers.
 final currentWeatherProvider = Provider<WeatherSnapshot?>(
   (ref) => ref.watch(weatherControllerProvider).value,
+);
+
+/// The tide at the shared location, right now — or null before the
+/// controller has resolved once.
+///
+/// Unlike [currentWeatherProvider], the resolved value is a [TideState]
+/// rather than a plain snapshot: a tide reading has more than one honest
+/// reason to be absent, and callers that want to tell a missing position
+/// apart from a position the marine model has nothing for read the
+/// state's own type rather than a second flag. Null here means only
+/// "not resolved yet" — the brief loading gap before the first result,
+/// never a stand-in for one of the real states.
+final currentTideProvider = Provider<TideState?>(
+  (ref) => ref.watch(tideControllerProvider).value,
 );
 
 /// The human part of the day — morning, afternoon, evening, night — or

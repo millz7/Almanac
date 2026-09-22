@@ -5,9 +5,11 @@ import '../../../app/almanac_button.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/context/almanac_context.dart';
 import '../../../core/environment/environment_providers.dart';
+import '../../../core/environment/tide_extrema.dart';
 import '../../../core/time/date_words.dart';
 import '../../../core/widgets/widgets.dart';
 import '../application/nature_log_providers.dart';
+import '../domain/tide_nature_note.dart';
 import '../domain/weather_nature_note.dart';
 import 'nature_log_text.dart';
 import 'widgets/nature_mark.dart';
@@ -426,7 +428,11 @@ class _Landing extends ConsumerWidget {
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
         ],
+        // Two independent observations, shown as two separate lines —
+        // never merged into one sentence. See `_WeatherNote` and
+        // `_TideNote`.
         const _WeatherNote(),
+        const _TideNote(),
       ],
     );
   }
@@ -451,6 +457,40 @@ class _WeatherNote extends ConsumerWidget {
       padding: const EdgeInsets.only(top: AppSpacing.xs),
       child: Text(
         WeatherNatureNotes.noteFor(cue),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
+    );
+  }
+}
+
+/// A quiet, one-line prompt for what the tide might be worth noticing on
+/// a shore — never a safety instruction, and never merged with the
+/// weather note above into one claim. Absent entirely with no location,
+/// no marine data for this position, or a tide too far from a
+/// recognised state (rising, say) to have anything distinctive to say.
+class _TideNote extends ConsumerWidget {
+  const _TideNote();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tide = ref.watch(currentTideProvider);
+    if (tide is! TideAvailable) return const SizedBox.shrink();
+    final now = ref.watch(naturalEnvironmentProvider).value?.resolvedAt;
+    if (now == null) return const SizedBox.shrink();
+
+    final direction = tideDirectionAt(
+      tide.snapshot.samples,
+      now,
+      extrema: tide.snapshot.extrema,
+    );
+    final cue = TideNatureNotes.cueFor(direction);
+    if (cue == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Text(
+        TideNatureNotes.noteFor(cue),
         style: Theme.of(context).textTheme.bodySmall
             ?.copyWith(color: context.palette.textSecondary),
       ),

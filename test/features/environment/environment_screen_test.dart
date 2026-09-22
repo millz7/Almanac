@@ -1,12 +1,18 @@
 import 'package:almanac/app/app.dart';
 import 'package:almanac/app/almanac_button.dart';
 import 'package:almanac/app/navigation/almanac_navigation_bar.dart';
+import 'package:almanac/app/theme/app_theme.dart';
 import 'package:almanac/core/environment/geo_location.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/environment_providers.dart';
 import 'package:almanac/core/environment/moon_service.dart';
 import 'package:almanac/core/environment/solar_service.dart';
+import 'package:almanac/core/environment/tide.dart';
+import 'package:almanac/core/environment/tide_extrema.dart';
+import 'package:almanac/core/environment/tide_providers.dart';
+import 'package:almanac/core/environment/tide_service.dart';
+import 'package:almanac/features/environment/presentation/tide_screen.dart';
 import 'package:almanac/features/environment/presentation/widgets/moon_disc.dart';
 import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
 import 'package:flutter/material.dart';
@@ -346,15 +352,197 @@ void main() {
   });
 
   group('tides', () {
-    testWidgets('are held open with no data at all', (tester) async {
+    testWidgets('with no location shared, the fact says so plainly', (
+      tester,
+    ) async {
       await openToday(tester, overrides: environmentOverrides());
 
       expect(find.text('Tides'), findsOneWidget);
-      expect(find.text('Not here yet'), findsOneWidget);
-      // Nothing that could be mistaken for a tide time.
+      expect(find.text('Location needed'), findsOneWidget);
+      // Nothing that could be mistaken for a tide time or a fabricated
+      // reading.
       expect(find.textContaining('High water at'), findsNothing);
-      expect(find.textContaining('m'), findsWidgets); // 'moon', not metres
+      expect(find.text('0:00'), findsNothing);
     });
+
+    testWidgets('with a curve available, the fact shows the direction', (
+      tester,
+    ) async {
+      await openToday(
+        tester,
+        overrides: environmentOverrides(
+          now: DateTime.utc(2025, 7, 15, 12),
+          locationState: const LocationAvailable(TestLocations.london),
+          tideService: FakeTideService(
+            result: ({required location, required timeZone, required now}) =>
+                TideFetchData(
+                  testTideSnapshot(location: location, obtainedAt: now),
+                ),
+          ),
+        ),
+      );
+
+      expect(find.text('Tides'), findsOneWidget);
+      expect(
+        find.textContaining(RegExp('Rising|Falling|Near high|Near low')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('tapping the fact opens the tide detail page', (tester) async {
+      await openToday(
+        tester,
+        overrides: environmentOverrides(
+          now: DateTime.utc(2025, 7, 15, 12),
+          locationState: const LocationAvailable(TestLocations.london),
+          tideService: FakeTideService(
+            result: ({required location, required timeZone, required now}) =>
+                TideFetchData(
+                  testTideSnapshot(location: location, obtainedAt: now),
+                ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Tides'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Current'), findsOneWidget);
+      expect(find.textContaining('Not for navigation'), findsOneWidget);
+    });
+
+    testWidgets('a near-high reading reads as "Near high", not a number', (
+      tester,
+    ) async {
+      final now = DateTime.utc(2025, 7, 15, 12);
+      // A curve whose one turning point sits exactly at "now".
+      final samples = [
+        TideSample(
+          time: now.subtract(const Duration(hours: 2)),
+          heightMetres: 1.0,
+        ),
+        TideSample(
+          time: now.subtract(const Duration(hours: 1)),
+          heightMetres: 1.6,
+        ),
+        TideSample(time: now, heightMetres: 1.9),
+        TideSample(time: now.add(const Duration(hours: 1)), heightMetres: 1.6),
+        TideSample(time: now.add(const Duration(hours: 2)), heightMetres: 1.0),
+      ];
+      await openToday(
+        tester,
+        overrides: environmentOverrides(
+          now: now,
+          locationState: const LocationAvailable(TestLocations.london),
+          tideService: FakeTideService(
+            result: ({required location, required timeZone, required now}) =>
+                TideFetchData(
+                  TideSnapshot(
+                    location: location,
+                    obtainedAt: now,
+                    samples: samples,
+                    extrema: extractTideExtrema(
+                      samples,
+                      minSeparation: Duration.zero,
+                    ),
+                  ),
+                ),
+          ),
+        ),
+      );
+
+      expect(find.text('Near high'), findsOneWidget);
+    });
+
+    testWidgets(
+      'a location the marine model has nothing for reads as unavailable',
+      (tester) async {
+        await openToday(
+          tester,
+          overrides: environmentOverrides(
+            now: DateTime.utc(2025, 7, 15, 12),
+            locationState: const LocationAvailable(TestLocations.london),
+            tideService: FakeTideService(
+              result: ({required location, required timeZone, required now}) =>
+                  const TideFetchNoData(),
+            ),
+          ),
+        );
+
+        expect(find.text('Unavailable here'), findsOneWidget);
+
+        await tester.tap(find.text('Tides'));
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining("isn't available for this location"),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('a provider failure reads as not available now, quietly', (
+      tester,
+    ) async {
+      await openToday(
+        tester,
+        overrides: environmentOverrides(
+          now: DateTime.utc(2025, 7, 15, 12),
+          locationState: const LocationAvailable(TestLocations.london),
+          tideService: FakeTideService(failWith: Exception('no connectivity')),
+        ),
+      );
+
+      expect(find.text('Not available now'), findsOneWidget);
+      // Never a raw error on the primary Almanac page.
+      expect(find.textContaining('Exception'), findsNothing);
+      expect(find.textContaining('HTTP'), findsNothing);
+    });
+
+    testWidgets(
+      'the detail page survives double text size with nothing clipped',
+      (tester) async {
+        tester.view.physicalSize = const Size(400, 1400) * 2;
+        tester.view.devicePixelRatio = 2;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+        final now = DateTime.utc(2025, 7, 15, 12);
+        final container = ProviderContainer(
+          overrides: environmentOverrides(
+            now: now,
+            locationState: const LocationAvailable(TestLocations.london),
+            tideService: FakeTideService(
+              result: ({required location, required timeZone, required now}) =>
+                  TideFetchData(
+                    testTideSnapshot(location: location, obtainedAt: now),
+                  ),
+            ),
+          ),
+        );
+        addTearDown(container.dispose);
+        // Resolve the tide once before pumping the detail page directly,
+        // so the page's very first frame already has a real reading —
+        // this test is about the page's own layout at 2x text, not about
+        // waiting out its async loading state.
+        await container.read(tideControllerProvider.future);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.fromPalette(SeasonalPalettes.fallback),
+              home: const TideScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Current'), findsOneWidget);
+        expect(find.textContaining('Not for navigation'), findsOneWidget);
+      },
+    );
   });
 
   group('the shape of the page', () {

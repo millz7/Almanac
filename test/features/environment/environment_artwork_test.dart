@@ -4,6 +4,7 @@ import 'package:almanac/app/app.dart';
 import 'package:almanac/core/environment/day_night.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/season.dart';
+import 'package:almanac/core/environment/tide_service.dart';
 import 'package:almanac/features/environment/domain/environment_artwork.dart';
 import 'package:almanac/features/environment/presentation/environment_text.dart';
 import 'package:almanac/features/environment/presentation/widgets/environment_artwork_view.dart';
@@ -260,6 +261,15 @@ void main() {
           overrides: environmentOverrides(
             now: now,
             locationState: const LocationAvailable(TestLocations.london),
+            // A location is shared in this group, so the tide controller
+            // would otherwise reach for the real provider — give it a
+            // fake so no test here ever touches the network.
+            tideService: FakeTideService(
+              result: ({required location, required timeZone, required now}) =>
+                  TideFetchData(
+                    testTideSnapshot(location: location, obtainedAt: now),
+                  ),
+            ),
           ),
           child: const AlmanacApp(),
         ),
@@ -373,13 +383,13 @@ void main() {
             reason: '$name at ${scale}x',
           );
 
-          // And the tides stay honest all the way down.
-          await tester.scrollUntilVisible(
-            find.text(EnvironmentText.tidesValue),
-            240,
-            scrollable: page,
+          // And the tides fact scrolls into view along with everything
+          // else — reachable at every size, whatever it currently says.
+          final tideFact = find.textContaining(
+            RegExp('Rising|Falling|Near high|Near low'),
           );
-          expect(find.text(EnvironmentText.tidesValue), findsOneWidget);
+          await tester.scrollUntilVisible(tideFact, 240, scrollable: page);
+          expect(tideFact, findsOneWidget);
         });
       }
     }

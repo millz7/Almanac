@@ -4,6 +4,8 @@ import 'package:almanac/core/environment/local_time_zone.dart';
 import 'package:almanac/core/environment/location_service.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/solar_service.dart';
+import 'package:almanac/core/environment/tide_providers.dart';
+import 'package:almanac/core/environment/tide_service.dart';
 import 'package:almanac/core/environment/time_zone_service.dart';
 import 'package:almanac/core/environment/weather_providers.dart';
 import 'package:almanac/core/environment/weather_service.dart';
@@ -43,6 +45,7 @@ List<Override> environmentOverrides({
   LocationService? locationService,
   LocationState? locationState,
   WeatherService? weatherService,
+  TideService? tideService,
   SettingsStore? settingsStore,
   CycleStore? cycleStore,
   GardenStore? gardenStore,
@@ -123,5 +126,6 @@ List<Override> environmentOverrides({
       ),
     if (weatherService != null)
       weatherServiceProvider.overrideWithValue(weatherService),
+    if (tideService != null) tideServiceProvider.overrideWithValue(tideService),
   ];
 }

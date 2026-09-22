@@ -103,18 +103,6 @@ abstract final class EnvironmentText {
   static const moonLabel = 'Moon';
   static const tidesLabel = 'Tides';
 
-  /// What the tides strip says until real tide prediction exists.
-  ///
-  /// There are deliberately no times here and no chart: tide prediction
-  /// needs harmonic constituents for a particular port, which this app
-  /// does not have, and a plausible-looking made-up tide is worse than no
-  /// tide at all — somebody might plan a walk around it.
-  static const tidesValue = 'Not here yet';
-  static const tidesNote =
-      'High and low water for your nearest coast will appear here. Until '
-      'the app can look them up properly, it would rather show nothing '
-      'than a guess.';
-
   /// A value with no value: shown where a time genuinely does not exist.
   static const noValue = '—';
 

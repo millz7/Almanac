@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/context/almanac_context.dart';
 import '../../../../core/environment/geo_location.dart';
 import '../../../../core/environment/natural_environment.dart';
 import '../../../../core/environment/solar_service.dart';
+import '../../../../core/environment/tide_extrema.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../environment_text.dart';
 import '../moon_text.dart';
+import '../tide_text.dart';
 import 'moon_disc.dart';
 
 /// The four things the Almanac knows about today, in a row.
@@ -23,16 +27,17 @@ import 'moon_disc.dart';
 /// honest not-a-time cases are shown as themselves rather than dressed up
 /// as times. The moon is the real phase. Tides say plainly that they are
 /// not ready.
-class EnvironmentFacts extends StatelessWidget {
+class EnvironmentFacts extends ConsumerWidget {
   const EnvironmentFacts({super.key, required this.environment});
 
   final NaturalEnvironment environment;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final events = environment.solarEvents;
     final zone = environment.timeZone;
     final moon = environment.moon;
+    final tide = ref.watch(currentTideProvider);
 
     String solar(DateTime? instant) => instant == null
         ? EnvironmentText.noValue
@@ -80,8 +85,24 @@ class EnvironmentFacts extends StatelessWidget {
 
       _Fact(
         label: EnvironmentText.tidesLabel,
-        value: EnvironmentText.tidesValue,
-        spoken: '${EnvironmentText.tidesLabel}. ${EnvironmentText.tidesNote}',
+        value: switch (tide) {
+          null => EnvironmentText.noValue,
+          TideLocationRequired() => TideText.locationNeeded,
+          TideUnavailableForLocation() => TideText.unavailableHere,
+          TideProviderUnavailable() => TideText.notAvailableNow,
+          TideAvailable(:final snapshot) => TideText.directionLabel(
+            tideDirectionAt(
+              snapshot.samples,
+              environment.resolvedAt,
+              extrema: snapshot.extrema,
+            ),
+          ),
+        },
+        // Tappable whatever the state — the detail page is where each
+        // one is explained, including the location invitation for the
+        // one state that needs it, so the fact strip never has to
+        // squeeze an explanation into a medallion.
+        onTap: () => context.push(kTidesRoute),
         mark: const _TideMark(),
       ),
     ];

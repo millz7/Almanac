@@ -6,8 +6,9 @@ world — the sun, moon, tides, seasons and the life around us.
 
 **Environment** is the first real screen and the app's anchor: the date,
 the season, a drawn sky that follows the sun, today's sunrise and sunset,
-and the moon's phase. Tides are held open with no data rather than filled
-with a guess.
+the moon's phase, and — where the tide model has usable data for the
+position — a real, modelled tide reading. Where it does not, the app says
+so plainly rather than filling the gap with a guess.
 
 Everything else is the user's choice. On first launch the app asks four
 short questions — a name, a hemisphere, whether to use location, and what
@@ -314,12 +315,17 @@ change at all to how often the shared location itself is read. The
 refresh-cadence backlog above is otherwise still just that — a backlog —
 and tide data remains the feature it is written for.
 
-## Weather — the one exception to "no network"
+## Weather and tides — the two exceptions to "no network"
 
 Every other claim of "no network" and "nothing leaves the device" in
-this document is still true of the feature it is made about. Weather is
-the one deliberate exception, so it gets its own section rather than a
-footnote.
+this document is still true of the feature it is made about. Weather and
+tides are the two deliberate exceptions, so they get their own section
+rather than a footnote. Both follow the same rule: **environmental data
+such as weather and tides may require a limited network request** — a
+rounded, approximate position sent to get a reading back, never an
+account, a profile, or a history of where the device has been.
+
+### Weather
 
 **What it is.** A short, human sentence on the Environment page — "A
 cool, breezy morning, with rain developing later." — replacing what used
@@ -330,15 +336,13 @@ of other features (Nature Log, Garden, Meditation, Yoga, Cookbook,
 Cycle, Chakras, the Wheel of the Year) may add one quiet, clearly-labelled
 suggestion of their own from the same forecast — see each feature's own
 `weather_*_note.dart` file — but none of them call a weather provider
-directly, and weather is never merged into a moon, cycle or festival
-claim into one sentence.
+directly, and weather is never merged into a moon, cycle, tide or
+festival claim into one sentence.
 
-**The one network request.** A forecast fetch to
+**The network request.** A forecast fetch to
 [Open-Meteo](https://open-meteo.com)'s free, non-commercial endpoint,
 which needs no account and no API key —
-`lib/core/environment/open_meteo_weather_service.dart`. Nothing else in
-the app calls the network: not analytics, not advertising, not a cloud
-profile, not a remote config, not a tracking SDK.
+`lib/core/environment/open_meteo_weather_service.dart`.
 
 **Exactly what leaves the device.** The coordinates already held by the
 shared `locationStateProvider` — see "Hemisphere, location and privacy"
@@ -348,14 +352,6 @@ header beyond what `package:http` sends by default. The data returned
 (temperature, sky condition, wind, precipitation chance) is mapped once
 into the app's own types and the provider's raw response is discarded;
 nothing from it is kept past that call except the mapped snapshot itself.
-
-**No second location source.** Weather reads the same
-`locationStateProvider` every other feature does — "one place, one
-clock, one Almanac" — and never requests a more precise permission,
-never asks for background location, and never triggers a fresh GPS fix
-of its own. If the shared position is stale, weather simply waits for
-whatever next refreshes it for an unrelated reason (an app resume, a
-user-initiated refresh); it does not go looking for a better one.
 
 **Caching.** A fetched forecast is kept for 45 minutes
 (`kWeatherCacheDuration`) and reused within that window rather than
@@ -367,11 +363,6 @@ weather sentence and every feature's weather suggestion simply do not
 appear; nothing pretends to know, and nothing falls back to the old
 fixed light description.
 
-**No background use.** The fetch happens only in the foreground, only
-when the Environment page (or another consumer) actually reads
-`currentWeatherProvider`, and never on a timer. There is no periodic
-polling while the app is open and none while it is backgrounded.
-
 **Location denied or unavailable.** No network request is made at all.
 The Environment page keeps its astronomical season countdown and every
 other non-weather fact exactly as before; the weather sentence and every
@@ -379,9 +370,73 @@ feature's weather suggestion are simply absent. The existing location
 invitation is the one, unrepeated offer to change that — nothing about
 weather adds a second prompt.
 
-**What is never inferred.** No IP-based geolocation, no guessed city, no
-location history — the fetched forecast is not written to disk between
-launches, and the app forms no record of where a device has been.
+### Tides
+
+**What it is.** A real, modelled tide reading on the Environment fact
+strip — "Rising", "Falling", "Near high", "Near low" — replacing the old
+"Not here yet" placeholder, plus a small detail page reached by tapping
+it: the current state, the next high and low, and — space allowing — the
+one after each. Never a nautical chart, never a harbour tide table, and
+never claimed to be one: the detail page carries its own quiet line,
+"Approximate local tide estimate, modelled from sea level rather than a
+harbour tide table. Not for navigation." (`TideText.nonNavigationNote`),
+matching Open-Meteo's own published limitation for this data (see
+below). Nature Log may add one quiet, cautious note of its own from the
+same reading — low tide revealing more shoreline, a falling tide
+changing what is visible, a high tide looking different — kept
+structurally separate from its weather note, never merged with it into
+one sentence, and never a claim about what is safe to walk on.
+
+**The network request.** A sea-level fetch to [Open-Meteo
+Marine](https://open-meteo.com/en/docs/marine-weather-api) — the same
+provider and account-free model as weather, just a second endpoint —
+requesting only the `sea_level_height_msl` hourly variable —
+`lib/core/environment/open_meteo_marine_tide_service.dart`. Open-Meteo's
+own documentation is explicit about this data's limits: "Accuracy is
+limited in coastal areas — while it can be reasonably accurate near
+unobstructed coasts, it may be completely unreliable further inland.
+This data is not suitable for coastal navigation." The app's own
+non-navigation note exists because of that published limitation, not
+merely as a legal nicety.
+
+**Exactly what leaves the device.** The same shared, rounded (two
+decimal places) coordinates weather uses — no separate, more precise
+position is ever requested for tides. The request asks for one day back,
+today, and two days ahead of hourly sea-level readings; the response is
+parsed once into a short list of samples, a set of derived highs and
+lows, and then discarded, the same as weather.
+
+**High and low tides are derived on the device**, not supplied by the
+provider: Open-Meteo Marine returns a sea-level curve, not a table of
+tide events. `lib/core/environment/tide_extrema.dart` walks that curve
+for local turning points, discards anything too small a wiggle to be a
+real tide (under 5 cm) or too close together to be a second genuine
+event (under 3 hours), and never treats the first or last sample of the
+fetched window as a turning point, since there is no data beyond the
+window to confirm one. The current direction — rising, falling, near a
+high, or near a low — comes from the same curve read at the current
+instant, not from which event happens to be listed next.
+
+**Not every position has a tide.** A location the marine model has no
+usable data for — well inland, typically — is answered honestly as
+"Unavailable here" rather than a fabricated `0:00`/`0 m` reading, and
+that answer is itself cached so the app does not ask again on every
+visit. A provider failure with no still-useful cached reading reads as
+"Not available now". Neither state is treated as an error the user needs
+to see fixed; the rest of Environment stays fully usable either way.
+
+**Caching.** A fetched tide curve — or a confirmed "no data here" answer
+— is kept for 45 minutes (`kTideCacheDuration`), the same duration and
+the same reasoning as weather's own cache.
+
+**Location denied or unavailable.** No network request is made at all;
+the fact strip reads "Location needed" and the detail page offers the
+same location invitation the rest of Environment does.
+
+**What is never inferred**, for weather or tides alike: no IP-based
+geolocation, no guessed city or coastline, no location history — nothing
+fetched is written to disk between launches, and the app forms no record
+of where a device has been.
 
 ## The moon
 
@@ -1688,9 +1743,10 @@ here. At the time this was fixed, the app's architecture was "no
 network, nothing leaves the device" without exception, and that made the
 dependency a real regression on top of the source file next to it
 claiming in prose that fonts were never fetched. That blanket claim no
-longer holds app-wide — see "Weather" below for the one, deliberate
-network request the app now makes — but nothing about *this* history
-changes: fonts are still never fetched, from Google or anywhere else.
+longer holds app-wide — see "Weather and tides" below for the two
+deliberate network requests the app now makes — but nothing about *this*
+history changes: fonts are still never fetched, from Google or anywhere
+else.
 
 The dependency is gone. `lib/app/theme/almanac_fonts.dart` is the only
 place a typeface is chosen, it currently resolves to the platform's own

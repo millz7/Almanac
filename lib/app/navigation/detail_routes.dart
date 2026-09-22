@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/features/feature_registry.dart';
 import '../../features/environment/presentation/moon_screen.dart';
+import '../../features/environment/presentation/tide_screen.dart';
 
 /// Pages that live *inside* a feature rather than beside it.
 ///
@@ -36,6 +37,36 @@ List<RouteBase> detailRoutesFor(FeatureDefinition feature) =>
             transitionsBuilder: (context, animation, _, child) {
               // Reduced motion arrives at the page rather than travelling
               // to it.
+              if (MediaQuery.disableAnimationsOf(context)) return child;
+
+              final eased = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              );
+              return FadeTransition(
+                opacity: eased,
+                child: ScaleTransition(
+                  scale: Tween(begin: 0.94, end: 1.0).animate(eased),
+                  child: child,
+                ),
+              );
+            },
+          ),
+        ),
+        GoRoute(
+          // Relative to the parent, which makes the full path
+          // `/environment/tides`.
+          path: 'tides',
+          pageBuilder: (context, state) => CustomTransitionPage(
+            key: state.pageKey,
+            child: const TideScreen(),
+            // The same short fade-and-scale as the Moon's own page, for
+            // the same reason: one consistent way of opening a page
+            // inside the Environment, not a transition of its own for
+            // every new one.
+            transitionDuration: const Duration(milliseconds: 220),
+            reverseTransitionDuration: const Duration(milliseconds: 180),
+            transitionsBuilder: (context, animation, _, child) {
               if (MediaQuery.disableAnimationsOf(context)) return child;
 
               final eased = CurvedAnimation(
