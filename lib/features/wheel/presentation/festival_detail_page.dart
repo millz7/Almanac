@@ -7,6 +7,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/festival.dart';
+import '../domain/weather_festival_note.dart';
 
 /// A small, restrained mark for each festival — the same spirit as the
 /// Almanac's other line icons, never an occult symbol or a rune.
@@ -85,6 +86,7 @@ class FestivalDetailPage extends ConsumerWidget {
             intent: FestivalYogaIntent(id),
           ),
         ),
+        const _WeatherNote(),
 
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,6 +158,32 @@ class FestivalDetailPage extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// A gentle nudge towards celebrating indoors or out, from today's
+/// weather — never a change to which festival this is, its date, its
+/// meaning, or its hemisphere. See `WeatherFestivalNotes`. Absent
+/// entirely with no location, no network, or a day with nothing
+/// distinctive about it.
+class _WeatherNote extends ConsumerWidget {
+  const _WeatherNote();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final cue = WeatherFestivalNotes.cueFor(weather.current);
+    if (cue == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Text(
+        WeatherFestivalNotes.noteFor(cue),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
     );
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
-import '../../../core/environment/day_night.dart';
 import '../../../core/environment/natural_environment.dart';
 import '../../../core/environment/season.dart';
 import '../../../core/environment/solar_service.dart';
@@ -81,34 +80,6 @@ String describeNextSeason(SeasonState season, DateTime instant) {
     <= 0 => '$next arrives today',
     1 => '$next arrives tomorrow',
     _ => '$next arrives in $days days',
-  };
-}
-
-/// A short, honest line about where the light is.
-///
-/// Says only what the app knows. When the times were estimated from the
-/// clock because no position has been shared, it says so instead of
-/// implying a sunrise it has not calculated.
-String describeLight(NaturalEnvironment environment) {
-  switch (environment.solarEvents.kind) {
-    case SolarDayKind.sunNeverSets:
-      return 'The sun does not set here today';
-    case SolarDayKind.sunNeverRises:
-      return 'The sun stays below the horizon today';
-    case SolarDayKind.risesAndSets:
-      break;
-  }
-
-  final estimated =
-      environment.dayNight.accuracy ==
-      DayNightAccuracy.estimatedWithoutLocation;
-
-  return switch (environment.dayNight.phase) {
-    DayPhase.dawn => 'The light is coming back',
-    DayPhase.day => estimated ? 'Daylight, by the clock' : 'The sun is up',
-    DayPhase.dusk => 'The light is going',
-    DayPhase.night =>
-      estimated ? 'Night, by the clock' : 'Dark, and the world is resting',
   };
 }
 

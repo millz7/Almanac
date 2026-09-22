@@ -5,6 +5,8 @@ import 'package:almanac/core/environment/location_service.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/solar_service.dart';
 import 'package:almanac/core/environment/time_zone_service.dart';
+import 'package:almanac/core/environment/weather_providers.dart';
+import 'package:almanac/core/environment/weather_service.dart';
 import 'package:almanac/core/features/feature_registry.dart';
 import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
@@ -40,6 +42,7 @@ List<Override> environmentOverrides({
   SolarService? solarService,
   LocationService? locationService,
   LocationState? locationState,
+  WeatherService? weatherService,
   SettingsStore? settingsStore,
   CycleStore? cycleStore,
   GardenStore? gardenStore,
@@ -118,5 +121,7 @@ List<Override> environmentOverrides({
       locationStateProvider.overrideWith(
         () => FixedLocationController(locationState),
       ),
+    if (weatherService != null)
+      weatherServiceProvider.overrideWithValue(weatherService),
   ];
 }

@@ -5,6 +5,8 @@ import 'package:almanac/core/environment/location_service.dart';
 import 'package:almanac/core/environment/location_state.dart';
 import 'package:almanac/core/environment/solar_service.dart';
 import 'package:almanac/core/environment/time_zone_service.dart';
+import 'package:almanac/core/environment/weather.dart';
+import 'package:almanac/core/environment/weather_service.dart';
 
 /// A location service that reports whatever the test wants, and records
 /// whether the app prompted or merely checked.
@@ -115,6 +117,67 @@ class FakeSolarService implements SolarService {
     return SolarEvents.risesAndSets(sunrise: sunrise!, sunset: sunset!);
   }
 }
+
+/// A weather source a test controls completely: returns a fixed
+/// snapshot, or throws, and counts how many times [fetch] was actually
+/// called — so a test can prove the app fetched once, not twice, or
+/// prove it survived a failure.
+class FakeWeatherService implements WeatherService {
+  FakeWeatherService({this.result, this.failWith});
+
+  /// What a successful call returns. A snapshot builder rather than a
+  /// fixed value, since some tests want the returned location or time to
+  /// reflect what was actually asked for.
+  WeatherSnapshot Function({
+    required GeoLocation location,
+    required LocalTimeZone timeZone,
+    required DateTime now,
+  })?
+  result;
+
+  /// When set, every call throws this instead of returning [result] —
+  /// standing in for a timeout, a non-200 response, or a body that will
+  /// not parse; the controller reacts to all three the same way.
+  Object? failWith;
+
+  int fetchCount = 0;
+
+  @override
+  Future<WeatherSnapshot> fetch({
+    required GeoLocation location,
+    required LocalTimeZone timeZone,
+    required DateTime now,
+  }) async {
+    fetchCount++;
+    if (failWith case final error?) throw error;
+    return result!(location: location, timeZone: timeZone, now: now);
+  }
+}
+
+/// A ready-made, otherwise-ordinary snapshot for tests that only care
+/// that *a* forecast came back, not what is in it.
+WeatherSnapshot testWeatherSnapshot({
+  required GeoLocation location,
+  required DateTime obtainedAt,
+  WeatherCondition condition = WeatherCondition.partlyCloudy,
+}) => WeatherSnapshot(
+  location: location,
+  obtainedAt: obtainedAt,
+  current: CurrentWeather(
+    temperatureC: 15,
+    apparentTemperatureC: 15,
+    condition: condition,
+    precipitationMm: 0,
+    cloudCoverPercent: 40,
+    windSpeedKmh: 8,
+  ),
+  today: const DailySummary(
+    highC: 18,
+    lowC: 9,
+    precipitationProbabilityPercent: 10,
+  ),
+  hourly: const [],
+);
 
 /// A few real places, for hemisphere and time-zone coverage.
 ///

@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/almanac_button.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
 import '../application/chakra_reflections.dart';
 import '../domain/chakras.dart';
+import '../domain/weather_chakra_note.dart';
 import 'widgets/chakra_journey.dart';
 import 'widgets/chakra_symbol.dart';
 
@@ -114,7 +116,35 @@ class _Journey extends StatelessWidget {
         Text(ChakraCatalogue.introduction, style: textTheme.bodyLarge),
         const SizedBox(height: AppSpacing.lg),
         ChakraJourney(onChosen: onChosen),
+        const _WeatherNote(),
       ],
+    );
+  }
+}
+
+/// A single, quiet reflective line for today's weather — shown here,
+/// about all seven together, rather than inside any one chakra's own
+/// detail, so it is never read as a claim about a particular one of
+/// them. See `WeatherChakraNotes` for why it is worded as a prompt and
+/// never a cause. Absent entirely with no location, no network, or a
+/// day with nothing distinctive about it.
+class _WeatherNote extends ConsumerWidget {
+  const _WeatherNote();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final cue = WeatherChakraNotes.cueFor(weather.current);
+    if (cue == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.lg),
+      child: Text(
+        WeatherChakraNotes.noteFor(cue),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
     );
   }
 }

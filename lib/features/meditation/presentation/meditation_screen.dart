@@ -15,6 +15,7 @@ import '../domain/cycle_meditation.dart';
 import '../domain/festival_meditation.dart';
 import '../domain/meditation_technique.dart';
 import '../domain/moon_meditation.dart';
+import '../domain/weather_meditation.dart';
 import 'meditation_text.dart';
 import 'widgets/breath_guidance.dart';
 import 'widgets/duration_stepper.dart';
@@ -393,7 +394,39 @@ class _TodayContext extends ConsumerWidget {
             arrived: arrivedForFestival != null,
             onChoose: onChoose,
           ),
+        _WeatherContext(onChoose: onChoose),
       ],
+    );
+  }
+}
+
+/// Today's weather, when it is distinctive enough to suggest a practice.
+///
+/// A fifth, independent observation about today, arriving through no
+/// doorway of its own — there is no "coming from the weather", only
+/// whatever the shared forecast currently says. Absent entirely with no
+/// location, no network, or an ordinary day with nothing distinctive
+/// about it; see `WeatherMeditations.cueFor`.
+class _WeatherContext extends ConsumerWidget {
+  const _WeatherContext({required this.onChoose});
+
+  final ValueChanged<MeditationTechnique> onChoose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final cue = WeatherMeditations.cueFor(weather.current);
+    if (cue == null) return const SizedBox.shrink();
+
+    final technique = MeditationTechniques.byId(
+      WeatherMeditations.techniqueFor(cue),
+    );
+    return MoonContextCard(
+      heading: WeatherMeditations.headingFor(cue),
+      technique: technique,
+      invitation: WeatherMeditations.invitationFor(cue),
+      onBegin: () => onChoose(technique),
     );
   }
 }

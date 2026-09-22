@@ -27,13 +27,15 @@ class LocationInvitation extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Connect location to see sunrise and sunset where you are.',
+          'Connect location to see sunrise, sunset and today\'s weather '
+          'where you are.',
           style: textTheme.bodyLarge,
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Read on this device only, and never sent anywhere. Everything '
-          'else here works without it.',
+          'Read on this device only. A rough position is used to request '
+          'a local forecast; nothing else here is sent anywhere, and '
+          'everything else works without it.',
           style: textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.sm),

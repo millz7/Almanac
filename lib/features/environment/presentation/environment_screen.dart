@@ -16,6 +16,7 @@ import '../../../core/environment/solar_service.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/environment_artwork.dart';
 import 'environment_text.dart';
+import 'weather_narrative.dart';
 import 'widgets/environment_artwork_view.dart';
 import 'widgets/environment_facts.dart';
 import 'widgets/location_invitation.dart';
@@ -192,6 +193,7 @@ class _Today extends ConsumerWidget {
     // Direct entry: nothing carried in, so this asks for whatever the
     // Wheel currently thinks is worth mentioning, if anything.
     final festival = ref.watch(almanacFestivalProvider(null));
+    final weather = ref.watch(currentWeatherProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,14 +205,28 @@ class _Today extends ConsumerWidget {
           style: textTheme.eyebrow?.copyWith(color: palette.textSecondary),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(describeLight(environment), style: textTheme.journalNote),
-        const SizedBox(height: AppSpacing.xs),
+        // A short, human weather sentence — never a numerical report,
+        // and never shown at all when there is genuinely nothing to
+        // say: no location, no network, or a forecast too stale to
+        // trust. `LocationInvitation` elsewhere on this page is the
+        // one, unrepeated offer to fix the first of those; this line
+        // simply says nothing rather than apologising for it.
+        if (weather case final snapshot?) ...[
+          Text(
+            describeWeather(
+              weather: snapshot,
+              localNow: environment.timeZone.wallTimeAt(environment.resolvedAt),
+            ),
+            style: textTheme.journalNote,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ],
         AlmanacAnnotation(
           describeNextSeason(environment.season, environment.resolvedAt),
         ),
-        // A quiet, additional line — never a replacement for the light
-        // description or the season countdown above. Absent entirely
-        // when the Wheel is switched off, or when no festival is close.
+        // A quiet, additional line — never a replacement for the weather
+        // sentence or the season countdown above. Absent entirely when
+        // the Wheel is switched off, or when no festival is close.
         if (festival case final active?) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(

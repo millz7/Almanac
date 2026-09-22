@@ -9,6 +9,14 @@
          using the hemisphere the user chose. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- The one network permission in the app, added for a single purpose:
+         requesting a local weather forecast from Open-Meteo using the
+         approximate location above. No other feature makes a network
+         request. There is no analytics, advertising or tracking use of
+         this permission — see the "Weather" section of the README for
+         exactly what is sent and when. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="Almanac"
         android:name="${applicationName}"

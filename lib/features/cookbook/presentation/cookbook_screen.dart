@@ -9,6 +9,7 @@ import '../domain/cycle_recipes.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/recipe_catalogue.dart';
+import '../domain/weather_cookbook_note.dart';
 import 'cookbook_text.dart';
 import 'widgets/recipe_card.dart';
 import 'widgets/season_selector.dart';
@@ -179,6 +180,9 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
           RecipeCatalogue.collectionNote(season),
           style: Theme.of(context).textTheme.bodyMedium,
         ),
+        // Only while looking at the season actually being lived in —
+        // browsing away from it says nothing about today's weather.
+        if (season == current) const _WeatherNote(),
         _Collection(
           season: season,
           growth: _growth,
@@ -199,6 +203,31 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
             arrived: _arrivedForFestival != null,
           ),
       ],
+    );
+  }
+}
+
+/// A quiet, secondary nudge towards the warmer or lighter end of
+/// today's seasonal collection. Never a second way of choosing what to
+/// cook — see `WeatherCookbookNotes`. Absent entirely with no location,
+/// no network, or a day with nothing distinctive about it.
+class _WeatherNote extends ConsumerWidget {
+  const _WeatherNote();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final cue = WeatherCookbookNotes.cueFor(weather.current);
+    if (cue == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Text(
+        WeatherCookbookNotes.noteFor(cue),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
     );
   }
 }

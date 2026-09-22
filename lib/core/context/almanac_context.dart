@@ -1,13 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../environment/day_night.dart';
+import '../environment/daypart.dart';
 import '../environment/environment_providers.dart';
 import '../environment/moon_phase.dart';
+import '../environment/weather.dart';
+import '../environment/weather_providers.dart';
 import '../time/clock_providers.dart';
 import 'almanac_moment.dart';
 
+export '../environment/daypart.dart' show Daypart;
 export '../environment/environment_providers.dart'
     show currentSeasonProvider, resolvedHemisphereProvider;
+export '../environment/weather.dart' show WeatherCondition, WeatherSnapshot;
 export '../time/clock_providers.dart' show todayProvider;
 export 'almanac_moment.dart';
 export 'almanac_intent.dart';
@@ -36,6 +41,38 @@ final currentMoonProvider = Provider<MoonPhaseState>((ref) {
 final currentDaylightProvider = Provider<DayNightState?>(
   (ref) => ref.watch(naturalEnvironmentProvider).value?.dayNight,
 );
+
+/// The most recent forecast, or null.
+///
+/// A thin selector over [weatherControllerProvider] — the same shape as
+/// [currentMoonProvider] and [currentDaylightProvider] — flattening its
+/// `AsyncValue` to a plain nullable snapshot, so a consumer never has to
+/// branch on loading or error: there is either weather worth saying
+/// something about, or there is nothing to say, and both look the same
+/// from here. See `weather_providers.dart` for why null covers every
+/// reason (no location, no network, a stale cache) without
+/// distinguishing them.
+///
+/// Deliberately **not** part of [AlmanacMoment]: a [WeatherSnapshot]
+/// carries the coordinates it was fetched for, and the moment's one firm
+/// rule is that it holds no position at all. A consumer that wants
+/// weather alongside the rest of the moment reads both providers.
+final currentWeatherProvider = Provider<WeatherSnapshot?>(
+  (ref) => ref.watch(weatherControllerProvider).value,
+);
+
+/// The human part of the day — morning, afternoon, evening, night — or
+/// null before the environment has resolved once.
+///
+/// A thin selector over the same [naturalEnvironmentProvider] the rest of
+/// this file reads, turning its resolved local time into a [Daypart] via
+/// [daypartAt] so a weather suggestion can say "this morning" or "tonight"
+/// without any feature touching a clock or a time zone itself.
+final currentDaypartProvider = Provider<Daypart?>((ref) {
+  final environment = ref.watch(naturalEnvironmentProvider).value;
+  if (environment == null) return null;
+  return daypartAt(environment.timeZone.wallTimeAt(environment.resolvedAt));
+});
 
 /// The whole current moment, for a consumer that genuinely needs several
 /// parts of it at once.

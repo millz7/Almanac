@@ -57,6 +57,12 @@ dependencies:
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
 
+  # The one network call in the app: a forecast from Open-Meteo, which
+  # needs no account and no API key for non-commercial use. Deliberately
+  # the smallest conventional HTTP client rather than a broad networking
+  # framework — see `lib/core/environment/open_meteo_weather_service.dart`.
+  http: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

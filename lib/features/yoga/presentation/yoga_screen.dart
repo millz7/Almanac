@@ -11,6 +11,7 @@ import '../../../core/context/almanac_context.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/cycle_yoga.dart';
 import '../domain/festival_yoga.dart';
+import '../domain/weather_yoga.dart';
 import '../domain/yoga_practices.dart';
 import 'widgets/cycle_context_card.dart';
 import 'widgets/pose_figure.dart';
@@ -263,6 +264,7 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
                 arrivedFor: _arrivedForFestival,
                 onChoose: _choosePractice,
               ),
+              _WeatherContext(onChoose: _choosePractice),
               PracticeChooser(onChosen: _choosePractice),
             ],
           ),
@@ -566,6 +568,36 @@ class _FestivalContext extends ConsumerWidget {
       practice: FestivalYoga.practiceFor(active.id),
       invitation: suggestion.invitation,
       onBegin: () => onChoose(FestivalYoga.practiceFor(active.id)),
+    );
+  }
+}
+
+/// Today's weather, when it is distinctive enough to suggest a practice.
+///
+/// Reads the shared forecast and daypart directly — there is no doorway
+/// into Yoga from the weather the way there is from Cycle Syncing or the
+/// Wheel, so this always shows the suggestion under its own heading
+/// rather than an "arrived" one. Absent entirely with no location, no
+/// network, or an ordinary day with nothing distinctive about it.
+class _WeatherContext extends ConsumerWidget {
+  const _WeatherContext({required this.onChoose});
+
+  final ValueChanged<YogaPractice> onChoose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final daypart = ref.watch(currentDaypartProvider);
+    final cue = WeatherYoga.cueFor(weather.current, daypart);
+    if (cue == null) return const SizedBox.shrink();
+
+    final practice = YogaPractices.byId(WeatherYoga.practiceFor(cue));
+    return CycleContextCard(
+      heading: WeatherYoga.headingFor(cue),
+      practice: practice,
+      invitation: WeatherYoga.invitationFor(cue),
+      onBegin: () => onChoose(practice),
     );
   }
 }

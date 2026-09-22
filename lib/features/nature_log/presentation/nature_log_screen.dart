@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/almanac_button.dart';
 import '../../../app/theme/app_theme.dart';
+import '../../../core/context/almanac_context.dart';
 import '../../../core/environment/environment_providers.dart';
 import '../../../core/time/date_words.dart';
 import '../../../core/widgets/widgets.dart';
 import '../application/nature_log_providers.dart';
+import '../domain/weather_nature_note.dart';
 import 'nature_log_text.dart';
 import 'widgets/nature_mark.dart';
 
@@ -424,7 +426,34 @@ class _Landing extends ConsumerWidget {
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
         ],
+        const _WeatherNote(),
       ],
+    );
+  }
+}
+
+/// A quiet, one-line prompt for what today's weather might be worth
+/// noticing — never a sighting, never a claim about what is actually
+/// out there. Absent entirely with no location, no network, or an
+/// ordinary day with nothing distinctive to suggest.
+class _WeatherNote extends ConsumerWidget {
+  const _WeatherNote();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final daypart = ref.watch(currentDaypartProvider);
+    final cue = WeatherNatureNotes.cueFor(weather.current, daypart);
+    if (cue == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Text(
+        WeatherNatureNotes.noteFor(cue),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
     );
   }
 }

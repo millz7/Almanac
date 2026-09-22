@@ -10,6 +10,7 @@ import '../../../core/time/date_words.dart';
 import '../../../core/widgets/widgets.dart';
 import '../application/cycle_providers.dart';
 import '../domain/cycle_syncing.dart';
+import '../domain/weather_cycle_note.dart';
 import 'cycle_text.dart';
 import 'widgets/bleeding_marker.dart';
 import 'widgets/cycle_length_stepper.dart';
@@ -788,6 +789,7 @@ class _SyncingPage extends ConsumerWidget {
           Text(CycleText.chooseAPhase, style: textTheme.bodyLarge),
           const SizedBox(height: AppSpacing.lg),
           _PhaseChoices(selected: null, onChoose: onChoosePhase),
+          const _WeatherComfort(),
         ],
       );
     }
@@ -850,7 +852,40 @@ class _SyncingPage extends ConsumerWidget {
         _Section(heading: CycleText.durationHeading, lines: [guide.duration]),
 
         Text(kExperienceMayDiffer, style: textTheme.bodySmall),
+        const _WeatherComfort(),
       ],
+    );
+  }
+}
+
+/// A single, generic line about today's weather — never about the
+/// phase above it, and never in the same sentence as one.
+///
+/// **Independent by construction.** This reads only the shared
+/// forecast, never [cycleMomentProvider] or anything about a phase, so
+/// there is no way for it to accidentally combine the two into a claim
+/// like "because you are luteal and it is raining" — see
+/// `WeatherCycleNotes` for the one cue it currently offers. Comfort and
+/// activity only: nothing here is ever about hormones, fertility or the
+/// timing of a period, and the phase above is calculated exactly as it
+/// would be with no weather in the Almanac at all.
+class _WeatherComfort extends ConsumerWidget {
+  const _WeatherComfort();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return const SizedBox.shrink();
+    final cue = WeatherCycleNotes.cueFor(weather.current);
+    if (cue == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: Text(
+        WeatherCycleNotes.noteFor(cue),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
     );
   }
 }

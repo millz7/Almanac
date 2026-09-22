@@ -171,7 +171,10 @@ void main() {
       );
 
       expect(
-        find.text('Connect location to see sunrise and sunset where you are.'),
+        find.text(
+          'Connect location to see sunrise, sunset and today\'s weather '
+          'where you are.',
+        ),
         findsOneWidget,
       );
       expect(find.text('Enable location'), findsOneWidget);
@@ -466,58 +469,67 @@ void main() {
     });
   });
 
-  group('what the light is doing', () {
-    testWidgets('daytime says the sun is up', (tester) async {
+  group('the weather sentence on TODAY', () {
+    testWidgets('with a forecast available, the weather sentence shows', (
+      tester,
+    ) async {
       await openToday(
         tester,
         overrides: environmentOverrides(
           now: DateTime.utc(2025, 7, 15, 12),
           locationState: const LocationAvailable(TestLocations.london),
+          weatherService: FakeWeatherService(
+            result: ({required location, required timeZone, required now}) =>
+                testWeatherSnapshot(location: location, obtainedAt: now),
+          ),
         ),
       );
 
-      expect(find.text('The sun is up'), findsOneWidget);
+      // The exact wording is `weather_narrative_test.dart`'s job; this
+      // only proves the sentence reaches the screen and that none of the
+      // eight retired fixed light descriptions ever does. Noon UTC is
+      // 1pm in London during British Summer Time — the afternoon.
+      expect(find.textContaining('afternoon'), findsOneWidget);
+      for (final retired in [
+        'The sun does not set here today',
+        'The sun stays below the horizon today',
+        'The light is coming back',
+        'Daylight, by the clock',
+        'The sun is up',
+        'The light is going',
+        'Night, by the clock',
+        'Dark, and the world is resting',
+      ]) {
+        expect(find.text(retired), findsNothing);
+      }
     });
 
-    testWidgets('after dark says so', (tester) async {
+    testWidgets('with no location shared, there is no weather sentence', (
+      tester,
+    ) async {
       await openToday(
         tester,
-        overrides: environmentOverrides(
-          now: DateTime.utc(2025, 7, 15, 23, 30),
-          locationState: const LocationAvailable(TestLocations.london),
-        ),
+        overrides: environmentOverrides(now: DateTime.utc(2025, 7, 15, 12)),
       );
 
-      expect(find.text('Dark, and the world is resting'), findsOneWidget);
+      // No location was shared, so no weather request was ever made and
+      // nothing weather-shaped appears — the astronomical countdown
+      // below it is unaffected either way, see the season group above.
+      expect(find.textContaining('morning'), findsNothing);
+      expect(find.textContaining('afternoon'), findsNothing);
+      expect(find.textContaining('evening'), findsNothing);
+      expect(find.textContaining('tonight'), findsNothing);
     });
 
-    testWidgets('an estimate is described as an estimate', (tester) async {
-      // No coordinates, so day/night came from the clock. The wording
-      // must not imply the app knows where the sun is.
+    testWidgets('the season countdown still shows with no weather available', (
+      tester,
+    ) async {
       await openToday(
         tester,
-        overrides: environmentOverrides(
-          now: DateTime.utc(2025, 7, 15, 12),
-          solarService: FakeSolarService(),
-        ),
+        overrides: environmentOverrides(now: DateTime.utc(2025, 7, 15, 12)),
       );
 
-      expect(find.text('Daylight, by the clock'), findsOneWidget);
-      expect(find.text('The sun is up'), findsNothing);
-    });
-
-    testWidgets('midnight sun is described as itself', (tester) async {
-      await openToday(
-        tester,
-        overrides: environmentOverrides(
-          now: DateTime.utc(2025, 7, 1, 12),
-          timeZone: TestTimeZones.tromso,
-          solarService: FakeSolarService(kind: SolarDayKind.sunNeverSets),
-          locationState: const LocationAvailable(TestLocations.tromso),
-        ),
-      );
-
-      expect(find.text('The sun does not set here today'), findsOneWidget);
+      expect(find.textContaining('arrives'), findsOneWidget);
     });
   });
 }

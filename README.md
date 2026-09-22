@@ -308,6 +308,81 @@ implemented yet, and the current behaviour above is unchanged.**
   prediction made a minute ago. Confusing the two is what would drag the
   app towards continuous positioning.
 
+Weather, added since this was written, is a proof that the last point
+holds: it refreshes on its own separate schedule (below) while making no
+change at all to how often the shared location itself is read. The
+refresh-cadence backlog above is otherwise still just that — a backlog —
+and tide data remains the feature it is written for.
+
+## Weather — the one exception to "no network"
+
+Every other claim of "no network" and "nothing leaves the device" in
+this document is still true of the feature it is made about. Weather is
+the one deliberate exception, so it gets its own section rather than a
+footnote.
+
+**What it is.** A short, human sentence on the Environment page — "A
+cool, breezy morning, with rain developing later." — replacing what used
+to be a fixed description of light and dark. Never a forecast dashboard:
+no hourly chart, no 7-day list, no radar, no weather-map imagery, and no
+temperature reading larger than the rest of the page's text. A handful
+of other features (Nature Log, Garden, Meditation, Yoga, Cookbook,
+Cycle, Chakras, the Wheel of the Year) may add one quiet, clearly-labelled
+suggestion of their own from the same forecast — see each feature's own
+`weather_*_note.dart` file — but none of them call a weather provider
+directly, and weather is never merged into a moon, cycle or festival
+claim into one sentence.
+
+**The one network request.** A forecast fetch to
+[Open-Meteo](https://open-meteo.com)'s free, non-commercial endpoint,
+which needs no account and no API key —
+`lib/core/environment/open_meteo_weather_service.dart`. Nothing else in
+the app calls the network: not analytics, not advertising, not a cloud
+profile, not a remote config, not a tracking SDK.
+
+**Exactly what leaves the device.** The coordinates already held by the
+shared `locationStateProvider` — see "Hemisphere, location and privacy"
+above — rounded to two decimal places (roughly a kilometre) before the
+request is made. No account identifier, no device identifier, and no
+header beyond what `package:http` sends by default. The data returned
+(temperature, sky condition, wind, precipitation chance) is mapped once
+into the app's own types and the provider's raw response is discarded;
+nothing from it is kept past that call except the mapped snapshot itself.
+
+**No second location source.** Weather reads the same
+`locationStateProvider` every other feature does — "one place, one
+clock, one Almanac" — and never requests a more precise permission,
+never asks for background location, and never triggers a fresh GPS fix
+of its own. If the shared position is stale, weather simply waits for
+whatever next refreshes it for an unrelated reason (an app resume, a
+user-initiated refresh); it does not go looking for a better one.
+
+**Caching.** A fetched forecast is kept for 45 minutes
+(`kWeatherCacheDuration`) and reused within that window rather than
+fetched again, including across a screen revisit. A forecast up to that
+age is also used if a later refresh attempt fails — a timeout, no
+connectivity, an invalid response — rather than the app showing nothing
+or an error. Past that window, or with no cached forecast at all, the
+weather sentence and every feature's weather suggestion simply do not
+appear; nothing pretends to know, and nothing falls back to the old
+fixed light description.
+
+**No background use.** The fetch happens only in the foreground, only
+when the Environment page (or another consumer) actually reads
+`currentWeatherProvider`, and never on a timer. There is no periodic
+polling while the app is open and none while it is backgrounded.
+
+**Location denied or unavailable.** No network request is made at all.
+The Environment page keeps its astronomical season countdown and every
+other non-weather fact exactly as before; the weather sentence and every
+feature's weather suggestion are simply absent. The existing location
+invitation is the one, unrepeated offer to change that — nothing about
+weather adds a second prompt.
+
+**What is never inferred.** No IP-based geolocation, no guessed city, no
+location history — the fetched forecast is not written to disk between
+launches, and the app forms no record of where a device has been.
+
 ## The moon
 
 The phase is calculated on the device from the moon's elongation from the
@@ -1609,9 +1684,13 @@ The short version:
 The app previously depended on `google_fonts`, which **downloads its
 faces from `fonts.gstatic.com` at first use** unless the files are also
 bundled and runtime fetching is disabled — neither of which was true
-here. In an app whose architecture is "no network, nothing leaves the
-device", that was a real regression, and the source file next to it
-claimed in prose that fonts were never fetched.
+here. At the time this was fixed, the app's architecture was "no
+network, nothing leaves the device" without exception, and that made the
+dependency a real regression on top of the source file next to it
+claiming in prose that fonts were never fetched. That blanket claim no
+longer holds app-wide — see "Weather" below for the one, deliberate
+network request the app now makes — but nothing about *this* history
+changes: fonts are still never fetched, from Google or anywhere else.
 
 The dependency is gone. `lib/app/theme/almanac_fonts.dart` is the only
 place a typeface is chosen, it currently resolves to the platform's own
