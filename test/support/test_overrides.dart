@@ -40,6 +40,7 @@ List<Override> environmentOverrides({
   DateTime? now,
   DateTime Function()? clock,
   LocalTimeZone? timeZone,
+  TimeZoneService? timeZoneService,
   DateTime? sunrise,
   DateTime? sunset,
   SolarService? solarService,
@@ -107,7 +108,9 @@ List<Override> environmentOverrides({
     // single instant with `now`.
     clockProvider.overrideWithValue(clock ?? () => instant),
     initialTimeZoneProvider.overrideWithValue(zone),
-    timeZoneServiceProvider.overrideWithValue(FixedTimeZoneService(zone)),
+    timeZoneServiceProvider.overrideWithValue(
+      timeZoneService ?? FixedTimeZoneService(zone),
+    ),
     locationServiceProvider.overrideWithValue(
       locationService ??
           FakeLocationService(

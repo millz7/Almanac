@@ -188,7 +188,12 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
   /// Saves a new observation and returns to the log, where it will
   /// already be at the top.
   Future<void> _save(Future<void> Function() record) async {
-    if (_recording) return;
+    // Once per form: a second tap while writing, or one that lands after
+    // the form has already gone, records nothing.
+    if (_recording ||
+        (_page is! NatureRecordPage && _page is! NatureCustomPage)) {
+      return;
+    }
     _recording = true;
     try {
       await _saving(record);
@@ -218,6 +223,7 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
       );
 
   Future<void> _remove(NatureObservation observation) async {
+    if (_page is! NatureObservationPage) return;
     final confirmed = await _confirm(
       title: NatureLogText.removeTitle,
       body: NatureLogText.removeBody,

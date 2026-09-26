@@ -37,7 +37,16 @@ final onboardingStageProvider = Provider<OnboardingStage>((ref) {
 
   // Checked first, so somebody who has finished setup is never sent back
   // through it by a question that did not exist when they set the app up.
-  if (settings.onboardingCompleted) return OnboardingStage.complete;
+  //
+  // The one exception is a hemisphere that has gone missing — a damaged
+  // stored value reads as "not chosen". Without it no season can be
+  // shown honestly, so that single question is asked again rather than
+  // the app quietly guessing; everything else they set up stands.
+  if (settings.onboardingCompleted) {
+    return settings.hemisphere == null
+        ? OnboardingStage.hemisphere
+        : OnboardingStage.complete;
+  }
 
   if (!settings.nameAsked) return OnboardingStage.name;
   if (settings.hemisphere == null) return OnboardingStage.hemisphere;

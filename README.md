@@ -1833,6 +1833,55 @@ in `pubspec.yaml`, and set `AlmanacFonts.bundledDisplay`. Nothing else
 changes. Body copy stays in the platform text face either way —
 readability is not something the Almanac trades for character.
 
+## Robustness
+
+The rules the app keeps when things go wrong. Each one is tested in
+`test/app/hardening/`.
+
+- **System Back walks up, never out.** Features keep their inner pages
+  (a recipe, a chakra, a Nature Log form, a festival) as state inside
+  one screen, so each wraps itself in `InnerBack`: Back does exactly what
+  the page's own Back control does, and only leaves the feature from its
+  first page. A running Meditation or Yoga session ends on Back, exactly
+  as tapping the orb or figure does. Moon and Tides are real routes and
+  pop normally. A dialog or sheet on top always closes first.
+- **Typed words are never thrown away silently.** The Cookbook's recipe
+  form and the Nature Log's observation forms track whether anything has
+  changed. Leaving a changed form — Cancel, the page's Back or system
+  Back — asks "Leave without saving?" (`UnsavedChanges`); an untouched
+  form just closes. Saved data is never affected by leaving.
+- **One confirmation, hardened once.** Every yes/no question goes through
+  `Confirm.ask`: one dialog at a time, each answer acts once (a second
+  tap during the closing animation cannot pop the page underneath), and
+  dismissing means "no". Saves ignore a second tap while writing, or
+  after the form has already gone.
+- **A failed write is never reported as a success.** The screen keeps
+  what was typed, says "That could not be saved on this device", and the
+  action can be retried. If a store could not be read at all, it refuses
+  to write until it can, so the empty screen it fell back to can never
+  overwrite what is still on the device.
+- **Damage costs only what it damaged.** Every stored list is one record
+  per line; a line that will not parse is dropped on its own. A settings
+  or cycle value of the wrong type reads as missing instead of failing
+  the whole read. If the stored hemisphere is lost, that single question
+  is asked again rather than guessed.
+- **Today follows the app's own time zone.** `todayProvider` reads the
+  resolved IANA zone, not the process's `toLocal()`, so a zone change
+  picked up on resume moves the date with everything else. The
+  environment re-resolves at local midnight and on resume; there is no
+  polling timer.
+- **Weather and tides never describe another place, or another part of
+  the day.** Caches are keyed to a ~1 km position. After a failed
+  refresh a cached forecast is reused only for the same place and only
+  if under three hours old (`kWeatherFallbackMaxAge`), and a cached tide
+  curve only while it still covers the present. Both re-check on resume,
+  so a lost signal recovers without a restart, one request per trigger.
+  Both services ask Open-Meteo for Unix timestamps, so the hour a clock
+  falls back cannot produce two readings at one instant.
+- **Location permission is re-checked on every resume** (a cheap check
+  that reads no position), so a permission revoked in system settings is
+  noticed straight away rather than when the fix goes stale.
+
 ## Testing
 
 ```

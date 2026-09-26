@@ -177,7 +177,9 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
   }) => Confirm.ask(context, title: title, body: body, yes: yes, no: no);
 
   Future<void> _saveOwn(String? id, OwnRecipeDraft draft) async {
-    if (_ownSaving) return;
+    // Once per form: a second tap while writing, or one that lands after
+    // the form has already gone, saves nothing.
+    if (_ownSaving || _own is! _WritingOwn) return;
     _ownSaving = true;
     try {
       final savedId = id == null
@@ -212,6 +214,7 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
   }
 
   Future<void> _deleteOwn(OwnRecipe recipe) async {
+    if (_own is! _ReadingOwn) return;
     final confirmed = await _confirm(
       title: CookbookText.deleteTitle,
       body: CookbookText.deleteBody,

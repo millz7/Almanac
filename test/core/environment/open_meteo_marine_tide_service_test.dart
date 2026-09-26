@@ -101,6 +101,7 @@ void main() {
           'latitude',
           'longitude',
           'hourly',
+          'timeformat',
           'timezone',
           'past_days',
           'forecast_days',

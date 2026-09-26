@@ -60,6 +60,10 @@ class OpenMeteoWeatherService implements WeatherService {
 
     final uri = _endpoint.replace(
       queryParameters: {
+        // Instants rather than local wall-clock strings: in the hour a
+        // clock falls back, two local "01:00" readings would otherwise
+        // name the same moment. The time zone still shapes the days.
+        'timeformat': 'unixtime',
         'latitude': latitude.toStringAsFixed(2),
         'longitude': longitude.toStringAsFixed(2),
         'current': _currentFields,
@@ -217,7 +221,14 @@ class OpenMeteoWeatherService implements WeatherService {
   /// `"2026-04-27T14:00"` — so they are parsed as local time in [zone]
   /// and turned into a real instant via [LocalTimeZone.instantAtLocal],
   /// never stored as a naive clock time.
+  ///
+  /// With `timeformat=unixtime`, which the app asks for, a time is whole
+  /// seconds since the epoch — an unambiguous UTC instant, the right
+  /// answer on the days the clocks change. The ISO form is still read.
   DateTime _parseLocalTime(String iso, LocalTimeZone zone) {
+    if (int.tryParse(iso) case final seconds?) {
+      return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
+    }
     final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})')
         .firstMatch(iso);
     if (match == null) {
