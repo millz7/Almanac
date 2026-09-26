@@ -61,6 +61,7 @@ abstract final class JournalText {
     'Journal page for ${longDate(entry.date)}',
     'Read only',
     moon(entry.context),
+    entry.context.season,
     ?entry.context.festivalName,
     if (entry.context.maramatakaName != null) maramataka(entry.context),
   ].join('. ');

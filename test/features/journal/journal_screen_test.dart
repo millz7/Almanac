@@ -400,6 +400,7 @@ void main() {
       );
       await press(tester, previous);
       expect(find.text('New Moon · 1% illuminated'), findsOneWidget);
+      expect(find.text('Summer'), findsOneWidget);
       expect(find.text('Lughnasadh'), findsOneWidget);
       expect(find.text('Maramataka: Whiro (estimated)'), findsOneWidget);
     });

@@ -466,6 +466,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(JournalText.moon(context), style: quiet),
+        Text(context.season, style: quiet),
         if (context.festivalName case final festival?)
           Text(festival, style: quiet),
         if (context.maramatakaName != null)
