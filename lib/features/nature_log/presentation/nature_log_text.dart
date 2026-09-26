@@ -54,6 +54,10 @@ abstract final class NatureLogText {
       'Location is off, so seasonal species suggestions are not being '
       'shown.';
 
+  /// The one small label over today's weather and tide notes, keeping
+  /// them apart from the regional guide's own line above.
+  static const outsideToday = 'Outside today';
+
   /// Said where the whole book is on offer, so browsing a reference
   /// catalogue is never mistaken for being told these things are
   /// around you now.
@@ -139,6 +143,7 @@ abstract final class NatureLogText {
     changeDate,
     nothingAroundNow,
     noGuideHere,
+    outsideToday,
     noGuideNote,
     noLocationNote,
     bookIsReference,

@@ -45,7 +45,8 @@ abstract final class WeatherNatureNotes {
       'A little rain today — tracks and textures can be easier to spot '
           'on wet ground.',
     NatureWeatherCue.afterRain =>
-      'After rain, fungi and snails can be easier to notice.',
+      'After rain, look for fungi, snails and changes in the ground '
+          'underfoot.',
     NatureWeatherCue.windy =>
       'A windy day — look for how the plants and trees are moving.',
     NatureWeatherCue.brightMorning =>

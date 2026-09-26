@@ -414,10 +414,11 @@ void main() {
       );
       expect(find.text('Match the seasons around you'), findsOneWidget);
       expect(find.text('Real sunrise and sunset times'), findsOneWidget);
-      expect(
-        find.text('Tide forecasts from your nearest coast'),
-        findsOneWidget,
-      );
+      expect(find.text('Local weather'), findsOneWidget);
+      expect(find.text('Local tide estimates'), findsOneWidget);
+      // Never more precise than the app is: no named coast or station.
+      expect(find.textContaining('nearest coast'), findsNothing);
+      expect(find.textContaining('never sent anywhere'), findsNothing);
       expect(find.text('Flora and fauna in your area'), findsOneWidget);
       // No pressure, no dead end.
       expect(find.textContaining('must'), findsNothing);

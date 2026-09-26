@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/environment/environment_providers.dart';
+import '../../../../core/environment/location_copy.dart';
 import '../../../../core/environment/location_state.dart';
 import '../../../../core/widgets/widgets.dart';
 
@@ -73,11 +74,7 @@ class LocationSettingState extends ConsumerState<LocationSetting> {
         ),
 
         const SizedBox(height: AppSpacing.md),
-        Text(
-          'Your location is only ever read on this device. It is never '
-          'sent anywhere and no history of it is kept.',
-          style: textTheme.bodySmall,
-        ),
+        Text(LocationCopy.privacy, style: textTheme.bodySmall),
       ],
     );
   }
@@ -92,10 +89,10 @@ class LocationSettingState extends ConsumerState<LocationSetting> {
 
   String _explanation(LocationState state) => switch (state) {
     LocationAvailable() =>
-      'Sunrise and sunset are calculated for where you are.',
+      'Sunrise, sunset, weather and tides follow where you are.',
     LocationPermissionNotRequested() =>
-      'Seasons follow your hemisphere. Add location for sunrise and '
-          'sunset where you actually are.',
+      'Seasons follow your hemisphere. Add location for sunrise, sunset, '
+          'weather and tides where you actually are.',
     LocationPermissionDenied() =>
       'That is fine — the app works from your hemisphere. You can turn '
           'location on whenever you like.',

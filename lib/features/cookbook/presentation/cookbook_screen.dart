@@ -188,19 +188,20 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
           growth: _growth,
           onOpen: (recipe) => setState(() => _open = recipe),
         ),
-        // And, underneath it, a small collection for the time of month.
+        // Then an approaching festival — a few ideas for one particular
+        // day, so it reads before anything that applies all month.
+        if (festival case final active?)
+          _FestivalCollection(
+            active: active,
+            arrived: _arrivedForFestival != null,
+          ),
+        // And last, a small collection for the time of month.
         if (cyclePhase case final phase?)
           _CycleCollection(
             phase: phase,
             arrived: _arrivedForPhase != null,
             growth: _growth,
             onOpen: (recipe) => setState(() => _open = recipe),
-          ),
-        // And, underneath that, suggestions for an approaching festival.
-        if (festival case final active?)
-          _FestivalCollection(
-            active: active,
-            arrived: _arrivedForFestival != null,
           ),
       ],
     );

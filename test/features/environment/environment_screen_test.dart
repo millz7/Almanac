@@ -178,7 +178,7 @@ void main() {
 
       expect(
         find.text(
-          'Connect location to see sunrise, sunset and today\'s weather '
+          'Connect location to see sunrise, sunset, weather and tides '
           'where you are.',
         ),
         findsOneWidget,

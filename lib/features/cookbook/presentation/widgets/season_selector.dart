@@ -104,30 +104,34 @@ class _SeasonChip extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ],
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        season.label,
-                        style: textTheme.labelLarge?.copyWith(
-                          color: selected
-                              ? palette.onPrimarySoft
-                              : palette.textPrimary,
-                        ),
-                      ),
-                      // Said in words, so nobody has to notice a tint to
-                      // know which season is theirs.
-                      if (isCurrent)
+                  // Flexible, so at 2x text on a phone the words wrap
+                  // inside the chip rather than running past its edge.
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                         Text(
-                          CookbookText.yourSeason,
-                          style: textTheme.bodySmall?.copyWith(
+                          season.label,
+                          style: textTheme.labelLarge?.copyWith(
                             color: selected
                                 ? palette.onPrimarySoft
-                                : palette.textSecondary,
+                                : palette.textPrimary,
                           ),
                         ),
-                    ],
+                        // Said in words, so nobody has to notice a tint to
+                        // know which season is theirs.
+                        if (isCurrent)
+                          Text(
+                            CookbookText.yourSeason,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: selected
+                                  ? palette.onPrimarySoft
+                                  : palette.textSecondary,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),

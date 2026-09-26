@@ -628,6 +628,27 @@ feature back on finds the data where it was.
 This is the rule for every future cross-feature context, not a detail of
 Cycle. See the README for how it is wired and tested.
 
+### Several contexts, one page
+
+When the moon, a cycle phase, a festival and the weather all have
+something to say, the page must still read as one page:
+
+- **once, in its own place.** TODAY on the Environment is weather →
+  season → festival; the moon and the tide stay in the fact strip and
+  are not repeated. Weather and tide are never merged into one sentence
+  anywhere — in the Nature Log they are two lines under one quiet label;
+- **one heading, not one per card.** "For today" is said once above the
+  suggestions; each card is named by its context;
+- **the weather yields.** It is the most ambient context, so it is shown
+  only when it adds a practice not already suggested and there is room
+  (`ContextDensity`; three cards in Meditation, two in Yoga). The
+  practice list stays the primary content;
+- **a switched-off feature leaves no trace.** No heading, no empty
+  label, no doorway — the Wheel off means no festival line anywhere.
+
+It is a presentation rule with fixed order and fixed limits — no
+scoring, and no learning.
+
 ---
 
 ## 16. Voice

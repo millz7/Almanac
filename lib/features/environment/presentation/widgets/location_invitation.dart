@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/environment/environment_providers.dart';
+import '../../../../core/environment/location_copy.dart';
 
 /// The offer, when no position has been shared.
 ///
@@ -27,15 +28,13 @@ class LocationInvitation extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Connect location to see sunrise, sunset and today\'s weather '
+          'Connect location to see sunrise, sunset, weather and tides '
           'where you are.',
           style: textTheme.bodyLarge,
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Read on this device only. A rough position is used to request '
-          'a local forecast; nothing else here is sent anywhere, and '
-          'everything else works without it.',
+          '${LocationCopy.privacy} Everything else here works without it.',
           style: textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.sm),

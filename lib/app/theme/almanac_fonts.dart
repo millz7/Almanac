@@ -11,8 +11,9 @@
 /// directory and no `GoogleFonts.config.allowRuntimeFetching = false`.
 ///
 /// So the running app made a network request, to a third party, carrying
-/// the device's IP — in an app whose whole architecture is "no network,
-/// no analytics, nothing leaves the device". `almanac_text_roles.dart`
+/// the device's IP — in an app whose whole architecture was, at the time,
+/// "no network, no analytics, nothing leaves the device" (weather and
+/// tides are now the only, deliberate exceptions). `almanac_text_roles.dart`
 /// even claimed in prose that "fonts are never downloaded at runtime".
 /// The prose was right about the intent and wrong about the code.
 ///

@@ -8,6 +8,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../../app/context/cycle_phase_context.dart';
 import '../../../app/context/festival_context.dart';
 import '../../../core/context/almanac_context.dart';
+import '../../../core/context/context_density.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/cycle_yoga.dart';
 import '../domain/festival_yoga.dart';
@@ -256,6 +257,10 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
             children: [
               // One Almanac: the same day Cycle Syncing is looking at.
               // Above the usual choices, and it changes none of them.
+              _TodayHeading(
+                arrivedForPhase: _arrivedForPhase,
+                arrivedForFestival: _arrivedForFestival,
+              ),
               _CycleContext(
                 arrivedFor: _arrivedForPhase,
                 onChoose: _choosePractice,
@@ -264,7 +269,11 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
                 arrivedFor: _arrivedForFestival,
                 onChoose: _choosePractice,
               ),
-              _WeatherContext(onChoose: _choosePractice),
+              _WeatherContext(
+                arrivedForPhase: _arrivedForPhase,
+                arrivedForFestival: _arrivedForFestival,
+                onChoose: _choosePractice,
+              ),
               PracticeChooser(onChosen: _choosePractice),
             ],
           ),
@@ -534,11 +543,49 @@ class _CycleContext extends ConsumerWidget {
     final suggestion = CycleYoga.forPhase(phase);
     return CycleContextCard(
       heading: arrivedFor == null
-          ? YogaText.forToday
+          ? phase.phrase
           : CycleYogaIntent(arrivedFor!).heading,
       practice: CycleYoga.practiceFor(phase),
       invitation: suggestion.invitation,
       onBegin: () => onChoose(CycleYoga.practiceFor(phase)),
+    );
+  }
+}
+
+/// "For today", said once above the cycle and festival suggestions when
+/// Yoga was opened normally, so two context cards never both carry the
+/// same heading. Each card then simply names what it is about. Absent on
+/// an arrival through a doorway, whose own heading says why they came,
+/// and absent when there is no cycle or festival context at all — the
+/// weather card, when it shows, carries its own heading.
+class _TodayHeading extends ConsumerWidget {
+  const _TodayHeading({
+    required this.arrivedForPhase,
+    required this.arrivedForFestival,
+  });
+
+  final CyclePhase? arrivedForPhase;
+  final FestivalId? arrivedForFestival;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final phase = ref.watch(almanacCyclePhaseProvider(arrivedForPhase));
+    final festival = ref.watch(almanacFestivalProvider(arrivedForFestival));
+    // If a feature was switched off since they walked in, whatever they
+    // arrived with is gone too, so this is no longer an arrival.
+    final arrived =
+        (arrivedForPhase != null && phase != null) ||
+        (arrivedForFestival != null && festival != null);
+    if (arrived || (phase == null && festival == null)) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Text(
+        YogaText.forToday,
+        style: Theme.of(context).textTheme.journalLabel
+            ?.copyWith(color: context.palette.textSecondary),
+      ),
     );
   }
 }
@@ -563,7 +610,7 @@ class _FestivalContext extends ConsumerWidget {
     final suggestion = FestivalYoga.forFestival(active.id);
     return CycleContextCard(
       heading: arrivedFor == null
-          ? YogaText.forToday
+          ? active.id.label
           : FestivalYogaIntent(arrivedFor!).heading,
       practice: FestivalYoga.practiceFor(active.id),
       invitation: suggestion.invitation,
@@ -578,10 +625,20 @@ class _FestivalContext extends ConsumerWidget {
 /// into Yoga from the weather the way there is from Cycle Syncing or the
 /// Wheel, so this always shows the suggestion under its own heading
 /// rather than an "arrived" one. Absent entirely with no location, no
-/// network, or an ordinary day with nothing distinctive about it.
+/// network, or an ordinary day with nothing distinctive about it — and
+/// also when it would only repeat a practice the cycle or festival card
+/// above already suggests, or when both of those are already showing.
+/// With only three practices, three context cards would simply be the
+/// practice list again, pushed down the page.
 class _WeatherContext extends ConsumerWidget {
-  const _WeatherContext({required this.onChoose});
+  const _WeatherContext({
+    required this.arrivedForPhase,
+    required this.arrivedForFestival,
+    required this.onChoose,
+  });
 
+  final CyclePhase? arrivedForPhase;
+  final FestivalId? arrivedForFestival;
   final ValueChanged<YogaPractice> onChoose;
 
   @override
@@ -592,7 +649,21 @@ class _WeatherContext extends ConsumerWidget {
     final cue = WeatherYoga.cueFor(weather.current, daypart);
     if (cue == null) return const SizedBox.shrink();
 
-    final practice = YogaPractices.byId(WeatherYoga.practiceFor(cue));
+    final phase = ref.watch(almanacCyclePhaseProvider(arrivedForPhase));
+    final festival = ref.watch(almanacFestivalProvider(arrivedForFestival));
+    final id = WeatherYoga.practiceFor(cue);
+    if (!ContextDensity.admits(
+      candidate: id,
+      alreadyShown: [
+        if (phase != null) CycleYoga.practiceFor(phase).id,
+        if (festival != null) FestivalYoga.practiceFor(festival.id).id,
+      ],
+      limit: kMaxYogaContexts,
+    )) {
+      return const SizedBox.shrink();
+    }
+
+    final practice = YogaPractices.byId(id);
     return CycleContextCard(
       heading: WeatherYoga.headingFor(cue),
       practice: practice,
@@ -602,9 +673,12 @@ class _WeatherContext extends ConsumerWidget {
   }
 }
 
+/// How many context cards Yoga shows at most above its three practices.
+const kMaxYogaContexts = 2;
+
 /// The one contextual heading Yoga adds.
 abstract final class YogaText {
-  /// Shown when Yoga was opened normally rather than through a doorway.
-  /// It mentions today; it does not announce it.
+  /// Shown once, when Yoga was opened normally rather than through a
+  /// doorway. It mentions today; it does not announce it.
   static const forToday = 'For today';
 }

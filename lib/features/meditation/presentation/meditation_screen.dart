@@ -10,6 +10,7 @@ import '../../../app/theme/app_theme.dart';
 import '../../../app/context/cycle_phase_context.dart';
 import '../../../app/context/festival_context.dart';
 import '../../../core/context/almanac_context.dart';
+import '../../../core/context/context_density.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/cycle_meditation.dart';
 import '../domain/festival_meditation.dart';
@@ -394,11 +395,29 @@ class _TodayContext extends ConsumerWidget {
             arrived: arrivedForFestival != null,
             onChoose: onChoose,
           ),
-        _WeatherContext(onChoose: onChoose),
+        // The most ambient context last, and only when it adds a
+        // practice the page is not already suggesting — see
+        // `ContextDensity`.
+        _WeatherContext(
+          alreadySuggested: [
+            MoonMeditations.techniqueFor(
+              arrivedFromMoon ?? ref.watch(currentMoonProvider).phase,
+            ).id,
+            if (cyclePhase case final phase?)
+              CycleMeditations.techniqueFor(phase).id,
+            if (festival case final active?)
+              FestivalMeditations.techniqueFor(active.id).id,
+          ],
+          onChoose: onChoose,
+        ),
       ],
     );
   }
 }
+
+/// How many "For today" suggestions Meditation shows at most, so the
+/// four practices underneath stay the page's primary content.
+const kMaxMeditationContexts = 3;
 
 /// Today's weather, when it is distinctive enough to suggest a practice.
 ///
@@ -406,9 +425,18 @@ class _TodayContext extends ConsumerWidget {
 /// doorway of its own — there is no "coming from the weather", only
 /// whatever the shared forecast currently says. Absent entirely with no
 /// location, no network, or an ordinary day with nothing distinctive
-/// about it; see `WeatherMeditations.cueFor`.
+/// about it; see `WeatherMeditations.cueFor`. Also absent when it would
+/// only repeat a practice already suggested above, or when the page
+/// already carries [kMaxMeditationContexts] suggestions.
 class _WeatherContext extends ConsumerWidget {
-  const _WeatherContext({required this.onChoose});
+  const _WeatherContext({
+    required this.alreadySuggested,
+    required this.onChoose,
+  });
+
+  /// The practices the moon, cycle and festival cards above already
+  /// point at, in the order they are shown.
+  final List<TechniqueId> alreadySuggested;
 
   final ValueChanged<MeditationTechnique> onChoose;
 
@@ -419,9 +447,16 @@ class _WeatherContext extends ConsumerWidget {
     final cue = WeatherMeditations.cueFor(weather.current);
     if (cue == null) return const SizedBox.shrink();
 
-    final technique = MeditationTechniques.byId(
-      WeatherMeditations.techniqueFor(cue),
-    );
+    final id = WeatherMeditations.techniqueFor(cue);
+    if (!ContextDensity.admits(
+      candidate: id,
+      alreadyShown: alreadySuggested,
+      limit: kMaxMeditationContexts,
+    )) {
+      return const SizedBox.shrink();
+    }
+
+    final technique = MeditationTechniques.byId(id);
     return MoonContextCard(
       heading: WeatherMeditations.headingFor(cue),
       technique: technique,

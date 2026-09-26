@@ -126,6 +126,33 @@ The next cross-feature context to be built inherits this by using the
 same seam: Garden off must mean the Cookbook never opens `GardenStore`,
 in the same shape, for the same reason.
 
+### Several contexts on one page
+
+By now a single page can have four things to say about today — the
+moon, a cycle phase, an approaching festival and the weather — and the
+rule for how they coexist is a presentation rule, not a ranking. It
+lives in `lib/core/context/context_density.dart`:
+
+- **each context speaks once, in its own place.** On the Environment,
+  TODAY reads weather sentence → season countdown → festival line; the
+  moon and the tide are facts in the strip above it and are never
+  repeated below. The Nature Log keeps its weather note and its tide
+  note as two separate lines under one "Outside today" label;
+- **the most ambient context yields.** `ContextDensity.admits` lets a
+  weather suggestion in only when it offers a practice the page is not
+  already suggesting, and only while there is room — at most three
+  context cards in Meditation (`kMaxMeditationContexts`) and two in Yoga
+  (`kMaxYogaContexts`), so the practices themselves stay the page;
+- **a heading is said once.** On a direct visit Meditation and Yoga say
+  "For today" once, and each card underneath is named by what it is
+  about ("Beltane", "luteal phase", "Rain today");
+- **order is fixed, not scored.** The Cookbook reads the seasonal
+  collection, then an approaching festival, then the cycle collection;
+  its weather note is one quiet line, and only on the current season.
+
+There is no scoring, weighting or learning in any of this: the same
+inputs always give the same page.
+
 `currentMoonProvider` and `currentDaylightProvider` are **selectors**,
 written the same way `currentSeasonProvider` already was: they prefer
 the resolved environment and fall back to the same service it uses. A
@@ -253,6 +280,15 @@ Location itself is optional and stays that way:
   platform when it needs one.
 - The app never re-prompts on its own; a permanent denial sets
   `canRequest` to false.
+
+Every promise the app makes about location — on the onboarding screen,
+in the Almanac drawer and in the Environment's invitation — comes from
+one place, `lib/core/environment/location_copy.dart`, so the benefits
+listed and the privacy sentence cannot drift apart. The benefits are
+limited to what the app actually does (seasons, sunrise and sunset,
+local weather, local tide estimates, flora and fauna); the privacy line
+says plainly that an approximate position is sent only to look up
+weather and tides, with no account, tracking or location history.
 
 Note that seasons are **astronomical**: they turn at the equinoxes and
 solstices, not on the 1st of a month. Early September is therefore still

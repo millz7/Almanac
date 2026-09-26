@@ -428,73 +428,85 @@ class _Landing extends ConsumerWidget {
             style: textTheme.bodySmall?.copyWith(color: palette.textSecondary),
           ),
         ],
-        // Two independent observations, shown as two separate lines —
-        // never merged into one sentence. See `_WeatherNote` and
-        // `_TideNote`.
-        const _WeatherNote(),
-        const _TideNote(),
+        const _OutsideToday(),
       ],
     );
   }
 }
 
-/// A quiet, one-line prompt for what today's weather might be worth
-/// noticing — never a sighting, never a claim about what is actually
-/// out there. Absent entirely with no location, no network, or an
-/// ordinary day with nothing distinctive to suggest.
-class _WeatherNote extends ConsumerWidget {
-  const _WeatherNote();
+/// Today's weather and tide, as two quiet, separate lines under one
+/// small label — or nothing at all.
+///
+/// **Kept apart from the regional guide above** by its own label, so a
+/// passing shower is never read as part of what the Nature Book says
+/// about this place and month. **Kept apart from each other** as two
+/// lines, each from its own provider, never merged into one sentence
+/// about the wind and the tide together. Absent entirely when neither
+/// has anything distinctive to say — no location, no network, no marine
+/// data here, or simply an ordinary day.
+class _OutsideToday extends ConsumerWidget {
+  const _OutsideToday();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final weather = ref.watch(currentWeatherProvider);
-    if (weather == null) return const SizedBox.shrink();
-    final daypart = ref.watch(currentDaypartProvider);
-    final cue = WeatherNatureNotes.cueFor(weather.current, daypart);
-    if (cue == null) return const SizedBox.shrink();
+    final notes = [?_weatherNote(ref), ?_tideNote(ref)];
+    if (notes.isEmpty) return const SizedBox.shrink();
+
+    final textTheme = Theme.of(context).textTheme;
+    final palette = context.palette;
 
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Text(
-        WeatherNatureNotes.noteFor(cue),
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: context.palette.textSecondary),
+      padding: const EdgeInsets.only(top: AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            NatureLogText.outsideToday,
+            style: textTheme.journalLabel?.copyWith(
+              color: palette.textSecondary,
+            ),
+          ),
+          for (final note in notes)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Text(
+                note,
+                style: textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
-}
 
-/// A quiet, one-line prompt for what the tide might be worth noticing on
-/// a shore — never a safety instruction, and never merged with the
-/// weather note above into one claim. Absent entirely with no location,
-/// no marine data for this position, or a tide too far from a
-/// recognised state (rising, say) to have anything distinctive to say.
-class _TideNote extends ConsumerWidget {
-  const _TideNote();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tide = ref.watch(currentTideProvider);
-    if (tide is! TideAvailable) return const SizedBox.shrink();
-    final now = ref.watch(naturalEnvironmentProvider).value?.resolvedAt;
-    if (now == null) return const SizedBox.shrink();
-
-    final direction = tideDirectionAt(
-      tide.snapshot.samples,
-      now,
-      extrema: tide.snapshot.extrema,
+  /// What today's weather might be worth noticing — never a sighting.
+  static String? _weatherNote(WidgetRef ref) {
+    final weather = ref.watch(currentWeatherProvider);
+    if (weather == null) return null;
+    final cue = WeatherNatureNotes.cueFor(
+      weather.current,
+      ref.watch(currentDaypartProvider),
     );
-    final cue = TideNatureNotes.cueFor(direction);
-    if (cue == null) return const SizedBox.shrink();
+    return cue == null ? null : WeatherNatureNotes.noteFor(cue);
+  }
 
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Text(
-        TideNatureNotes.noteFor(cue),
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: context.palette.textSecondary),
+  /// What the tide might be worth noticing on a shore — never a safety
+  /// instruction. A rising tide has nothing distinctive to say.
+  static String? _tideNote(WidgetRef ref) {
+    final tide = ref.watch(currentTideProvider);
+    if (tide is! TideAvailable) return null;
+    final now = ref.watch(naturalEnvironmentProvider).value?.resolvedAt;
+    if (now == null) return null;
+    final cue = TideNatureNotes.cueFor(
+      tideDirectionAt(
+        tide.snapshot.samples,
+        now,
+        extrema: tide.snapshot.extrema,
       ),
     );
+    return cue == null ? null : TideNatureNotes.noteFor(cue);
   }
 }
 

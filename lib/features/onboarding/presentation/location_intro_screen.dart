@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../../core/environment/environment_providers.dart';
+import '../../../core/environment/location_copy.dart';
 import '../../../core/settings/settings_providers.dart';
 import '../../../core/widgets/widgets.dart';
 import 'onboarding_page.dart';
@@ -24,15 +25,6 @@ class LocationIntroScreen extends ConsumerStatefulWidget {
 
 class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
   bool _busy = false;
-
-  /// What location would eventually unlock. Deliberately phrased as
-  /// things the app could show, not things the user is missing out on.
-  static const _benefits = <String>[
-    'Match the seasons around you',
-    'Real sunrise and sunset times',
-    'Tide forecasts from your nearest coast',
-    'Flora and fauna in your area',
-  ];
 
   Future<void> _allow() async {
     setState(() => _busy = true);
@@ -78,7 +70,7 @@ class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
       heading: 'Let your Almanac follow the world around you',
       supporting: 'We can use your real location to personalise your Almanac',
       children: [
-        for (final benefit in _benefits)
+        for (final benefit in LocationCopy.benefits)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: Row(
@@ -93,9 +85,8 @@ class _LocationIntroScreenState extends ConsumerState<LocationIntroScreen> {
 
         const SizedBox(height: AppSpacing.md),
         Text(
-          'Your position is read on this device, never sent anywhere, and '
-          'never shown to you as coordinates. No history of it is kept. '
-          'The seasons follow your hemisphere either way.',
+          '${LocationCopy.privacy} The seasons follow your hemisphere '
+          'either way.',
           style: textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.xl),

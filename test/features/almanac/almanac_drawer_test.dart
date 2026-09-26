@@ -376,7 +376,8 @@ void main() {
       expect(find.text('Location access'), findsOneWidget);
       expect(find.text('Not enabled'), findsOneWidget);
       expect(find.text('Enable Location'), findsOneWidget);
-      expect(find.textContaining('never sent anywhere'), findsOneWidget);
+      expect(find.textContaining('approximate position'), findsOneWidget);
+      expect(find.textContaining('never sent anywhere'), findsNothing);
     });
 
     testWidgets('it only prompts from a deliberate tap', (tester) async {

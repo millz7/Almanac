@@ -36,9 +36,12 @@ abstract final class TideText {
   static const unavailableHere = 'Unavailable here';
   static const notAvailableNow = 'Not available now';
 
+  /// Deliberately short: the location invitation underneath already
+  /// says what location adds and what happens to it, so this only says
+  /// why the tide in particular needs it — and never repeats that offer.
   static const locationNeededExplanation =
-      "Connect location to see the tide where you are. Everything else "
-      "here works without it.";
+      'A tide belongs to a particular stretch of water, so it needs a '
+      'rough idea of where you are. The app never guesses a coast.';
 
   static const unavailableHereExplanation =
       "Tide information isn't available for this location. This is "
