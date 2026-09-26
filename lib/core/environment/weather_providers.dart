@@ -59,6 +59,37 @@ class WeatherController extends AsyncNotifier<WeatherSnapshot?> {
   /// location-object change can decide to reuse it without an `await`.
   WeatherSnapshot? _lastFetch;
 
+  /// The request already on its way, and where it is for. A second
+  /// rebuild for the same place while it is out — a resume and a fresh
+  /// position arriving together — waits for it rather than asking twice.
+  Future<WeatherSnapshot>? _inFlight;
+  GeoLocation? _inFlightFor;
+
+  Future<WeatherSnapshot> _fetchOnce(GeoLocation location, DateTime now) {
+    final pending = _inFlight;
+    final pendingFor = _inFlightFor;
+    if (pending != null &&
+        pendingFor != null &&
+        _sameApproximateLocation(pendingFor, location)) {
+      return pending;
+    }
+    final request = ref
+        .read(weatherServiceProvider)
+        .fetch(
+          location: location,
+          timeZone: ref.read(timeZoneProvider),
+          now: now,
+        );
+    _inFlight = request;
+    _inFlightFor = location;
+    void settle() {
+      if (identical(_inFlight, request)) _inFlight = null;
+    }
+
+    request.then((_) => settle(), onError: (Object _) => settle());
+    return request;
+  }
+
   @override
   Future<WeatherSnapshot?> build() async {
     final location = ref.watch(locationStateProvider).location;
@@ -76,13 +107,7 @@ class WeatherController extends AsyncNotifier<WeatherSnapshot?> {
     }
 
     try {
-      final snapshot = await ref
-          .read(weatherServiceProvider)
-          .fetch(
-            location: location,
-            timeZone: ref.read(timeZoneProvider),
-            now: now,
-          );
+      final snapshot = await _fetchOnce(location, now);
       _lastFetch = snapshot;
       return snapshot;
     } on Object {

@@ -118,7 +118,18 @@ class LocationController extends Notifier<LocationState> {
   /// whether permission and location services are on. A permission
   /// revoked in system settings is therefore noticed on the very next
   /// resume, not fifteen minutes later.
-  Future<void> refresh({bool force = false}) async {
+  Future<void> refresh({bool force = false}) =>
+      _checking ??= _refresh(force: force).whenComplete(() => _checking = null);
+
+  // One of each at a time. A resume and a tap arriving together, or a
+  // button pressed twice, join the call already running instead of
+  // starting a second position read, a second permission prompt or a
+  // second settings page.
+  Future<void>? _checking;
+  Future<void>? _requesting;
+  Future<bool>? _openingSettings;
+
+  Future<void> _refresh({required bool force}) async {
     final current = state;
     if (!force &&
         current is LocationAvailable &&
@@ -143,7 +154,10 @@ class LocationController extends Notifier<LocationState> {
 
   /// Asks the user for location access. Only ever called from a
   /// deliberate tap.
-  Future<void> requestAccess() async {
+  Future<void> requestAccess() =>
+      _requesting ??= _requestAccess().whenComplete(() => _requesting = null);
+
+  Future<void> _requestAccess() async {
     state = await _guard(
       () => ref.read(locationServiceProvider).requestAccess(),
     );
@@ -154,7 +168,10 @@ class LocationController extends Notifier<LocationState> {
   ///
   /// Awaited inside the try so a failure in the platform channel is
   /// caught here rather than escaping as an unhandled rejection.
-  Future<bool> openSystemSettings() async {
+  Future<bool> openSystemSettings() => _openingSettings ??=
+      _openSystemSettings().whenComplete(() => _openingSettings = null);
+
+  Future<bool> _openSystemSettings() async {
     try {
       return await ref.read(locationServiceProvider).openSystemSettings();
     } on Object {

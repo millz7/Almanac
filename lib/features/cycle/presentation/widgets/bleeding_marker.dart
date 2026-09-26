@@ -140,7 +140,13 @@ class BleedingLegend extends StatelessWidget {
                   children: [
                     BleedingMarker(level: spec.level, size: swatchSize),
                     const SizedBox(width: AppSpacing.xs),
-                    Text(spec.level.label, style: textTheme.bodyMedium),
+                    // Wraps at large text rather than running off the edge.
+                    Flexible(
+                      child: Text(
+                        spec.level.label,
+                        style: textTheme.bodyMedium,
+                      ),
+                    ),
                   ],
                 ),
               ),

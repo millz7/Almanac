@@ -35,8 +35,19 @@ class OwnRecipesController extends AsyncNotifier<OwnRecipes> {
     List<String> method = const [],
     String? note,
   }) async {
-    final order = _recipes.nextOrder;
-    // The order makes it unique without a random number or a clock.
+    // The form will not offer Save without a name; this is the same rule
+    // one layer down, so a blank recipe can never be written.
+    if (title.trim().isEmpty) {
+      throw ArgumentError.value(title, 'title', 'A recipe needs a name');
+    }
+    // The order makes it unique without a random number or a clock: it is
+    // always past every stored order, so an id in use is never reused.
+    // Checked all the same, so even a damaged file whose ids and orders
+    // disagree cannot hand a new recipe an existing one's id.
+    var order = _recipes.nextOrder;
+    while (_recipes.find('own-$order') != null) {
+      order++;
+    }
     final id = 'own-$order';
     await _persist(
       _recipes.adding(
@@ -63,6 +74,11 @@ class OwnRecipesController extends AsyncNotifier<OwnRecipes> {
   }) {
     final existing = _recipes.find(id);
     if (existing == null) return Future.value();
+    if (title.trim().isEmpty) {
+      return Future.error(
+        ArgumentError.value(title, 'title', 'A recipe needs a name'),
+      );
+    }
     final cleaned = _clean(note);
     return _persist(
       _recipes.updating(

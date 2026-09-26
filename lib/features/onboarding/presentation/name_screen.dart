@@ -34,6 +34,8 @@ class _NameScreenState extends ConsumerState<NameScreen> {
   /// on; routing follows the saved setting, so there is nothing to
   /// navigate to here.
   Future<void> _finish({required bool keepName}) async {
+    // The keyboard's Done and the button can arrive together.
+    if (_busy) return;
     setState(() {
       _busy = true;
       _failed = false;

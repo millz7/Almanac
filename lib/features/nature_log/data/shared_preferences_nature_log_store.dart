@@ -27,6 +27,13 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
   /// would overwrite what is still on the device.
   bool _unreadable = false;
 
+  /// Stored lines this version could not read — damaged, or written by
+  /// a newer version with a category or level this one has never heard
+  /// of. Never shown, but written back untouched, so saving something
+  /// new can never quietly delete a record the app merely did not
+  /// understand.
+  List<String> _unread = const [];
+
   Future<SharedPreferencesWithCache> _open() =>
       _opening ??= SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
@@ -36,9 +43,12 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
   Future<NatureLog> read() async {
     try {
       final preferences = await _open();
-      final value = decodeLog(
-        preferences.getStringList(_observationsKey) ?? const [],
-      );
+      final lines = preferences.getStringList(_observationsKey) ?? const [];
+      final value = decodeLog(lines);
+      _unread = [
+        for (final line in lines)
+          if (decodeObservation(line) == null) line,
+      ];
       _unreadable = false;
       return value;
     } on Object catch (error) {
@@ -55,7 +65,10 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
       throw StateError('Stored nature log could not be read; not overwriting');
     }
     final preferences = await _open();
-    await preferences.setStringList(_observationsKey, encodeLog(log));
+    await preferences.setStringList(_observationsKey, [
+      ...encodeLog(log),
+      ..._unread,
+    ]);
   }
 
   @override
@@ -66,5 +79,6 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
     }
     // Deliberately emptied: there is nothing left to overwrite.
     _unreadable = false;
+    _unread = const [];
   }
 }

@@ -25,6 +25,13 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
   /// would overwrite what is still on the device.
   bool _unreadable = false;
 
+  /// Stored lines this version could not read — damaged, or written by
+  /// a newer version with a category or level this one has never heard
+  /// of. Never shown, but written back untouched, so saving something
+  /// new can never quietly delete a record the app merely did not
+  /// understand.
+  List<String> _unread = const [];
+
   Future<SharedPreferencesWithCache> _open() =>
       _opening ??= SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
@@ -34,9 +41,12 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
   Future<OwnRecipes> read() async {
     try {
       final preferences = await _open();
-      final value = decodeOwnRecipes(
-        preferences.getStringList(_recipesKey) ?? const [],
-      );
+      final lines = preferences.getStringList(_recipesKey) ?? const [];
+      final value = decodeOwnRecipes(lines);
+      _unread = [
+        for (final line in lines)
+          if (decodeOwnRecipe(line) == null) line,
+      ];
       _unreadable = false;
       return value;
     } on Object catch (error) {
@@ -53,7 +63,10 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
       throw StateError('Stored own recipes could not be read; not overwriting');
     }
     final preferences = await _open();
-    await preferences.setStringList(_recipesKey, encodeOwnRecipes(recipes));
+    await preferences.setStringList(_recipesKey, [
+      ...encodeOwnRecipes(recipes),
+      ..._unread,
+    ]);
   }
 
   @override
@@ -64,5 +77,6 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
     }
     // Deliberately emptied: there is nothing left to overwrite.
     _unreadable = false;
+    _unread = const [];
   }
 }

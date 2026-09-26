@@ -28,6 +28,13 @@ class SharedPreferencesGardenStore implements GardenStore {
   /// would overwrite what is still on the device.
   bool _unreadable = false;
 
+  /// Stored lines this version could not read — damaged, or written by
+  /// a newer version with a category or level this one has never heard
+  /// of. Never shown, but written back untouched, so saving something
+  /// new can never quietly delete a record the app merely did not
+  /// understand.
+  List<String> _unread = const [];
+
   Future<SharedPreferencesWithCache> _open() =>
       _opening ??= SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
@@ -37,9 +44,12 @@ class SharedPreferencesGardenStore implements GardenStore {
   Future<MyGarden> read() async {
     try {
       final preferences = await _open();
-      final value = decodeGarden(
-        preferences.getStringList(_plantsKey) ?? const [],
-      );
+      final lines = preferences.getStringList(_plantsKey) ?? const [];
+      final value = decodeGarden(lines);
+      _unread = [
+        for (final line in lines)
+          if (decodeGardenPlant(line) == null) line,
+      ];
       _unreadable = false;
       return value;
     } on Object catch (error) {
@@ -56,7 +66,10 @@ class SharedPreferencesGardenStore implements GardenStore {
       throw StateError('Stored garden could not be read; not overwriting');
     }
     final preferences = await _open();
-    await preferences.setStringList(_plantsKey, encodeGarden(garden));
+    await preferences.setStringList(_plantsKey, [
+      ...encodeGarden(garden),
+      ..._unread,
+    ]);
   }
 
   @override
@@ -67,5 +80,6 @@ class SharedPreferencesGardenStore implements GardenStore {
     }
     // Deliberately emptied: there is nothing left to overwrite.
     _unreadable = false;
+    _unread = const [];
   }
 }

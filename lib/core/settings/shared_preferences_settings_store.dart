@@ -37,6 +37,11 @@ class SharedPreferencesSettingsStore implements SettingsStore {
 
   final SharedPreferencesWithCache _preferences;
 
+  /// Category names this version does not recognise — chosen in a newer
+  /// version — kept and written back, so a downgrade and an upgrade do
+  /// not quietly switch a feature off.
+  List<String> _unknownFeatures = const [];
+
   /// Opens the store. Throws if the platform cannot provide preferences —
   /// see [openSettingsStore] for the handling of that.
   static Future<SettingsStore> open() async {
@@ -90,6 +95,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
     await _preferences.setStringList(_featuresKey, [
       for (final feature in FeatureRegistry.optional)
         if (settings.features.contains(feature.id)) feature.id.name,
+      ..._unknownFeatures,
     ]);
     await _preferences.setBool(
       _onboardingCompletedKey,
@@ -128,6 +134,10 @@ class SharedPreferencesSettingsStore implements SettingsStore {
     }
     if (stored == null) return const {};
 
+    _unknownFeatures = [
+      for (final entry in stored)
+        if (FeatureId.tryParse(entry) == null) entry,
+    ];
     return {
       for (final entry in stored)
         if (FeatureId.tryParse(entry) case final id?)

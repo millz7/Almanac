@@ -92,8 +92,17 @@ OwnRecipe? decodeOwnRecipe(String line) {
   );
 }
 
-OwnRecipes decodeOwnRecipes(List<String> lines) =>
-    OwnRecipes([for (final line in lines) ?decodeOwnRecipe(line)]);
+/// Reads a whole stored collection. Should two lines ever claim one id —
+/// only possible if the file was damaged — the first is kept, so an edit
+/// or a delete can never reach two recipes at once.
+OwnRecipes decodeOwnRecipes(List<String> lines) {
+  final seen = <String>{};
+  return OwnRecipes([
+    for (final line in lines)
+      if (decodeOwnRecipe(line) case final recipe?)
+        if (seen.add(recipe.id)) recipe,
+  ]);
+}
 
 List<String> encodeOwnRecipes(OwnRecipes recipes) => [
   for (final recipe in recipes.recipes) encodeOwnRecipe(recipe),

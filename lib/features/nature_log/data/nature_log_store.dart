@@ -114,8 +114,18 @@ NatureObservation? decodeObservation(String line) {
 /// observation carries the name it was saved with, it still reads
 /// correctly and can still be edited or deleted. Downgrading loses
 /// nothing.
-NatureLog decodeLog(List<String> lines) =>
-    NatureLog([for (final line in lines) ?decodeObservation(line)]);
+///
+/// Should two lines ever claim one id — only possible if the file was
+/// damaged — the first is kept, so an edit or a removal can never reach
+/// two observations at once.
+NatureLog decodeLog(List<String> lines) {
+  final seen = <String>{};
+  return NatureLog([
+    for (final line in lines)
+      if (decodeObservation(line) case final observation?)
+        if (seen.add(observation.instanceId)) observation,
+  ]);
+}
 
 List<String> encodeLog(NatureLog log) => [
   for (final observation in log.observations) encodeObservation(observation),

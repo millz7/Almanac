@@ -58,6 +58,12 @@ class SharedPreferencesCycleStore implements CycleStore {
   /// saving that would overwrite a history that is still on the device.
   bool _unreadable = false;
 
+  /// Stored day lines this version could not read — damaged, or written
+  /// by a newer version with a level this one has never heard of. Never
+  /// shown, but written back untouched, so recording a day can never
+  /// quietly delete one the app merely did not understand.
+  List<String> _unread = const [];
+
   /// Reads one small value, treating a damaged one as missing so it can
   /// never take the records down with it.
   static T? _tolerant<T>(T? Function() read) {
@@ -78,6 +84,10 @@ class SharedPreferencesCycleStore implements CycleStore {
       final manual = _tolerant(() => preferences.getString(_manualPhaseKey));
 
       final stored = preferences.getStringList(_recordsKey);
+      _unread = [
+        for (final line in stored ?? const <String>[])
+          if (decodeRecord(line) == null) line,
+      ];
       final legacy = _tolerant(
         () => preferences.getStringList(_legacyStartsKey),
       );
@@ -125,7 +135,10 @@ class SharedPreferencesCycleStore implements CycleStore {
     SharedPreferencesWithCache preferences,
     CycleData data,
   ) async {
-    await preferences.setStringList(_recordsKey, encodeRecords(data));
+    await preferences.setStringList(_recordsKey, [
+      ...encodeRecords(data),
+      ..._unread,
+    ]);
     await preferences.setInt(_lengthKey, data.assumedCycleLength);
     final manual = data.manualPhase;
     if (manual == null) {
@@ -146,5 +159,6 @@ class SharedPreferencesCycleStore implements CycleStore {
     }
     // Deliberately emptied: there is nothing left to overwrite.
     _unreadable = false;
+    _unread = const [];
   }
 }

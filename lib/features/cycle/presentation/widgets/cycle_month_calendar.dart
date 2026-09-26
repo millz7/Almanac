@@ -73,26 +73,33 @@ class CycleMonthCalendar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            // Comfortably over the minimum target at any sensible width.
-            childAspectRatio: 0.78,
+        LayoutBuilder(
+          builder: (context, constraints) => GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              // Comfortably over the minimum target at any sensible width,
+              // and taller still when the text is larger, so a day's number
+              // is never squeezed out of its cell at 2x.
+              mainAxisExtent: _DayCell.heightFor(
+                context,
+                width: constraints.maxWidth / 7,
+              ),
+            ),
+            itemCount: cells,
+            itemBuilder: (context, index) {
+              if (index < leading) return const SizedBox.shrink();
+              final date = first.addDays(index - leading);
+              return _DayCell(
+                date: date,
+                record: records[date.day],
+                isToday: date == today,
+                // A day that has not happened cannot have been noticed.
+                onTap: date.isAfter(today) ? null : () => onOpenDay(date),
+              );
+            },
           ),
-          itemCount: cells,
-          itemBuilder: (context, index) {
-            if (index < leading) return const SizedBox.shrink();
-            final date = first.addDays(index - leading);
-            return _DayCell(
-              date: date,
-              record: records[date.day],
-              isToday: date == today,
-              // A day that has not happened cannot have been noticed.
-              onTap: date.isAfter(today) ? null : () => onOpenDay(date),
-            );
-          },
         ),
       ],
     );
@@ -112,10 +119,32 @@ class _DayCell extends StatelessWidget {
   final bool isToday;
   final VoidCallback? onTap;
 
+  /// The cell's height: the familiar proportion, or whatever the day's
+  /// number, mark and "Day 1" need at the reader's text size, whichever
+  /// is taller.
+  static double heightFor(BuildContext context, {required double width}) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final number = Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14;
+    final needed =
+        AppSpacing.xs * 2 +
+        scaler.scale(number) * 1.5 +
+        2 +
+        CycleMonthCalendar.markerSize +
+        _labelHeight(scaler);
+    final proportional = width / 0.78;
+    return needed > proportional ? needed : proportional;
+  }
+
+  static double _labelHeight(TextScaler scaler) {
+    final scaled = scaler.scale(9) * 1.4;
+    return scaled > 12 ? scaled : 12;
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final textTheme = Theme.of(context).textTheme;
+    final labelHeight = _labelHeight(MediaQuery.textScalerOf(context));
 
     return Semantics(
       container: true,
@@ -139,41 +168,47 @@ class _DayCell extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${date.day}',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: onTap == null
-                        ? palette.textSecondary.withValues(alpha: 0.5)
-                        : palette.textPrimary,
+            // Never overflow a cell: at an extreme size the contents shrink
+            // to fit, and the full date is always in the spoken label.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${date.day}',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: onTap == null
+                          ? palette.textSecondary.withValues(alpha: 0.5)
+                          : palette.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                SizedBox(
-                  height: CycleMonthCalendar.markerSize,
-                  child: record == null
-                      ? null
-                      : BleedingMarker(
-                          level: record!.level,
-                          size: CycleMonthCalendar.markerSize,
-                        ),
-                ),
-                // Beside the mark, never instead of it.
-                SizedBox(
-                  height: 12,
-                  child: (record?.isPeriodStart ?? false)
-                      ? Text(
-                          CycleText.firstDayShort,
-                          style: textTheme.labelSmall?.copyWith(
-                            fontSize: 9,
-                            color: palette.textSecondary,
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    height: CycleMonthCalendar.markerSize,
+                    child: record == null
+                        ? null
+                        : BleedingMarker(
+                            level: record!.level,
+                            size: CycleMonthCalendar.markerSize,
                           ),
-                        )
-                      : null,
-                ),
-              ],
+                  ),
+                  // Beside the mark, never instead of it.
+                  SizedBox(
+                    height: labelHeight,
+                    child: (record?.isPeriodStart ?? false)
+                        ? Text(
+                            CycleText.firstDayShort,
+                            style: textTheme.labelSmall?.copyWith(
+                              fontSize: 9,
+                              color: palette.textSecondary,
+                            ),
+                          )
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

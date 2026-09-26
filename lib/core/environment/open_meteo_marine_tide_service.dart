@@ -130,16 +130,23 @@ class OpenMeteoMarineTideService implements TideService {
       );
     }
 
+    // In time order, whatever order they arrived in, and each instant
+    // once: a repeated time — a clock change read the old way — is
+    // dropped rather than handed to the curve as a zero-length step.
+    final readings = <TideSample>[
+      for (var i = 0; i < times.length; i++)
+        if (heights[i] case final height?)
+          TideSample(
+            time: _parseLocalTime(times[i], timeZone),
+            heightMetres: height.toDouble(),
+          ),
+    ]..sort((a, b) => a.time.compareTo(b.time));
     final samples = <TideSample>[];
-    for (var i = 0; i < times.length; i++) {
-      final height = heights[i];
-      if (height == null) continue;
-      final time = _parseLocalTime(times[i], timeZone);
-      // Strictly in order, whatever the response says: a repeated or
-      // backwards time — a clock change read the old way — is dropped
-      // rather than handed to the curve as a zero-length step.
-      if (samples.isNotEmpty && !time.isAfter(samples.last.time)) continue;
-      samples.add(TideSample(time: time, heightMetres: height.toDouble()));
+    for (final reading in readings) {
+      if (samples.isNotEmpty && !reading.time.isAfter(samples.last.time)) {
+        continue;
+      }
+      samples.add(reading);
     }
 
     // Every reading came back null: the documented shape of "this grid
@@ -171,9 +178,11 @@ class OpenMeteoMarineTideService implements TideService {
     List<dynamic> list => [
       for (final item in list)
         switch (item) {
-          num n => n,
+          // A sea level tens of metres from the mean, or not a finite
+          // number at all, is a broken response rather than a tide.
+          num n when n.isFinite && n.abs() <= 30 => n,
           null => null,
-          _ => throw TideServiceFailure('expected a number, got $item'),
+          _ => throw TideServiceFailure('expected a sea level, got $item'),
         },
     ],
     _ => const [],

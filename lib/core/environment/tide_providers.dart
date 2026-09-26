@@ -50,6 +50,36 @@ class TideController extends AsyncNotifier<TideState> {
   GeoLocation? _lastLocation;
   DateTime? _lastResolvedAt;
 
+  /// The request already on its way, and where it is for — the same
+  /// one-at-a-time rule as the weather's.
+  Future<TideFetchResult>? _inFlight;
+  GeoLocation? _inFlightFor;
+
+  Future<TideFetchResult> _fetchOnce(GeoLocation location, DateTime now) {
+    final pending = _inFlight;
+    final pendingFor = _inFlightFor;
+    if (pending != null &&
+        pendingFor != null &&
+        _sameApproximateLocation(pendingFor, location)) {
+      return pending;
+    }
+    final request = ref
+        .read(tideServiceProvider)
+        .fetch(
+          location: location,
+          timeZone: ref.read(timeZoneProvider),
+          now: now,
+        );
+    _inFlight = request;
+    _inFlightFor = location;
+    void settle() {
+      if (identical(_inFlight, request)) _inFlight = null;
+    }
+
+    request.then((_) => settle(), onError: (Object _) => settle());
+    return request;
+  }
+
   @override
   Future<TideState> build() async {
     final location = ref.watch(locationStateProvider).location;
@@ -66,13 +96,7 @@ class TideController extends AsyncNotifier<TideState> {
     if (_stillFresh(location, now)) return _lastState!;
 
     try {
-      final result = await ref
-          .read(tideServiceProvider)
-          .fetch(
-            location: location,
-            timeZone: ref.read(timeZoneProvider),
-            now: now,
-          );
+      final result = await _fetchOnce(location, now);
       final state = switch (result) {
         TideFetchData(:final snapshot) => TideAvailable(snapshot),
         TideFetchNoData() => const TideUnavailableForLocation(),

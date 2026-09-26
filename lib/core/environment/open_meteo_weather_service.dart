@@ -138,6 +138,16 @@ class OpenMeteoWeatherService implements WeatherService {
           ? null
           : _number(current['wind_gusts_10m']),
     );
+    _plausible(currentWeather.temperatureC, -90, 60, 'temperature');
+    _plausible(
+      currentWeather.apparentTemperatureC,
+      -100,
+      70,
+      'apparent temperature',
+    );
+    _plausible(currentWeather.windSpeedKmh, 0, 400, 'wind speed');
+    _plausible(currentWeather.precipitationMm, 0, 500, 'precipitation');
+    _plausible(currentWeather.cloudCoverPercent, 0, 100, 'cloud cover');
 
     final dailyTimes = _stringList(daily['time']);
     final highs = _numberList(daily['temperature_2m_max']);
@@ -159,10 +169,27 @@ class OpenMeteoWeatherService implements WeatherService {
     final hourlyCodes = _numberList(hourly['weather_code']);
     final hourlyRainChance = _numberList(hourly['precipitation_probability']);
     final hourlyWind = _numberList(hourly['wind_speed_10m']);
+    for (final t in [...hourlyTemps, ...highs, ...lows]) {
+      _plausible(t, -90, 60, 'temperature');
+    }
+    for (final w in hourlyWind) {
+      _plausible(w, 0, 400, 'wind speed');
+    }
+    for (final p in [...hourlyRainChance, ...rainChance]) {
+      _plausible(p, 0, 100, 'chance of rain');
+    }
+
+    // Read in time order, whatever order they arrived in, and a repeated
+    // time only once: the look-ahead reads "the next few hours" and must
+    // not be told the same hour twice or an earlier hour later.
+    final order = [
+      for (var i = 0; i < hourlyTimes.length; i++)
+        (i, _parseLocalTime(hourlyTimes[i], timeZone)),
+    ]..sort((a, b) => a.$2.compareTo(b.$2));
 
     final series = <HourlyWeather>[];
-    for (var i = 0; i < hourlyTimes.length; i++) {
-      final time = _parseLocalTime(hourlyTimes[i], timeZone);
+    for (final (i, time) in order) {
+      if (series.isNotEmpty && !time.isAfter(series.last.time)) continue;
       if (time.isBefore(
         obtainedAt.toUtc().subtract(const Duration(hours: 1)),
       )) {
@@ -202,9 +229,18 @@ class OpenMeteoWeatherService implements WeatherService {
   double _round(double value) => (value * 100).round() / 100;
 
   double _number(Object? value) => switch (value) {
-    num n => n.toDouble(),
+    num n when n.isFinite => n.toDouble(),
     _ => throw WeatherServiceFailure('expected a number, got $value'),
   };
+
+  /// A reading no weather on Earth produces is a broken response, not a
+  /// forecast: the fetch fails quietly and the app says nothing, rather
+  /// than describing a 900° afternoon.
+  static void _plausible(double value, double min, double max, String what) {
+    if (value < min || value > max) {
+      throw WeatherServiceFailure('implausible $what: $value');
+    }
+  }
 
   List<double> _numberList(Object? value) => switch (value) {
     List<dynamic> list => [for (final item in list) _number(item)],

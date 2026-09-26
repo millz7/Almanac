@@ -1878,6 +1878,19 @@ The rules the app keeps when things go wrong. Each one is tested in
   so a lost signal recovers without a restart, one request per trigger.
   Both services ask Open-Meteo for Unix timestamps, so the hour a clock
   falls back cannot produce two readings at one instant.
+- **What this version cannot read is kept, not lost.** A stored line
+  with a category or level from a newer version (or simply damaged) is
+  not shown, but every store writes it back untouched, so saving
+  something new never deletes it. Unknown categories in settings are
+  kept the same way. Two lines claiming one id are read once.
+- **One request at a time.** Location checks, permission prompts and
+  opening system settings each join a call already running rather than
+  starting another; weather and tides share an in-flight request for
+  the same place between rebuilds.
+- **Nonsense is refused quietly.** A non-finite or physically
+  impossible weather or tide value fails the fetch (and the app says
+  nothing) rather than being described; out-of-order or repeated hours
+  are read once, in order.
 - **Location permission is re-checked on every resume** (a cheap check
   that reads no position), so a permission revoked in system settings is
   noticed straight away rather than when the fix goes stale.

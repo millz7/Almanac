@@ -90,9 +90,21 @@ class NatureLogController extends AsyncNotifier<NatureLog> {
     String? note,
     String? placeLabel,
   }) {
+    // The form will not offer Save without a name; the same rule one
+    // layer down, so a nameless observation can never be written.
+    if (label.trim().isEmpty) {
+      return Future.error(
+        ArgumentError.value(label, 'name', 'An observation needs a name'),
+      );
+    }
     final today = ref.read(todayProvider);
     final date = on ?? today;
-    final order = _log.nextOrder;
+    var order = _log.nextOrder;
+    // Past every stored order already; checked all the same, so even a
+    // damaged file cannot hand a new observation an existing id.
+    while (_log.find('obs-$order-${date.iso}') != null) {
+      order++;
+    }
 
     return _persist(
       _log.adding(
