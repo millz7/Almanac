@@ -30,6 +30,7 @@ class Chakra {
     required this.place,
     required this.associations,
     required this.prompt,
+    required this.ways,
     required this.points,
     required this.position,
   });
@@ -64,6 +65,12 @@ class Chakra {
 
   /// A quiet question. Not a test, and there is no right answer.
   final String prompt;
+
+  /// Two ordinary ways to spend a moment with this chakra's themes —
+  /// things anybody can do, anywhere, and never a practice that
+  /// promises an effect. `chakra_content_test.dart` holds the shape and
+  /// reads the wording.
+  final List<String> ways;
 
   /// How many points its drawn symbol carries.
   ///

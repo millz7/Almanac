@@ -489,6 +489,43 @@ void main() {
 
       expect(find.bySemanticsLabel('Apple. Established.'), findsOneWidget);
     });
+
+    testWidgets('a change survives a restart', (tester) async {
+      final store = InMemoryGardenStore();
+      await openGarden(tester, store: store);
+      await addExistingPlant(tester, 'Mint');
+      await press(
+        tester,
+        find.bySemanticsLabel(EstablishmentState.seedling.label),
+      );
+
+      await openGarden(tester, store: store);
+      await press(tester, chapter(GardenText.myGarden));
+      expect(find.bySemanticsLabel('Mint. Seedling.'), findsOneWidget);
+      expect(
+        (await store.read()).find('mint')!.state,
+        EstablishmentState.seedling,
+      );
+    });
+
+    testWidgets('a removal survives a restart', (tester) async {
+      final store = InMemoryGardenStore();
+      await openGarden(tester, store: store);
+      await addExistingPlant(tester, 'Mint');
+      await press(tester, find.widgetWithText(TextButton, GardenText.remove));
+      await press(
+        tester,
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.widgetWithText(TextButton, GardenText.remove),
+        ),
+      );
+
+      await openGarden(tester, store: store);
+      await press(tester, chapter(GardenText.myGarden));
+      expect(find.text(GardenText.gardenEmpty), findsOneWidget);
+      expect((await store.read()).isEmpty, isTrue);
+    });
   });
 
   group('living in the Almanac', () {

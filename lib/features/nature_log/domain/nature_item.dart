@@ -15,6 +15,7 @@ enum NatureCategory {
   plant('Plant', 'Plants'),
   insect('Insect', 'Insects'),
   fungi('Fungus', 'Fungi'),
+  animal('Animal', 'Animals'),
   other('Other', 'Other');
 
   const NatureCategory(this.label, this.plural);

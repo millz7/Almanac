@@ -1055,4 +1055,68 @@ void main() {
       );
     });
   });
+
+  group('across a restart', () {
+    /// A second pump on the same store, with a fresh container: what
+    /// closing and reopening the app is.
+    Future<void> restart(WidgetTester tester, NatureLogStore store) async {
+      await tester.pumpWidget(const SizedBox());
+      await openNatureLog(tester, store: store);
+      await press(tester, route(NatureLogText.myObservations));
+    }
+
+    testWidgets('something recorded is still there', (tester) async {
+      final store = InMemoryNatureLogStore();
+      await openNatureLog(tester, store: store);
+      await recordCustom(tester, 'A hedgehog', category: 'Animal');
+
+      await restart(tester, store);
+      expect(entry('A hedgehog'), findsOneWidget);
+      final kept = (await store.read()).recent.single;
+      expect(kept.category, NatureCategory.animal);
+    });
+
+    testWidgets('a change is still changed', (tester) async {
+      final store = InMemoryNatureLogStore();
+      await openNatureLog(tester, store: store);
+      await recordCustom(tester, 'A moth', note: 'On the window');
+      await press(tester, entry('A moth'));
+      await type(tester, NatureLogText.noteLabel, 'By the porch light');
+      await press(tester, saveChanges);
+
+      await restart(tester, store);
+      expect(find.text('By the porch light'), findsOneWidget);
+      expect(find.text('On the window'), findsNothing);
+    });
+
+    testWidgets('something removed stays removed', (tester) async {
+      final store = InMemoryNatureLogStore();
+      await openNatureLog(tester, store: store);
+      await recordCustom(tester, 'A moth');
+      await press(tester, entry('A moth'));
+      await press(
+        tester,
+        find.widgetWithText(TextButton, NatureLogText.remove),
+      );
+      await press(tester, dialogButton(NatureLogText.remove));
+
+      await restart(tester, store);
+      expect(entry('A moth'), findsNothing);
+      expect(find.text(NatureLogText.logEmpty), findsOneWidget);
+      expect(
+        find.widgetWithText(ElevatedButton, NatureLogText.recordSomething),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the Animal category is offered for your own record', (
+      tester,
+    ) async {
+      await openNatureLog(tester);
+      await toLanding(tester);
+      await press(tester, recordSomething);
+      await press(tester, writeYourOwn);
+      expect(find.bySemanticsLabel('Animal'), findsOneWidget);
+    });
+  });
 }

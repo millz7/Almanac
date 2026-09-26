@@ -39,6 +39,10 @@ abstract final class NatureBook {
         for (final item in NatureFungiAndOther.all)
           if (item.category == NatureCategory.fungi) item,
       ],
+      NatureCategory.animal: [
+        for (final item in NatureFungiAndOther.all)
+          if (item.category == NatureCategory.animal) item,
+      ],
       NatureCategory.other: [
         for (final item in NatureFungiAndOther.all)
           if (item.category == NatureCategory.other) item,

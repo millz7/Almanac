@@ -985,11 +985,13 @@ class _ObservationFormState extends State<_ObservationForm> {
 
         Text(NatureLogText.dateLabel, style: textTheme.bodySmall),
         const SizedBox(height: AppSpacing.xs),
-        Row(
+        // A Wrap rather than a Row, so at 2x text on a phone the button
+        // moves under the date instead of running off the edge.
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
           children: [
-            Expanded(
-              child: Text(formatDate(_date), style: textTheme.bodyLarge),
-            ),
+            Text(formatDate(_date), style: textTheme.bodyLarge),
             TextButton(
               onPressed: () async {
                 final picked = await widget.onAskForDate(_date);

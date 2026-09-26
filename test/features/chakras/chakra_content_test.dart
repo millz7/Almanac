@@ -8,12 +8,14 @@ import 'package:flutter_test/flutter_test.dart';
 List<String> everythingSaid() => [
   ChakraCatalogue.introduction,
   ChakraCatalogue.reflectionNote,
+  ChakraCatalogue.waysHeading,
   for (final chakra in ChakraCatalogue.all) ...[
     chakra.name,
     chakra.sanskrit,
     chakra.place,
     ...chakra.associations,
     chakra.prompt,
+    ...chakra.ways,
     chakra.traditionSentence,
     chakra.semanticLabel,
   ],
@@ -106,6 +108,20 @@ void main() {
       for (final chakra in ChakraCatalogue.all) {
         expect(chakra.prompt, endsWith('?'), reason: '${chakra.id}');
       }
+    });
+
+    test('has two ordinary ways to pause, each its own sentence', () {
+      final all = <String>{};
+      for (final chakra in ChakraCatalogue.all) {
+        expect(chakra.ways, hasLength(2), reason: '${chakra.id}');
+        for (final way in chakra.ways) {
+          expect(way, endsWith('.'), reason: way);
+          expect(way.length, lessThan(90), reason: way);
+          all.add(way);
+        }
+      }
+      // Fourteen different moments, not one repeated seven times.
+      expect(all, hasLength(14));
     });
 
     test('has a symbol with points to draw', () {

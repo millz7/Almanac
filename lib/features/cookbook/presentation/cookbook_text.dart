@@ -1,4 +1,5 @@
 import '../../../core/context/cycle_phase.dart';
+import '../domain/own_recipe.dart';
 import '../domain/recipe_catalogue.dart';
 
 /// Everything the Cookbook says, and the two things it has to work out
@@ -68,6 +69,63 @@ abstract final class CookbookText {
     return recipe.tags.map((t) => t.label).join(' and ');
   }
 
+  // Your recipes: the ones the user keeps themselves.
+  static const yourRecipes = 'Your recipes';
+  static const yourRecipe = 'Your recipe';
+  static const noOwnRecipes = 'Nothing written down yet.';
+  static const noOwnRecipesNote =
+      'Add a recipe you make often and it will be kept here, alongside '
+      'the seasonal ones.';
+  static const addRecipe = 'Add a recipe';
+  static const editRecipe = 'Edit recipe';
+  static const saveRecipe = 'Save recipe';
+  static const saveChanges = 'Save changes';
+  static const deleteRecipe = 'Delete recipe';
+  static const cancel = 'Cancel';
+  static const saved = 'Saved to your recipes.';
+  static const saveFailed = 'That could not be saved on this device.';
+  static const ownPrivacy =
+      'Your recipes are kept on this device only. No account, and no '
+      'copy anywhere else.';
+
+  static const titleLabel = 'Recipe name';
+  static const titleHint = 'Leek and potato soup';
+  static const ingredientsLabel = 'Ingredients';
+  static const ingredientsHint = 'One per line';
+  static const methodLabel = 'Method';
+  static const methodHint = 'One step per line';
+  static const noteLabel = 'Notes';
+  static const noteHint = 'Anything worth remembering next time.';
+  static const nameNeeded = 'A recipe needs a name before it can be saved.';
+
+  static const noIngredients = 'No ingredients written down.';
+  static const noMethod = 'No method written down.';
+
+  static const deleteTitle = 'Delete this recipe?';
+  static const deleteBody =
+      'It will be removed from this device. This cannot be undone.';
+  static const delete = 'Delete';
+  static const keep = 'Keep';
+
+  static const leaveTitle = 'Leave without saving?';
+  static const leaveBody = 'What you have written here will not be kept.';
+  static const leave = 'Leave';
+  static const keepEditing = 'Keep editing';
+
+  /// "Leek and potato soup. Your recipe." — a tile, spoken.
+  static String ownRecipeLabel(OwnRecipe recipe) =>
+      '${recipe.title}. $yourRecipe.';
+
+  /// "3 ingredients · 4 steps" — how much is written down, never a
+  /// judgement of it.
+  static String ownRecipeSummary(OwnRecipe recipe) {
+    String count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
+    return [
+      count(recipe.ingredients.length, 'ingredient', 'ingredients'),
+      count(recipe.method.length, 'step', 'steps'),
+    ].join(' · ');
+  }
+
   /// A season selector, as a screen reader hears it.
   static String seasonLabel(Season season, {required bool isCurrent}) =>
       isCurrent ? '${season.label}. $yourSeason.' : season.label;
@@ -85,6 +143,38 @@ abstract final class CookbookText {
     cookLabel,
     servesLabel,
     duration(const Duration(minutes: 90)),
+    yourRecipes,
+    yourRecipe,
+    noOwnRecipes,
+    noOwnRecipesNote,
+    addRecipe,
+    editRecipe,
+    saveRecipe,
+    saveChanges,
+    deleteRecipe,
+    cancel,
+    saved,
+    saveFailed,
+    ownPrivacy,
+    titleLabel,
+    titleHint,
+    ingredientsLabel,
+    ingredientsHint,
+    methodLabel,
+    methodHint,
+    noteLabel,
+    noteHint,
+    nameNeeded,
+    noIngredients,
+    noMethod,
+    deleteTitle,
+    deleteBody,
+    delete,
+    keep,
+    leaveTitle,
+    leaveBody,
+    leave,
+    keepEditing,
     for (final season in Season.values) RecipeCatalogue.collectionNote(season),
     for (final tag in DietaryTag.values) tag.label,
     for (final recipe in RecipeCatalogue.all) ...[

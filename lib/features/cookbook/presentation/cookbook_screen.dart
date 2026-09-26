@@ -5,12 +5,14 @@ import '../../../app/almanac_button.dart';
 import '../../../app/context/cycle_phase_context.dart';
 import '../../../app/context/festival_context.dart';
 import '../../../core/context/almanac_context.dart';
-import '../domain/cycle_recipes.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../application/own_recipes_providers.dart';
+import '../domain/cycle_recipes.dart';
 import '../domain/recipe_catalogue.dart';
 import '../domain/weather_cookbook_note.dart';
 import 'cookbook_text.dart';
+import 'own_recipes.dart';
 import 'widgets/recipe_card.dart';
 import 'widgets/season_selector.dart';
 import 'widgets/season_sprig.dart';
@@ -31,8 +33,10 @@ import 'widgets/season_sprig.dart';
 /// what is growing near anybody. So a collection is "inspired by winter
 /// ingredients, wherever you are" and never "in season near you".
 ///
-/// Read-only, and it stores nothing: no favourites, no history, no note
-/// of what was looked at.
+/// **Your recipes.** The one thing the Cookbook keeps is what the user
+/// writes down themselves — see [OwnRecipesSection] — in its own local
+/// store. It still keeps no favourites, no history and no note of what
+/// was looked at.
 class CookbookScreen extends ConsumerStatefulWidget {
   const CookbookScreen({super.key});
 
@@ -63,6 +67,13 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
 
   /// The recipe being read, or null for the collection.
   Recipe? _open;
+
+  /// One of the user's own recipes being read or written, or null.
+  _OwnView? _own;
+
+  /// Whether the own recipe on screen has just been saved.
+  bool _ownSaved = false;
+  bool _ownSaveFailed = false;
 
   late final AnimationController _growth;
   bool _started = false;
@@ -138,11 +149,159 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     if (!_still) _growth.forward(from: 0);
   }
 
+  OwnRecipesController get _ownRecipes => ref.read(ownRecipesProvider.notifier);
+
+  void _showOwn(_OwnView? view, {bool saved = false}) => setState(() {
+    _own = view;
+    _ownSaved = saved;
+    _ownSaveFailed = false;
+  });
+
+  /// Asks before anything is thrown away. The same plain dialog the
+  /// Garden and the Nature Log use, so a question reads the same
+  /// everywhere in the book.
+  Future<bool> _confirm({
+    required String title,
+    required String body,
+    required String yes,
+    required String no,
+  }) async {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(yes),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(no),
+          ),
+        ],
+      ),
+    );
+    return answer ?? false;
+  }
+
+  Future<void> _saveOwn(String? id, OwnRecipeDraft draft) async {
+    try {
+      final savedId = id == null
+          ? await _ownRecipes.add(
+              title: draft.title,
+              ingredients: draft.ingredients,
+              method: draft.method,
+              note: draft.note,
+            )
+          : await _ownRecipes
+                .edit(
+                  id,
+                  title: draft.title,
+                  ingredients: draft.ingredients,
+                  method: draft.method,
+                  note: draft.note,
+                )
+                .then((_) => id);
+      if (mounted) _showOwn(_ReadingOwn(savedId), saved: true);
+    } on Object {
+      if (mounted) setState(() => _ownSaveFailed = true);
+    }
+  }
+
+  Future<void> _cancelOwn(String? id, {required bool changed}) async {
+    if (changed &&
+        !await _confirm(
+          title: CookbookText.leaveTitle,
+          body: CookbookText.leaveBody,
+          yes: CookbookText.leave,
+          no: CookbookText.keepEditing,
+        )) {
+      return;
+    }
+    if (mounted) _showOwn(id == null ? null : _ReadingOwn(id));
+  }
+
+  Future<void> _deleteOwn(OwnRecipe recipe) async {
+    final confirmed = await _confirm(
+      title: CookbookText.deleteTitle,
+      body: CookbookText.deleteBody,
+      yes: CookbookText.delete,
+      no: CookbookText.keep,
+    );
+    if (!confirmed) return;
+    try {
+      await _ownRecipes.remove(recipe.id);
+      if (mounted) _showOwn(null);
+    } on Object {
+      if (mounted) setState(() => _ownSaveFailed = true);
+    }
+  }
+
+  Widget _ownPage(_OwnView view) {
+    final recipes = ref.watch(ownRecipesProvider).value ?? OwnRecipes.empty;
+    final textTheme = Theme.of(context).textTheme;
+
+    final failure = _ownSaveFailed
+        ? Semantics(
+            container: true,
+            liveRegion: true,
+            child: Text(
+              CookbookText.saveFailed,
+              style: textTheme.bodyMedium?.copyWith(
+                color: context.palette.error,
+              ),
+            ),
+          )
+        : null;
+
+    switch (view) {
+      case _ReadingOwn(:final id):
+        final recipe = recipes.find(id);
+        // Gone — removed, or never stored — so there is nothing to read.
+        if (recipe == null) return _collection();
+        return AppScaffold(
+          title: recipe.title,
+          subtitle: CookbookText.yourRecipe,
+          trailing: const AlmanacButton(),
+          body: [
+            OwnRecipePage(
+              recipe: recipe,
+              saved: _ownSaved,
+              onEdit: () => _showOwn(_WritingOwn(id)),
+              onDelete: () => _deleteOwn(recipe),
+              onBack: () => _showOwn(null),
+            ),
+            ?failure,
+          ],
+        );
+      case _WritingOwn(:final id):
+        final existing = id == null ? null : recipes.find(id);
+        return AppScaffold(
+          title: existing == null
+              ? CookbookText.addRecipe
+              : CookbookText.editRecipe,
+          subtitle: existing?.title,
+          trailing: const AlmanacButton(),
+          body: [
+            OwnRecipeForm(
+              key: ValueKey('own-form-$id'),
+              existing: existing,
+              onSave: (draft) => _saveOwn(existing?.id, draft),
+              onCancel: (changed) => _cancelOwn(existing?.id, changed: changed),
+            ),
+            ?failure,
+          ],
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final current = ref.watch(currentSeasonProvider);
-    final season = _browsing ?? current;
     final recipe = _open;
+
+    if (_own case final own?) return _ownPage(own);
 
     if (recipe != null) {
       return AppScaffold(
@@ -159,6 +318,15 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
         ],
       );
     }
+
+    return _collection();
+  }
+
+  /// The Cookbook's main page: the seasonal collection, then whatever
+  /// the day adds, then the user's own recipes.
+  Widget _collection() {
+    final current = ref.watch(currentSeasonProvider);
+    final season = _browsing ?? current;
 
     // What the cycle collection is for: the phase they arrived with, or
     // — on a direct entry — whatever phase Cycle currently shows.
@@ -203,9 +371,33 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
             growth: _growth,
             onOpen: (recipe) => setState(() => _open = recipe),
           ),
+        // The user's own, after everything the Almanac offers.
+        OwnRecipesSection(
+          onOpen: (recipe) => _showOwn(_ReadingOwn(recipe.id)),
+          onAdd: () => _showOwn(const _WritingOwn()),
+        ),
       ],
     );
   }
+}
+
+/// Which of the user's own recipes is on screen, and how.
+sealed class _OwnView {
+  const _OwnView();
+}
+
+/// Reading one.
+final class _ReadingOwn extends _OwnView {
+  const _ReadingOwn(this.id);
+
+  final String id;
+}
+
+/// Writing one: a new recipe when [id] is null, or changing one.
+final class _WritingOwn extends _OwnView {
+  const _WritingOwn([this.id]);
+
+  final String? id;
 }
 
 /// A quiet, secondary nudge towards the warmer or lighter end of

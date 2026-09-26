@@ -812,6 +812,11 @@ quiz, no score, no streak and nothing to complete.
 catalogue and framing copy alike — against a list of clinical words and a
 list of gamified ones, so the wording cannot drift later.
 
+Each chakra page also offers **two ways to pause with it** — ordinary
+things anybody can do, such as standing with both feet on the floor or
+humming quietly for a minute. They are offered, not prescribed, promise
+no effect, and are read by the same content test.
+
 ### Colour that belongs to the season
 
 The traditional hues are the one place chakras could have dragged an
@@ -1183,9 +1188,10 @@ experience may be different." — is enough.
 ## Cookbook
 
 What could I make with the season I'm in? Four collections, four recipes
-each, bundled with the app. No search, no filters, no favourites, no
-network, no account, no storage of any kind — it does not even record
-which recipes were looked at.
+each, bundled with the app — and a place for the user's own. No search,
+no filters, no favourites, no network and no account. The only thing it
+stores is what the user writes down themselves (see **Your recipes**);
+it does not record which recipes were looked at.
 
 | | | |
 |---|---|---|
@@ -1234,6 +1240,32 @@ it matches whole words only, so a future recipe may describe a cured ham
 without tripping "cure" and a carbonara without tripping "carb". A real
 bottle of wine, a real block of butter and a real jug of buttermilk are
 all still caught, and there are tests in both directions.
+
+### Your recipes
+
+"You can add your own recipes" is the one Cookbook promise that needs
+storage, and it is kept the way the Garden and the Nature Log keep
+theirs:
+
+```
+OwnRecipe   id, order, title, ingredients[], method[], note?
+```
+
+- **Smaller than a catalogue recipe on purpose.** A name, what goes in,
+  what to do, and a note — no season, timings or serving count to
+  invent. Only the name is required; ingredients and method are typed
+  one per line, and blank lines are dropped.
+- **Never mixed into the seasonal collections.** "Your recipes" sits
+  under everything the Almanac offers, whichever season is being
+  browsed, with an empty state that says what to do.
+- **Local only.** A dedicated `OwnRecipeStore` behind its own
+  `cookbook.ownRecipes` key, one line of JSON per recipe (free text,
+  like the Nature Log), written before the screen changes. No account,
+  no sync, no photos, and a test checks the feature has no network code.
+- **Nothing is lost by accident.** Delete asks first, and Keep keeps
+  it. Leaving a form with unsaved words asks before throwing them away;
+  an untouched form just closes. The same plain dialog the Garden and
+  the Nature Log use.
 
 ### Recipes as data
 
@@ -1594,6 +1626,11 @@ heard of still reads as what the user saw rather than as a missing row,
 so a Nature Book that changes underneath the log — or a log written by a
 later version and read by an earlier one — costs nothing. An unknown
 `itemId` is kept, not dropped.
+
+Categories are Bird, Plant, Insect, Fungus, Animal and Other. Animal was
+added for the lizards, fish and mammals somebody may well notice; the
+book's skink and eel moved onto it, and older observations keep the
+category they were saved with.
 
 The only thing recorded automatically is the calendar day, from the same
 `todayProvider` Cycle and Garden read. A place is optional, typed by the

@@ -1,7 +1,7 @@
 import 'nature_item.dart';
 
-/// Fungi, and the handful of other things that are neither bird, plant
-/// nor insect.
+/// Fungi, a few animals (a lizard, an eel), and the handful of other
+/// things that are neither bird, plant nor insect.
 ///
 /// **The fungi entries describe forms, not dinners.** They are here to
 /// help somebody notice and name what they are looking at. Nothing in
@@ -101,7 +101,7 @@ abstract final class NatureFungiAndOther {
       id: 'common-skink',
       primaryName: 'Mokomoko',
       alternateName: 'Common skink',
-      category: NatureCategory.other,
+      category: NatureCategory.animal,
       form: NatureMarkForm.other,
       scientificName: 'Oligosoma species',
       description:
@@ -119,7 +119,7 @@ abstract final class NatureFungiAndOther {
       id: 'longfin-eel',
       primaryName: 'Tuna',
       alternateName: 'Longfin eel',
-      category: NatureCategory.other,
+      category: NatureCategory.animal,
       form: NatureMarkForm.other,
       scientificName: 'Anguilla dieffenbachii',
       description:

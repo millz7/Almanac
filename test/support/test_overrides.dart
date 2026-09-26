@@ -14,6 +14,7 @@ import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
 import 'package:almanac/core/settings/user_settings.dart';
 import 'package:almanac/features/cycle/application/cycle_providers.dart';
+import 'package:almanac/features/cookbook/application/own_recipes_providers.dart';
 import 'package:almanac/features/garden/application/garden_providers.dart';
 import 'package:almanac/features/nature_log/application/nature_log_providers.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -50,6 +51,7 @@ List<Override> environmentOverrides({
   CycleStore? cycleStore,
   GardenStore? gardenStore,
   NatureLogStore? natureLogStore,
+  OwnRecipeStore? ownRecipeStore,
   Hemisphere? hemisphere = Hemisphere.northern,
   bool locationIntroSeen = true,
   bool refreshEnabled = false,
@@ -95,6 +97,10 @@ List<Override> environmentOverrides({
     // And the Nature Log, likewise: its own store, empty by default.
     natureLogStoreProvider.overrideWithValue(
       natureLogStore ?? InMemoryNatureLogStore(),
+    ),
+    // And the Cookbook's own recipes, likewise.
+    ownRecipeStoreProvider.overrideWithValue(
+      ownRecipeStore ?? InMemoryOwnRecipeStore(),
     ),
     // `clock` is for the rare test that needs time to *move*: pass a
     // closure over a variable the test reassigns. Everything else pins a

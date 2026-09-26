@@ -18,6 +18,9 @@ abstract final class ChakraCatalogue {
       'They are not measurements of anything. They are a way of pausing, '
       'one at a time.';
 
+  /// The heading over a chakra's two ways to pause.
+  static const waysHeading = 'Ways to pause with it';
+
   /// What the app promises about anything written in a reflection.
   static const reflectionNote =
       'Anything you write stays on this device. It is kept while the '
@@ -31,6 +34,10 @@ abstract final class ChakraCatalogue {
     place: 'the base of the body',
     associations: ['grounding', 'stability', 'belonging'],
     prompt: 'What helps you feel grounded today?',
+    ways: [
+      'Stand or sit with both feet on the floor, and notice what is holding you up.',
+      'Spend a few minutes outside on the ground, without a phone.',
+    ],
     points: 4,
     position: 1,
   );
@@ -43,6 +50,10 @@ abstract final class ChakraCatalogue {
     place: 'the lower belly',
     associations: ['creativity', 'feeling', 'flow'],
     prompt: 'What feels alive in you today?',
+    ways: [
+      'Put on a piece of music you like and let yourself move with it.',
+      'Make something small with your hands: a sketch, a meal, a note.',
+    ],
     points: 6,
     position: 2,
   );
@@ -55,6 +66,10 @@ abstract final class ChakraCatalogue {
     place: 'the upper belly',
     associations: ['personal agency', 'confidence', 'will'],
     prompt: 'Where could you trust yourself a little more?',
+    ways: [
+      'Choose one small thing you have been putting off, and do just that.',
+      'Write down one decision you made well this week.',
+    ],
     points: 10,
     position: 3,
   );
@@ -67,6 +82,10 @@ abstract final class ChakraCatalogue {
     place: 'the centre of the chest',
     associations: ['compassion', 'connection', 'openness'],
     prompt: 'What deserves your tenderness today?',
+    ways: [
+      'Send a kind word to someone you have been thinking of.',
+      'Sit with a hand on your chest and breathe slowly for a minute.',
+    ],
     points: 12,
     position: 4,
   );
@@ -79,6 +98,10 @@ abstract final class ChakraCatalogue {
     place: 'the throat',
     associations: ['expression', 'truth', 'communication'],
     prompt: 'What wants to be expressed?',
+    ways: [
+      'Say out loud, or write down, something you have been holding back.',
+      'Hum quietly for a minute, just to hear your own voice.',
+    ],
     points: 16,
     position: 5,
   );
@@ -91,6 +114,10 @@ abstract final class ChakraCatalogue {
     place: 'the brow',
     associations: ['insight', 'awareness', 'intuition'],
     prompt: 'What are you noticing beneath the surface?',
+    ways: [
+      'Sit quietly for a few minutes and watch what thoughts come and go.',
+      'Write down one thing you noticed today that you might usually miss.',
+    ],
     points: 2,
     position: 6,
   );
@@ -103,6 +130,10 @@ abstract final class ChakraCatalogue {
     place: 'the crown of the head',
     associations: ['contemplation', 'connection', 'transcendence'],
     prompt: 'What feels bigger than you today?',
+    ways: [
+      'Look up at the sky for a minute, whatever the weather.',
+      'Spend a little time in silence, without trying to do anything with it.',
+    ],
     points: 24,
     position: 7,
   );

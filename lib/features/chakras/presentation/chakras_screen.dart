@@ -242,6 +242,17 @@ class _ChakraDetailState extends State<_ChakraDetail>
         ),
 
         const SizedBox(height: AppSpacing.lg),
+        // Something to do, as well as something to think about: two
+        // ordinary moments, offered, never prescribed.
+        AlmanacSectionLabel(label: ChakraCatalogue.waysHeading),
+        const SizedBox(height: AppSpacing.sm),
+        for (final way in chakra.ways)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Text(way, style: textTheme.bodyMedium),
+          ),
+
+        const SizedBox(height: AppSpacing.lg),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
