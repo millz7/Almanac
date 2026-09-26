@@ -19,12 +19,24 @@ import 'calendar_date.dart';
 /// the foreground. A screen left open across midnight therefore moves to
 /// the new date on its own — Cycle Home does not sit in September on the
 /// first of October — without anything polling a clock.
+///
+/// **The date is read in the app's own time zone**, the IANA zone the
+/// environment resolved — never the process's `DateTime.toLocal()`. The
+/// two agree until the phone changes zone while the app is in the
+/// background: the zone is re-read on resume, but the runtime's own
+/// idea of "local" can lag until a restart, and "today" must follow the
+/// zone every other date in the app is calculated in.
 final todayProvider = Provider<CalendarDate>((ref) {
   final environment = ref.watch(naturalEnvironmentProvider).value;
   if (environment != null) {
-    return CalendarDate.from(environment.resolvedAt.toLocal());
+    return CalendarDate.from(
+      environment.timeZone.wallTimeAt(environment.resolvedAt),
+    );
   }
 
-  // Before the first resolution completes, the clock alone.
-  return CalendarDate.from(ref.watch(clockProvider)().toLocal());
+  // Before the first resolution completes, the clock alone — still in
+  // the app's zone.
+  return CalendarDate.from(
+    ref.watch(timeZoneProvider).wallTimeAt(ref.watch(clockProvider)()),
+  );
 });

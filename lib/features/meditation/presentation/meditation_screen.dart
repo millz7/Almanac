@@ -275,8 +275,25 @@ class _MeditationScreenState extends ConsumerState<MeditationScreen>
     setState(() => _stage = MeditationStage.ready);
   }
 
+  /// One level up. During a session that ends it, exactly as tapping
+  /// the orb does — nothing keeps running behind the setup. From the
+  /// setup or the closing words it returns to the four practices.
+  void _up() {
+    if (_stage.isImmersive) {
+      _endSession();
+    } else if (_stage != MeditationStage.choosingTechnique) {
+      _backToTechniques();
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    atTop: _stage == MeditationStage.choosingTechnique,
+    onBack: _up,
+    child: _buildPage(context),
+  );
+
+  Widget _buildPage(BuildContext context) {
     // The app's existing reduced-motion convention, as used by the
     // Environment screen's sky.
     final still = MediaQuery.disableAnimationsOf(context);

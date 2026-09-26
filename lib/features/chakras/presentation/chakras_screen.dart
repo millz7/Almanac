@@ -67,8 +67,22 @@ class _ChakrasScreenState extends ConsumerState<ChakrasScreen> {
     _closeReflection();
   }
 
+  /// One level up: from a reflection to its chakra, from a chakra to
+  /// the seven. The same as "Not now" and "Back to the seven".
+  void _up() => switch (_stage) {
+    ChakraStage.reflection => _closeReflection(),
+    ChakraStage.chakra => _backToJourney(),
+    ChakraStage.journey => null,
+  };
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    atTop: _stage == ChakraStage.journey,
+    onBack: _up,
+    child: _buildPage(),
+  );
+
+  Widget _buildPage() {
     final chakra = _selected;
 
     return AppScaffold(

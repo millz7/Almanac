@@ -75,6 +75,14 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
   bool _ownSaved = false;
   bool _ownSaveFailed = false;
 
+  /// Whether the recipe form on screen holds words not yet saved. Read
+  /// by system Back, which asks the same question Cancel does.
+  bool _formDirty = false;
+
+  /// Set while a save is being written, so a second tap on Save cannot
+  /// write the recipe twice.
+  bool _ownSaving = false;
+
   late final AnimationController _growth;
   bool _started = false;
 
@@ -155,6 +163,7 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     _own = view;
     _ownSaved = saved;
     _ownSaveFailed = false;
+    _formDirty = false;
   });
 
   /// Asks before anything is thrown away. The same plain dialog the
@@ -165,28 +174,11 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     required String body,
     required String yes,
     required String no,
-  }) async {
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(yes),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(no),
-          ),
-        ],
-      ),
-    );
-    return answer ?? false;
-  }
+  }) => Confirm.ask(context, title: title, body: body, yes: yes, no: no);
 
   Future<void> _saveOwn(String? id, OwnRecipeDraft draft) async {
+    if (_ownSaving) return;
+    _ownSaving = true;
     try {
       final savedId = id == null
           ? await _ownRecipes.add(
@@ -206,20 +198,16 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
                 .then((_) => id);
       if (mounted) _showOwn(_ReadingOwn(savedId), saved: true);
     } on Object {
+      // Nothing is shown as saved, the form keeps every word, and Save
+      // can simply be tried again.
       if (mounted) setState(() => _ownSaveFailed = true);
+    } finally {
+      _ownSaving = false;
     }
   }
 
   Future<void> _cancelOwn(String? id, {required bool changed}) async {
-    if (changed &&
-        !await _confirm(
-          title: CookbookText.leaveTitle,
-          body: CookbookText.leaveBody,
-          yes: CookbookText.leave,
-          no: CookbookText.keepEditing,
-        )) {
-      return;
-    }
+    if (changed && !await UnsavedChanges.confirmLeave(context)) return;
     if (mounted) _showOwn(id == null ? null : _ReadingOwn(id));
   }
 
@@ -290,6 +278,7 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
               existing: existing,
               onSave: (draft) => _saveOwn(existing?.id, draft),
               onCancel: (changed) => _cancelOwn(existing?.id, changed: changed),
+              onDirtyChanged: (dirty) => _formDirty = dirty,
             ),
             ?failure,
           ],
@@ -297,8 +286,30 @@ class _CookbookScreenState extends ConsumerState<CookbookScreen>
     }
   }
 
+  /// One logical level up: from a form (asking first if anything was
+  /// typed), from one of the user's recipes, or from a catalogue recipe.
+  void _up() {
+    switch (_own) {
+      case _WritingOwn(:final id):
+        final existing = id == null
+            ? null
+            : ref.read(ownRecipesProvider).value?.find(id);
+        _cancelOwn(existing?.id, changed: _formDirty);
+      case _ReadingOwn():
+        _showOwn(null);
+      case null:
+        if (_open != null) setState(() => _open = null);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    atTop: _own == null && _open == null,
+    onBack: _up,
+    child: _page(),
+  );
+
+  Widget _page() {
     final recipe = _open;
 
     if (_own case final own?) return _ownPage(own);

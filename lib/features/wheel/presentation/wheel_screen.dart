@@ -90,10 +90,16 @@ class _WheelScreenState extends ConsumerState<WheelScreen> {
   });
 
   @override
-  Widget build(BuildContext context) => switch (_stack.last) {
-    WheelLanding() => _WheelHome(onOpen: _open),
-    WheelFestivalPage(:final id) => FestivalDetailPage(id: id, onBack: _back),
-  };
+  Widget build(BuildContext context) => InnerBack(
+    // System Back from a festival returns to the wheel, as its own Back
+    // does, rather than closing the app.
+    atTop: _stack.length == 1,
+    onBack: _back,
+    child: switch (_stack.last) {
+      WheelLanding() => _WheelHome(onOpen: _open),
+      WheelFestivalPage(:final id) => FestivalDetailPage(id: id, onBack: _back),
+    },
+  );
 }
 
 /// The wheel itself, the current season and festival in words, and the

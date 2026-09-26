@@ -277,6 +277,7 @@ class OwnRecipeForm extends StatefulWidget {
     this.existing,
     required this.onSave,
     required this.onCancel,
+    this.onDirtyChanged,
   });
 
   /// The recipe being changed, or null for a new one.
@@ -287,6 +288,10 @@ class OwnRecipeForm extends StatefulWidget {
   /// Called with whether anything has been changed, so the screen can
   /// ask before throwing words away.
   final ValueChanged<bool> onCancel;
+
+  /// Told whenever the form goes from untouched to changed or back, so
+  /// system Back can ask the same question Cancel does.
+  final ValueChanged<bool>? onDirtyChanged;
 
   @override
   State<OwnRecipeForm> createState() => _OwnRecipeFormState();
@@ -310,6 +315,18 @@ class _OwnRecipeFormState extends State<OwnRecipeForm> {
     _method = TextEditingController(text: existing?.method.join('\n') ?? '');
     _note = TextEditingController(text: existing?.note ?? '');
     _initial = _snapshot;
+    for (final controller in [_title, _ingredients, _method, _note]) {
+      controller.addListener(_reportDirty);
+    }
+  }
+
+  bool _reported = false;
+
+  void _reportDirty() {
+    final changed = _changed;
+    if (changed == _reported) return;
+    _reported = changed;
+    widget.onDirtyChanged?.call(changed);
   }
 
   @override

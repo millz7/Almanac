@@ -13,6 +13,15 @@ abstract interface class LocationService {
   /// notices that permission was granted or revoked in system settings.
   Future<LocationState> currentState();
 
+  /// Whether permission is still granted and location services are still
+  /// on — checked **without prompting and without reading a position**.
+  ///
+  /// The cheap question asked on resume while a fix is still fresh: a
+  /// permission revoked in system settings, or a one-time grant that has
+  /// lapsed, must not leave the app claiming a location it no longer
+  /// has.
+  Future<bool> stillPermitted();
+
   /// Asks the user for permission, then tries to obtain a position.
   ///
   /// Only ever called in response to a deliberate user action. Returns
@@ -37,6 +46,9 @@ class UnavailableLocationService implements LocationService {
   @override
   Future<LocationState> currentState() async =>
       const LocationUnavailable('no location service configured');
+
+  @override
+  Future<bool> stillPermitted() async => false;
 
   @override
   Future<LocationState> requestAccess() async =>

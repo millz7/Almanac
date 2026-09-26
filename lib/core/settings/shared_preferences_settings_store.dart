@@ -49,12 +49,11 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   @override
   UserSettings read() {
     final hemisphere = _readHemisphere();
-    final locationIntroSeen =
-        _preferences.getBool(_locationIntroSeenKey) ?? false;
+    final locationIntroSeen = _bool(_locationIntroSeenKey) ?? false;
 
     return UserSettings(
       name: _readName(),
-      nameAsked: _preferences.getBool(_nameAskedKey) ?? false,
+      nameAsked: _bool(_nameAskedKey) ?? false,
       hemisphere: hemisphere,
       locationIntroSeen: locationIntroSeen,
       features: _readFeatures(),
@@ -101,14 +100,14 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   /// A blank stored name is treated as no name, so an empty string can
   /// never become the title "'s Almanac".
   String? _readName() {
-    final stored = _preferences.getString(_nameKey)?.trim();
+    final stored = _string(_nameKey)?.trim();
     return (stored == null || stored.isEmpty) ? null : stored;
   }
 
   /// An unrecognised hemisphere is treated as "not chosen", which sends
   /// the user back through onboarding rather than guessing for them.
   Hemisphere? _readHemisphere() {
-    final stored = _preferences.getString(_hemisphereKey);
+    final stored = _string(_hemisphereKey);
     if (stored == null) return null;
     for (final hemisphere in Hemisphere.values) {
       if (hemisphere.name == stored) return hemisphere;
@@ -121,7 +120,12 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   /// feature, so it is filtered out if an old or hand-edited value
   /// contains it.
   Set<FeatureId> _readFeatures() {
-    final stored = _preferences.getStringList(_featuresKey);
+    final List<String>? stored;
+    try {
+      stored = _preferences.getStringList(_featuresKey);
+    } on Object {
+      return const {};
+    }
     if (stored == null) return const {};
 
     return {
@@ -142,8 +146,27 @@ class SharedPreferencesSettingsStore implements SettingsStore {
     required Hemisphere? hemisphere,
     required bool locationIntroSeen,
   }) =>
-      _preferences.getBool(_onboardingCompletedKey) ??
+      _bool(_onboardingCompletedKey) ??
       (hemisphere != null && locationIntroSeen);
+
+  // A value of the wrong type — a damaged or hand-edited file — reads as
+  // missing rather than throwing, so the app still starts and falls back
+  // to the same defaults a fresh install gets for that one value.
+  bool? _bool(String key) {
+    try {
+      return _preferences.getBool(key);
+    } on Object {
+      return null;
+    }
+  }
+
+  String? _string(String key) {
+    try {
+      return _preferences.getString(key);
+    } on Object {
+      return null;
+    }
+  }
 }
 
 /// Opens the persistent settings store, falling back to an in-memory one

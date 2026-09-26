@@ -16,6 +16,11 @@ import 'weather_service.dart';
 /// real benefit to what the app says.
 const kWeatherCacheDuration = Duration(minutes: 45);
 
+/// The oldest forecast the app will still fall back on when a refresh
+/// fails. Past this, "the weather now" would be a description of some
+/// other part of the day, so saying nothing is more honest.
+const kWeatherFallbackMaxAge = Duration(hours: 3);
+
 /// The weather source. Behind an interface, like every other environment
 /// service, so a test never touches the network.
 final weatherServiceProvider = Provider<WeatherService>(
@@ -85,8 +90,11 @@ class WeatherController extends AsyncNotifier<WeatherSnapshot?> {
       // parsed. A still-usable cached forecast for roughly the same
       // place is better than nothing; otherwise there is simply no
       // weather this time, and the app carries on without it.
+      // Never another place's forecast, and never one so old it would
+      // describe a different part of the day.
       if (cached != null &&
-          _sameApproximateLocation(cached.location, location)) {
+          _sameApproximateLocation(cached.location, location) &&
+          !cached.isStaleAt(now, kWeatherFallbackMaxAge)) {
         return cached;
       }
       return null;

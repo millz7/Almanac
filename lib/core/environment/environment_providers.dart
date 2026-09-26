@@ -112,16 +112,30 @@ class LocationController extends Notifier<LocationState> {
   /// resume, so permission granted or revoked in system settings is
   /// picked up.
   ///
-  /// Skips the platform call entirely while the current fix is still
-  /// fresh, unless [force] is set — which is what the user's own
-  /// "refresh" action in Settings does.
+  /// While the current fix is still fresh it does not read a new
+  /// position — unless [force] is set, which is what the user's own
+  /// "refresh" action in Settings does — but it still asks, cheaply,
+  /// whether permission and location services are on. A permission
+  /// revoked in system settings is therefore noticed on the very next
+  /// resume, not fifteen minutes later.
   Future<void> refresh({bool force = false}) async {
     final current = state;
     if (!force &&
         current is LocationAvailable &&
         !current.isStaleAt(ref.read(clockProvider)(), kPositionMaxAge)) {
-      return;
+      final bool permitted;
+      try {
+        permitted = await ref.read(locationServiceProvider).stillPermitted();
+      } on Object {
+        // Could not tell: fall through to the full, guarded check.
+        return _recheck();
+      }
+      if (permitted) return;
     }
+    return _recheck();
+  }
+
+  Future<void> _recheck() async {
     state = await _guard(
       () => ref.read(locationServiceProvider).currentState(),
     );

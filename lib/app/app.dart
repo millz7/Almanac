@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/environment/environment_providers.dart';
+import '../core/environment/tide_providers.dart';
+import '../core/environment/weather_providers.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_providers.dart';
@@ -71,6 +73,12 @@ class _EnvironmentRefresherState extends ConsumerState<_EnvironmentRefresher> {
     // Non-prompting, and skipped entirely while the current fix is fresh.
     ref.read(locationStateProvider.notifier).refresh();
     ref.invalidate(naturalEnvironmentProvider);
+    // Weather and tides re-check on resume too, so a failed fetch — no
+    // signal on the last walk — recovers without waiting for the phone
+    // to move. Each keeps its own cache: within its freshness window
+    // this asks nothing of the network.
+    ref.invalidate(weatherControllerProvider);
+    ref.invalidate(tideControllerProvider);
   }
 
   @override

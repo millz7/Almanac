@@ -42,6 +42,17 @@ class FakeLocationService implements LocationService {
     return checkResult;
   }
 
+  /// How many times the cheap, position-free permission check ran.
+  int permissionCheckCount = 0;
+
+  /// Follows [checkResult]: permission is "still granted" exactly when
+  /// a full check would report a position.
+  @override
+  Future<bool> stillPermitted() async {
+    permissionCheckCount++;
+    return checkResult is LocationAvailable;
+  }
+
   @override
   Future<LocationState> requestAccess() async {
     requestCount++;
@@ -62,6 +73,10 @@ class ThrowingLocationService implements LocationService {
 
   @override
   Future<LocationState> currentState() async =>
+      throw StateError('platform location channel unavailable');
+
+  @override
+  Future<bool> stillPermitted() async =>
       throw StateError('platform location channel unavailable');
 
   @override

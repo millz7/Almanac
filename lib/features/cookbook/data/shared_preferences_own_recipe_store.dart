@@ -20,6 +20,11 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
 
   Future<SharedPreferencesWithCache>? _opening;
 
+  /// Set when what is stored could not be read at all. While it is set,
+  /// [write] refuses: the screen is showing nothing, and saving that
+  /// would overwrite what is still on the device.
+  bool _unreadable = false;
+
   Future<SharedPreferencesWithCache> _open() =>
       _opening ??= SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
@@ -29,18 +34,24 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
   Future<OwnRecipes> read() async {
     try {
       final preferences = await _open();
-      return decodeOwnRecipes(
+      final value = decodeOwnRecipes(
         preferences.getStringList(_recipesKey) ?? const [],
       );
+      _unreadable = false;
+      return value;
     } on Object catch (error) {
       // The failure, never the contents.
       debugPrint('Own recipes could not be read: ${error.runtimeType}');
+      _unreadable = true;
       return OwnRecipes.empty;
     }
   }
 
   @override
   Future<void> write(OwnRecipes recipes) async {
+    if (_unreadable) {
+      throw StateError('Stored own recipes could not be read; not overwriting');
+    }
     final preferences = await _open();
     await preferences.setStringList(_recipesKey, encodeOwnRecipes(recipes));
   }
@@ -51,5 +62,7 @@ class SharedPreferencesOwnRecipeStore implements OwnRecipeStore {
     for (final key in keys) {
       await preferences.remove(key);
     }
+    // Deliberately emptied: there is nothing left to overwrite.
+    _unreadable = false;
   }
 }

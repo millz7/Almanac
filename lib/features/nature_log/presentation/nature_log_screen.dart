@@ -102,6 +102,14 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
   /// Set once after saving, so the page can say so quietly.
   bool _acknowledged = false;
 
+  /// Whether the form on screen holds words not yet saved. Read by Back
+  /// — the page's own and the system's — before anything is thrown away.
+  bool _formDirty = false;
+
+  /// Set while a new observation is being written, so a second tap on
+  /// Save cannot record it twice.
+  bool _recording = false;
+
   @override
   void initState() {
     super.initState();
@@ -138,12 +146,14 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
     _stack.add(page);
     _acknowledged = false;
     _saveFailed = false;
+    _formDirty = false;
   });
 
   void _back() => setState(() {
     if (_stack.length > 1) _stack.removeLast();
     _acknowledged = false;
     _saveFailed = false;
+    _formDirty = false;
   });
 
   void _toLanding() => setState(() {
@@ -152,7 +162,17 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
       ..add(const NatureLogLanding());
     _acknowledged = false;
     _saveFailed = false;
+    _formDirty = false;
   });
+
+  /// One level up, asking first if a form holds unsaved words. Both the
+  /// page's Back control and the system's Back come through here, so
+  /// there is one rule and one question.
+  Future<void> _leave() async {
+    if (_formDirty && !await UnsavedChanges.confirmLeave(context)) return;
+    if (!mounted) return;
+    _stack.length > 2 ? _back() : _toLanding();
+  }
 
   NatureLogController get _log => ref.read(natureLogProvider.notifier);
 
@@ -168,9 +188,19 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
   /// Saves a new observation and returns to the log, where it will
   /// already be at the top.
   Future<void> _save(Future<void> Function() record) async {
-    await _saving(record);
+    if (_recording) return;
+    _recording = true;
+    try {
+      await _saving(record);
+    } finally {
+      _recording = false;
+    }
     if (!mounted) return;
+    // A failed write leaves the form exactly as it was, words and all,
+    // so Save can be tried again.
+    if (_saveFailed) return;
     setState(() {
+      _formDirty = false;
       _stack
         ..clear()
         ..addAll([const NatureLogLanding(), const NatureObservationsPage()]);
@@ -178,26 +208,14 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
     });
   }
 
-  Future<bool> _confirm({required String title, required String body}) async {
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(NatureLogText.remove),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(NatureLogText.keep),
-          ),
-        ],
-      ),
-    );
-    return answer ?? false;
-  }
+  Future<bool> _confirm({required String title, required String body}) =>
+      Confirm.ask(
+        context,
+        title: title,
+        body: body,
+        yes: NatureLogText.remove,
+        no: NatureLogText.keep,
+      );
 
   Future<void> _remove(NatureObservation observation) async {
     final confirmed = await _confirm(
@@ -233,7 +251,13 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    atTop: _stack.length == 1,
+    onBack: _leave,
+    child: _buildPage(context),
+  );
+
+  Widget _buildPage(BuildContext context) {
     final page = _page;
     final today = ref.watch(todayProvider);
     final season = ref.watch(currentSeasonProvider);
@@ -267,7 +291,7 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: _stack.length > 2 ? _back : _toLanding,
+              onPressed: _leave,
               child: const Text(NatureLogText.back),
             ),
           ),
@@ -306,6 +330,7 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
             item: NatureBook.byId(itemId),
             today: today,
             onAskForDate: _askForDate,
+            onDirtyChanged: (dirty) => _formDirty = dirty,
             onSave: (draft) => _save(
               () => _log.recordFromBook(
                 item: NatureBook.byId(itemId),
@@ -320,6 +345,7 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
             key: const ValueKey('record-custom'),
             today: today,
             onAskForDate: _askForDate,
+            onDirtyChanged: (dirty) => _formDirty = dirty,
             onSave: (draft) => _save(
               () => _log.recordCustom(
                 name: draft.name!,
@@ -345,6 +371,7 @@ class _NatureLogScreenState extends ConsumerState<NatureLogScreen>
             instanceId: instanceId,
             settle: _settle,
             onAskForDate: _askForDate,
+            onDirtyChanged: (dirty) => _formDirty = dirty,
             onSave: (draft) => _saving(
               () => _log.edit(
                 instanceId,
@@ -884,7 +911,11 @@ class _ObservationForm extends StatefulWidget {
     required this.onSave,
     this.item,
     this.existing,
+    this.onDirtyChanged,
   });
+
+  /// Told whenever the form goes from untouched to changed or back.
+  final ValueChanged<bool>? onDirtyChanged;
 
   /// The book entry being recorded, if it came from the book.
   final NatureItem? item;
@@ -924,6 +955,28 @@ class _ObservationFormState extends State<_ObservationForm> {
     _date = existing?.date ?? widget.today;
     _category =
         existing?.category ?? widget.item?.category ?? NatureCategory.other;
+    _initial = _snapshot;
+    for (final controller in [_name, _note, _place]) {
+      controller.addListener(_reportDirty);
+    }
+  }
+
+  late String _initial;
+  bool _reported = false;
+
+  String get _snapshot => [
+    _name.text,
+    _note.text,
+    _place.text,
+    _date.iso,
+    _category.name,
+  ].join('\u0000');
+
+  void _reportDirty() {
+    final changed = _snapshot != _initial;
+    if (changed == _reported) return;
+    _reported = changed;
+    widget.onDirtyChanged?.call(changed);
   }
 
   @override
@@ -976,7 +1029,10 @@ class _ObservationFormState extends State<_ObservationForm> {
                 _CategoryChip(
                   category: category,
                   selected: category == _category,
-                  onTap: () => setState(() => _category = category),
+                  onTap: () {
+                    setState(() => _category = category);
+                    _reportDirty();
+                  },
                 ),
             ],
           ),
@@ -995,7 +1051,10 @@ class _ObservationFormState extends State<_ObservationForm> {
             TextButton(
               onPressed: () async {
                 final picked = await widget.onAskForDate(_date);
-                if (picked != null && mounted) setState(() => _date = picked);
+                if (picked != null && mounted) {
+                  setState(() => _date = picked);
+                  _reportDirty();
+                }
               },
               child: const Text(NatureLogText.changeDate),
             ),
@@ -1039,15 +1098,20 @@ class _ObservationFormState extends State<_ObservationForm> {
                 ? NatureLogText.saveObservation
                 : NatureLogText.saveChanges,
             onPressed: _canSave
-                ? () => widget.onSave(
-                    _Draft(
-                      date: _date,
-                      name: _namesItself ? _name.text : null,
-                      category: _namesItself ? _category : null,
-                      note: _note.text,
-                      place: _place.text,
-                    ),
-                  )
+                ? () {
+                    // What is being saved is the new starting point.
+                    _initial = _snapshot;
+                    _reportDirty();
+                    widget.onSave(
+                      _Draft(
+                        date: _date,
+                        name: _namesItself ? _name.text : null,
+                        category: _namesItself ? _category : null,
+                        note: _note.text,
+                        place: _place.text,
+                      ),
+                    );
+                  }
                 : null,
           ),
         ),
@@ -1171,7 +1235,9 @@ class _ObservationsList extends ConsumerWidget {
         ? null
         : NatureLogText.seasonSummary(
             (log.value ?? NatureLog.empty).countBetween(
-              CalendarDate.from(environment.season.startedAt.toLocal()),
+              CalendarDate.from(
+                environment.timeZone.wallTimeAt(environment.season.startedAt),
+              ),
               ref.watch(todayProvider),
             ),
             season,
@@ -1322,7 +1388,10 @@ class _ObservationDetail extends ConsumerWidget {
     required this.onAskForDate,
     required this.onSave,
     required this.onRemove,
+    this.onDirtyChanged,
   });
+
+  final ValueChanged<bool>? onDirtyChanged;
 
   final String instanceId;
   final Animation<double> settle;
@@ -1345,6 +1414,7 @@ class _ObservationDetail extends ConsumerWidget {
           item: item,
           existing: observation,
           onAskForDate: onAskForDate,
+          onDirtyChanged: onDirtyChanged,
           onSave: onSave,
         ),
         const SizedBox(height: AppSpacing.sm),

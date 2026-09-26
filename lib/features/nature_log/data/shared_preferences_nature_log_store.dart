@@ -22,6 +22,11 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
 
   Future<SharedPreferencesWithCache>? _opening;
 
+  /// Set when what is stored could not be read at all. While it is set,
+  /// [write] refuses: the screen is showing nothing, and saving that
+  /// would overwrite what is still on the device.
+  bool _unreadable = false;
+
   Future<SharedPreferencesWithCache> _open() =>
       _opening ??= SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
@@ -31,16 +36,24 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
   Future<NatureLog> read() async {
     try {
       final preferences = await _open();
-      return decodeLog(preferences.getStringList(_observationsKey) ?? const []);
+      final value = decodeLog(
+        preferences.getStringList(_observationsKey) ?? const [],
+      );
+      _unreadable = false;
+      return value;
     } on Object catch (error) {
       // The failure, never the contents.
       debugPrint('Nature Log could not be read: ${error.runtimeType}');
+      _unreadable = true;
       return NatureLog.empty;
     }
   }
 
   @override
   Future<void> write(NatureLog log) async {
+    if (_unreadable) {
+      throw StateError('Stored nature log could not be read; not overwriting');
+    }
     final preferences = await _open();
     await preferences.setStringList(_observationsKey, encodeLog(log));
   }
@@ -51,5 +64,7 @@ class SharedPreferencesNatureLogStore implements NatureLogStore {
     for (final key in keys) {
       await preferences.remove(key);
     }
+    // Deliberately emptied: there is nothing left to overwrite.
+    _unreadable = false;
   }
 }

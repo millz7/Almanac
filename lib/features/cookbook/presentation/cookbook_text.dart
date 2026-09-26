@@ -1,4 +1,5 @@
 import '../../../core/context/cycle_phase.dart';
+import '../../../core/widgets/unsaved_changes.dart';
 import '../domain/own_recipe.dart';
 import '../domain/recipe_catalogue.dart';
 
@@ -107,10 +108,11 @@ abstract final class CookbookText {
   static const delete = 'Delete';
   static const keep = 'Keep';
 
-  static const leaveTitle = 'Leave without saving?';
-  static const leaveBody = 'What you have written here will not be kept.';
-  static const leave = 'Leave';
-  static const keepEditing = 'Keep editing';
+  // The shared unsaved-changes question, in the app's one set of words.
+  static const leaveTitle = UnsavedChanges.title;
+  static const leaveBody = UnsavedChanges.body;
+  static const leave = UnsavedChanges.leave;
+  static const keepEditing = UnsavedChanges.keepEditing;
 
   /// "Leek and potato soup. Your recipe." — a tile, spoken.
   static String ownRecipeLabel(OwnRecipe recipe) =>

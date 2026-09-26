@@ -121,7 +121,21 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
   /// Opens the editor for one day, and stays on the Calendar afterwards
   /// so several days in a row can be entered without navigating back in
   /// each time.
+  /// Set while a day's sheet is open, so a double tap on a day opens
+  /// one sheet, not two.
+  bool _editing = false;
+
   Future<void> _editDay(CalendarDate date) async {
+    if (_editing) return;
+    _editing = true;
+    try {
+      await _editDayOnce(date);
+    } finally {
+      _editing = false;
+    }
+  }
+
+  Future<void> _editDayOnce(CalendarDate date) async {
     final data = ref.read(cycleDataProvider).value ?? CycleData.empty;
     final result = await showModalBottomSheet<_DayEdit>(
       context: context,
@@ -150,29 +164,27 @@ class _CycleScreenState extends ConsumerState<CycleScreen> {
   }
 
   Future<void> _deleteEverything() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(CycleText.deleteAllTitle),
-        content: const Text(CycleText.deleteAllBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(CycleText.delete),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(CycleText.keep),
-          ),
-        ],
-      ),
+    final confirmed = await Confirm.ask(
+      context,
+      title: CycleText.deleteAllTitle,
+      body: CycleText.deleteAllBody,
+      yes: CycleText.delete,
+      no: CycleText.keep,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await _saving(_cycle.deleteEverything);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    // System Back does what the page's own Back does; the day editor is
+    // a sheet, which the navigator closes first.
+    atTop: _stack.length == 1,
+    onBack: _stack.length > 2 ? _back : _toHome,
+    child: _buildPage(context),
+  );
+
+  Widget _buildPage(BuildContext context) {
     final page = _page;
     final today = ref.watch(todayProvider);
     final season = ref.watch(currentSeasonProvider);
@@ -629,14 +641,18 @@ class _DayEditorState extends State<_DayEditor> {
                   Flexible(
                     child: PrimaryButton(
                       label: CycleText.save,
-                      onPressed: () => Navigator.of(
+                      // Once only: a second tap while the sheet closes
+                      // must not pop the page underneath.
+                      onPressed: () => ConfirmAnswer.closeOnce(
                         context,
-                      ).pop(_DayEdit(level: _level, isPeriodStart: _isStart)),
+                        _DayEdit(level: _level, isPeriodStart: _isStart),
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () =>
+                        ConfirmAnswer.closeOnce<_DayEdit?>(context, null),
                     child: const Text(CycleText.cancel),
                   ),
                 ],
@@ -646,7 +662,7 @@ class _DayEditorState extends State<_DayEditor> {
                   alignment: Alignment.centerLeft,
                   child: TextButton(
                     onPressed: () =>
-                        Navigator.of(context).pop(const _DayEdit()),
+                        ConfirmAnswer.closeOnce(context, const _DayEdit()),
                     child: const Text(CycleText.remove),
                   ),
                 ),

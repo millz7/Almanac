@@ -23,6 +23,11 @@ class SharedPreferencesGardenStore implements GardenStore {
 
   Future<SharedPreferencesWithCache>? _opening;
 
+  /// Set when what is stored could not be read at all. While it is set,
+  /// [write] refuses: the screen is showing nothing, and saving that
+  /// would overwrite what is still on the device.
+  bool _unreadable = false;
+
   Future<SharedPreferencesWithCache> _open() =>
       _opening ??= SharedPreferencesWithCache.create(
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
@@ -32,16 +37,24 @@ class SharedPreferencesGardenStore implements GardenStore {
   Future<MyGarden> read() async {
     try {
       final preferences = await _open();
-      return decodeGarden(preferences.getStringList(_plantsKey) ?? const []);
+      final value = decodeGarden(
+        preferences.getStringList(_plantsKey) ?? const [],
+      );
+      _unreadable = false;
+      return value;
     } on Object catch (error) {
       // The failure, never the contents.
       debugPrint('Garden could not be read: ${error.runtimeType}');
+      _unreadable = true;
       return MyGarden.empty;
     }
   }
 
   @override
   Future<void> write(MyGarden garden) async {
+    if (_unreadable) {
+      throw StateError('Stored garden could not be read; not overwriting');
+    }
     final preferences = await _open();
     await preferences.setStringList(_plantsKey, encodeGarden(garden));
   }
@@ -52,5 +65,7 @@ class SharedPreferencesGardenStore implements GardenStore {
     for (final key in keys) {
       await preferences.remove(key);
     }
+    // Deliberately emptied: there is nothing left to overwrite.
+    _unreadable = false;
   }
 }

@@ -43,6 +43,17 @@ class GeolocatorLocationService implements LocationService {
   }
 
   @override
+  Future<bool> stillPermitted() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (_refusalFor(permission) != null) return false;
+      return await Geolocator.isLocationServiceEnabled();
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
   Future<LocationState> requestAccess() async {
     try {
       var permission = await Geolocator.checkPermission();

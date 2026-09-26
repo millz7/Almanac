@@ -153,33 +153,46 @@ class _GardenScreenState extends ConsumerState<GardenScreen>
 
   Future<void> _addSown(PlantDefinition plant) async {
     await _saving(() => _garden.addSown(plant.id));
-    if (mounted) setState(() => _acknowledged = plant.id);
+    // Said only when it is true: a failed save shows its own line.
+    if (mounted && !_saveFailed) setState(() => _acknowledged = plant.id);
   }
 
   /// Adding something the user already has: the one question worth
   /// asking is how far along it is.
   Future<void> _addExisting(PlantDefinition plant) async {
-    final state = await showDialog<EstablishmentState>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text(GardenText.howIsItGrowing),
-        children: [
-          for (final state in EstablishmentState.values)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(context).pop(state),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: Text(state.question),
-              ),
-            ),
-        ],
-      ),
-    );
+    // One question at a time, however quickly the button is tapped.
+    if (_askingState) return;
+    _askingState = true;
+    final EstablishmentState? state;
+    try {
+      state = await _askState();
+    } finally {
+      _askingState = false;
+    }
     if (state == null) return;
 
-    await _saving(() => _garden.addExisting(plantId: plant.id, state: state));
-    if (mounted) setState(() => _acknowledged = plant.id);
+    await _saving(() => _garden.addExisting(plantId: plant.id, state: state!));
+    if (mounted && !_saveFailed) setState(() => _acknowledged = plant.id);
   }
+
+  bool _askingState = false;
+
+  Future<EstablishmentState?> _askState() => showDialog<EstablishmentState>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: const Text(GardenText.howIsItGrowing),
+      children: [
+        for (final state in EstablishmentState.values)
+          SimpleDialogOption(
+            onPressed: () => ConfirmAnswer.closeOnce(context, state),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(state.question),
+            ),
+          ),
+      ],
+    ),
+  );
 
   Future<void> _remove(PlantDefinition plant) async {
     final confirmed = await _confirm(
@@ -205,26 +218,13 @@ class _GardenScreenState extends ConsumerState<GardenScreen>
     required String title,
     required String body,
     required String confirm,
-  }) async {
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(confirm),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(GardenText.keep),
-          ),
-        ],
-      ),
-    );
-    return answer ?? false;
-  }
+  }) => Confirm.ask(
+    context,
+    title: title,
+    body: body,
+    yes: confirm,
+    no: GardenText.keep,
+  );
 
   /// Asks for a date, offering nothing later than today: a plant cannot
   /// have been sown on a day that has not happened.
@@ -241,7 +241,15 @@ class _GardenScreenState extends ConsumerState<GardenScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    // System Back does what the page's own Back does. Garden edits are
+    // saved as they are made, so there is nothing to ask about.
+    atTop: _stack.length == 1,
+    onBack: _stack.length > 2 ? _back : _toLanding,
+    child: _buildPage(context),
+  );
+
+  Widget _buildPage(BuildContext context) {
     final guide = ref.watch(gardeningGuideProvider);
     final today = ref.watch(todayProvider);
     final page = _page;

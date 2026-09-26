@@ -88,12 +88,21 @@ class TideController extends AsyncNotifier<TideState> {
       // provider is unreachable, not a guess dressed up as a reading.
       final cached = _lastState;
       if (cached is TideAvailable &&
-          _sameApproximateLocation(cached.snapshot.location, location)) {
+          _sameApproximateLocation(cached.snapshot.location, location) &&
+          _covers(cached.snapshot, now)) {
         return cached;
       }
       return const TideProviderUnavailable();
     }
   }
+
+  /// Whether a held curve still reaches past [now] — a tide curve is a
+  /// prediction, so an older one stays true for as long as it runs, but
+  /// no longer.
+  bool _covers(TideSnapshot snapshot, DateTime now) =>
+      snapshot.samples.isNotEmpty &&
+      !snapshot.samples.first.time.isAfter(now.toUtc()) &&
+      snapshot.samples.last.time.isAfter(now.toUtc());
 
   bool _stillFresh(GeoLocation location, DateTime now) {
     final resolvedAt = _lastResolvedAt;

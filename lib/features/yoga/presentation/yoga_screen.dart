@@ -227,8 +227,25 @@ class _YogaScreenState extends ConsumerState<YogaScreen>
     setState(() => _stage = YogaStage.ready);
   }
 
+  /// One level up. During a practice that ends it, exactly as tapping
+  /// the figure does. From the setup or the closing words it returns to
+  /// the three practices.
+  void _up() {
+    if (_stage.isImmersive) {
+      _endPractice();
+    } else if (_stage != YogaStage.choosingPractice) {
+      _backToPractices();
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => InnerBack(
+    atTop: _stage == YogaStage.choosingPractice,
+    onBack: _up,
+    child: _buildPage(context),
+  );
+
+  Widget _buildPage(BuildContext context) {
     // The app's existing reduced-motion convention, as used by
     // Meditation's orb and the Environment's sky.
     final still = MediaQuery.disableAnimationsOf(context);

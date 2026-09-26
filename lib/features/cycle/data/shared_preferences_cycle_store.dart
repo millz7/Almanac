@@ -53,15 +53,35 @@ class SharedPreferencesCycleStore implements CycleStore {
         cacheOptions: const SharedPreferencesWithCacheOptions(allowList: keys),
       );
 
+  /// Set when the stored records could not be read at all. While it is
+  /// set, [write] refuses: the screen is showing an empty cycle, and
+  /// saving that would overwrite a history that is still on the device.
+  bool _unreadable = false;
+
+  /// Reads one small value, treating a damaged one as missing so it can
+  /// never take the records down with it.
+  static T? _tolerant<T>(T? Function() read) {
+    try {
+      return read();
+    } on Object {
+      return null;
+    }
+  }
+
   @override
   Future<CycleData> read() async {
     try {
       final preferences = await _open();
-      final length = preferences.getInt(_lengthKey) ?? kDefaultCycleLength;
-      final manual = preferences.getString(_manualPhaseKey);
+      final length =
+          _tolerant(() => preferences.getInt(_lengthKey)) ??
+          kDefaultCycleLength;
+      final manual = _tolerant(() => preferences.getString(_manualPhaseKey));
 
       final stored = preferences.getStringList(_recordsKey);
-      final legacy = preferences.getStringList(_legacyStartsKey);
+      final legacy = _tolerant(
+        () => preferences.getStringList(_legacyStartsKey),
+      );
+      _unreadable = false;
 
       // Nothing to migrate: the ordinary path, and the one every launch
       // after the first takes.
@@ -88,12 +108,18 @@ class SharedPreferencesCycleStore implements CycleStore {
     } on Object catch (error) {
       // The failure, never the data.
       debugPrint('Cycle data could not be read: ${error.runtimeType}');
+      _unreadable = true;
       return CycleData.empty;
     }
   }
 
   @override
-  Future<void> write(CycleData data) async => _write(await _open(), data);
+  Future<void> write(CycleData data) async {
+    if (_unreadable) {
+      throw StateError('Stored cycle data could not be read; not overwriting');
+    }
+    await _write(await _open(), data);
+  }
 
   Future<void> _write(
     SharedPreferencesWithCache preferences,
@@ -118,5 +144,7 @@ class SharedPreferencesCycleStore implements CycleStore {
     for (final key in keys) {
       await preferences.remove(key);
     }
+    // Deliberately emptied: there is nothing left to overwrite.
+    _unreadable = false;
   }
 }
