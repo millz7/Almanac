@@ -167,7 +167,7 @@ void main() {
         await press(tester, navItem(feature.name));
         expect(location(), feature.route, reason: feature.name);
         expect(tester.takeException(), isNull, reason: feature.name);
-        expect(tabs(tester), hasLength(9), reason: feature.name);
+        expect(tabs(tester), hasLength(10), reason: feature.name);
       }
 
       Future<void> backTo(String route, String what) async {
@@ -518,7 +518,7 @@ void main() {
         environmentOverrides(features: everything),
         // Wide enough for the short labels, as on a large phone held
         // sideways or a tablet.
-        surface: const Size(760, 900),
+        surface: const Size(860, 900),
       );
       final strip = find.descendant(
         of: find.byType(AlmanacNavigationBar),
@@ -536,7 +536,7 @@ void main() {
         expect(navItem(feature.name), findsOneWidget, reason: feature.name);
       }
       // Short on screen, full to a screen reader.
-      for (final short in ['Env', 'Med', 'Chak', 'Cook', 'Hols']) {
+      for (final short in ['Env', 'Med', 'Chak', 'Cook', 'Hols', 'Jour']) {
         expect(find.text(short), findsWidgets, reason: short);
       }
 
@@ -604,7 +604,7 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(location(), kEnvironmentRoute);
         expect(find.text('TODAY'), findsOneWidget);
-        expect(tabs(tester), hasLength(9));
+        expect(tabs(tester), hasLength(10));
         // And every feature still opens.
         for (final feature in FeatureRegistry.optional) {
           container.read(routerProvider).go(feature.route);

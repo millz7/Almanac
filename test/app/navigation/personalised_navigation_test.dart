@@ -74,9 +74,7 @@ void main() {
       ]);
     });
 
-    testWidgets('everything chosen gives all nine destinations', (
-      tester,
-    ) async {
+    testWidgets('everything chosen gives all ten destinations', (tester) async {
       await pumpApp(
         tester,
         features: FeatureRegistry.optional.map((feature) => feature.id).toSet(),
@@ -92,6 +90,7 @@ void main() {
         'Garden',
         'Nature Log',
         'Wheel of the Year',
+        'Journal',
       ]);
     });
 
@@ -315,11 +314,11 @@ void main() {
     });
 
     testWidgets('a full Almanac shows the agreed short names', (tester) async {
-      // Wide enough that all eight fit at once; the narrow case is the
+      // Wide enough that all ten fit at once; the narrow case is the
       // scrolling one below.
       await pumpApp(
         tester,
-        surface: const Size(760, 900),
+        surface: const Size(860, 900),
         features: FeatureRegistry.optional.map((feature) => feature.id).toSet(),
       );
 
@@ -343,7 +342,7 @@ void main() {
 
       await pumpApp(
         tester,
-        surface: const Size(760, 900),
+        surface: const Size(860, 900),
         features: FeatureRegistry.optional.map((feature) => feature.id).toSet(),
       );
 
@@ -364,7 +363,7 @@ void main() {
     testWidgets('every destination stays comfortably tappable', (tester) async {
       await pumpApp(
         tester,
-        surface: const Size(760, 900),
+        surface: const Size(860, 900),
         features: FeatureRegistry.optional.map((feature) => feature.id).toSet(),
       );
 
@@ -383,7 +382,7 @@ void main() {
       }
     });
 
-    testWidgets('a bar too narrow for nine scrolls rather than shrinking', (
+    testWidgets('a bar too narrow for ten scrolls rather than shrinking', (
       tester,
     ) async {
       await pumpApp(
@@ -401,7 +400,7 @@ void main() {
 
       // ...and still holds every destination, at full size, with nothing
       // folded into an overflow menu.
-      expect(barOf(tester).destinations.length, 9);
+      expect(barOf(tester).destinations.length, 10);
       for (final feature in FeatureRegistry.all) {
         await tester.scrollUntilVisible(
           find.bySemanticsLabel(feature.name),
@@ -427,7 +426,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('…'), findsNothing);
       // Everything is still reachable.
-      expect(barOf(tester).destinations.length, 9);
+      expect(barOf(tester).destinations.length, 10);
     });
   });
 }

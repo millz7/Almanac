@@ -23,10 +23,11 @@ real moon.
 **Cookbook** is a small seasonal cookbook — sixteen recipes, four to a
 season. **Garden** is a gardening almanac: what is worth sowing,
 planting, tending, harvesting or pruning where you are, now, and a record
-of what you actually grow. **Nature Log** is the last of them: a quiet
-personal record of what you have noticed, beside a modest offline guide
-to what is often about at this time of year — offered only where the app
-actually knows the guide applies.
+of what you actually grow. **Nature Log** is a quiet personal record of
+what you have noticed, beside a modest offline guide to what is often
+about at this time of year — offered only where the app actually knows
+the guide applies. **Journal** is the last of them: a private page for
+each day you choose to write, kept only on the device.
 
 The Environment has depth as well as breadth: tapping its moon opens a
 page about the moon, and from there — if Meditation is part of your
@@ -627,11 +628,12 @@ scale and picks, in order:
 
 1. Full names — `Environment · Meditation · Yoga`.
 2. Each feature's deliberate short name — `Env · Med · Yoga · Chak ·
-   Cycle · Cook · Garden · Nature`. Chosen words, not truncations.
+   Cycle · Cook · Garden · Nature · Hols · Jour`. Chosen words, not
+   truncations.
 3. A strip that scrolls sideways, with every destination still present at
    full size.
 
-Whether a full eight-destination Almanac fits without scrolling depends
+Whether a full ten-destination Almanac fits without scrolling depends
 on the width and the rendered font; on a typical modern phone it does, on
 a narrow one it scrolls. Items never shrink below the minimum touch
 target to make room, and the bar grows taller for larger text rather than
@@ -1679,6 +1681,85 @@ observation is "A moth. Insect. Recorded 15 October." The way back sits
 *above* a page's list rather than below it, every target clears 48 dp,
 and names wrap rather than truncate at 2× text.
 
+## Journal
+
+A private page for each day the user chooses to write. Optional like
+every other part of the Almanac: chosen in onboarding or in the drawer,
+and dormant — its pages kept, untouched — while it is switched off.
+Switching it off while it is open returns to the Environment.
+
+### One page per day, and only the days that were written
+
+* **At most one page per local date.** A page's id *is* its date
+  (`2026-09-26`), so a second page for one day cannot exist, even in a
+  damaged file.
+* **A page exists only once something is saved on it.** Opening,
+  reading, flipping and leaving write nothing; blank or whitespace-only
+  text is refused by the controller and dropped by the store. There are
+  no blank records.
+* **Only today can be written.** The page opens on today, and the date
+  comes from `todayProvider` — the app's one idea of today, in the app's
+  own time zone. There is no date picker and no way to ask for another
+  day: a `JournalDraft` (permission to write one page) has a
+  library-private constructor, and the only thing that makes one is
+  `JournalController.openToday()`. Nothing in `lib/features/journal/`
+  calls `DateTime.now`; `createdAt`/`updatedAt` come from `clockProvider`.
+* **Today's page reopens for editing all day. The next day it is
+  read-only**, and today is a new, blank page.
+* **Explicit Save**, with the app's one unsaved-changes question
+  (`UnsavedChanges`) on every way off a page that holds unsaved words —
+  Previous, Contents, the page's Back and system Back. A double tap on
+  Save saves once; a failed save leaves the words where they are.
+
+### The midnight rule
+
+A draft keeps the date it was opened with. Somebody writing across
+midnight saves on the day they began — the words were that day's — and
+the page says so ("This page is still the day you began it on…"). Once
+they leave the page, today's page is the new day's. If nothing is
+unsaved when midnight passes, the page simply turns to the new day by
+itself. Both cases are tested (`test/features/journal/`).
+
+### The day's context, captured once
+
+The first save records what surrounded the day, as text:
+
+| Field | From |
+|---|---|
+| Moon phase name, illuminated fraction | `currentMoonProvider` |
+| Season | `currentSeasonProvider` |
+| Festival id and name | `almanacFestivalProvider` — only when the Wheel of the Year is part of the Almanac **and** the festival falls *on* that date (never one merely approaching) |
+| Maramataka night id, name and reference | `currentMaramatakaProvider` — only while the Maramataka preference is on |
+
+A new page saved after midnight uses the snapshot captured when the page
+was opened, so it describes the page's own day. **A saved page never
+recalculates**: a better Moon model, the Wheel switched off, or the
+Maramataka turned on or off leaves every old page exactly as it was.
+Editing a page changes only its words and `updatedAt`.
+
+### Reading the book
+
+It opens on today. Previous and Next move only between saved pages —
+never through blank days — and forward from the newest past page is
+today. **Contents** lists saved pages only, grouped by month (newest
+first), each with its full date, its Moon and any festival; each row is
+one screen-reader sentence and at least 48dp tall. A past page is
+announced as read-only. Removing a page — past or today's — asks first,
+through the app's one `Confirm` dialog, so a double tap is safe.
+
+### Private
+
+Its own store (`SharedPreferencesJournalStore`, key `journal.entries`,
+one JSON line per page), with the same hardening as every other store:
+a failed read refuses later writes rather than overwrite the device's
+pages, lines this version cannot read are written back untouched, and
+duplicate dates are read once. **No network, no account, no sharing, no
+mood, tags, images, audio or AI.** The words never appear in a log (a
+failed read logs only the kind of failure; `JournalEntry.toString()`
+prints the date alone), and no other feature reads the Journal — only the
+composition root that decides which screen a tab opens imports it, which
+a test checks.
+
 ## The Moon, inside the Environment
 
 The moon on the Environment page opens a page about the moon. It is
@@ -1759,6 +1840,66 @@ The intent is a hand-off, not stored state: it is taken on arrival and
 emptied on the next frame, so leaving and returning never finds
 yesterday's moon still waiting.
 
+## The Māori lunar calendar (Maramataka), inside the Moon
+
+An optional preference inside the Moon — **not** a category: no
+`FeatureId`, no tab, no onboarding question. In the Almanac drawer under
+*Preferences*: **Include Māori lunar calendar** — "Show Maramataka
+alongside the astronomical Moon cycle." Off by default, persisted as
+`settings.includeMaramataka`; a missing or damaged stored value reads as
+off.
+
+**Off**, nothing changes: the Moon page is exactly as before, the
+lunar-month page redirects to the Moon, and the Journal records no night.
+
+**On**, the Moon page gains a section after the astronomy: *MARAMATAKA /
+Māori lunar calendar*, the **estimated** night and its place in the month,
+the astronomical relationship (the phase keeps its own name — the night
+is never presented as a renaming of it), *About this night*, *Traditionally
+associated with* (only where the source says something), and **Explore
+the lunar month** — a page listing all thirty nights with tonight's
+marked in words ("Estimated tonight") and announced as selected, never by
+colour alone. Every Maramataka view carries the note:
+
+> Maramataka traditions vary between iwi and rohe. This view uses a
+> published reference sequence and should not be read as universal.
+
+### Sources, and one sequence only
+
+* **The night-by-night sequence is Te Ara's**, used whole and unaltered:
+  Paul Meredith, "Maramataka – the lunar calendar", *Te Ara — the
+  Encyclopedia of New Zealand*, page 2, "Nights of the month" — a list
+  Te Ara describes as adapted from names and observations made by
+  members of **Ngāti Kahungunu**, citing Elsdon Best, *The Maori division
+  of time*, pp. 34–35. The UI's source note says this explicitly. The
+  per-night notes are Te Ara's own words, quoted; the kūmara-planting and
+  Korekore notes are from its page 3, attributed and phrased as
+  tradition, not advice. Te Ara text is licensed CC BY-NC 3.0 NZ.
+* **Te Papa** ("What is the Maramataka | the Māori lunar calendar?",
+  "Nights in the Maramataka | the Māori lunar month") is used only for
+  general background — the month of about 29.5 days, beginning at the new
+  moon (Whiro) for most iwi and at the full moon (Rākaunui) for some, and
+  what it guided. Its descriptions are **never** merged into Te Ara's
+  sequence; there is no hybrid.
+* Names keep their macrons exactly as published. Nothing is translated
+  or narrated beyond what the source says, and nothing is a placeholder;
+  a content test checks both.
+
+### How the night is estimated
+
+From the Moon's age in the existing astronomical model
+(`MoonPhaseState.ageInDays`) — no second Moon calculation. The synodic
+month is divided evenly between the thirty nights from the new moon, so
+Whiro is first and Mutuwhenua last; ages outside one month wrap
+deterministically. The traditional way was to watch the Moon itself, so
+the app always says **estimated**. `Maramataka.nightForAge` and its tests
+live in `lib/core/environment/maramataka.dart` and
+`test/core/environment/maramataka_test.dart`.
+
+**Restraint:** the Maramataka appears only in the Moon and, when on, as a
+line on a new Journal page. Garden and Nature Log are deliberately
+unchanged — no planting or fishing guidance is derived from it.
+
 ## The Almanac panel
 
 A leaf mark at the top right of every screen opens a panel titled
@@ -1766,9 +1907,9 @@ A leaf mark at the top right of every screen opens a panel titled
 It is not a tab and not a settings screen: Profile (the name), Location &
 Region (hemisphere and location access, reusing the same widgets the old
 standalone settings screen used), and Your Almanac (a switch per feature,
-with the Environment listed as always on and no control to remove it).
-Changes are written before the control moves, and take effect
-immediately.
+with the Environment listed as always on and no control to remove it),
+then Preferences (Include Māori lunar calendar — see above). Changes are
+written before the control moves, and take effect immediately.
 
 ### Previewing palettes during development
 

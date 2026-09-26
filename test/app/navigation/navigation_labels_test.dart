@@ -78,10 +78,10 @@ void main() {
     });
 
     test('a full Almanac uses the agreed short names', () {
-      final destinations = almanacOf(8);
+      final destinations = almanacOf(9);
       final layout = layoutFor(
         destinations,
-        available: neededPerItem(destinations, short: true) * 9,
+        available: neededPerItem(destinations, short: true) * 10,
       );
 
       expect(layout.useShortLabels, isTrue);
@@ -96,14 +96,15 @@ void main() {
         'Garden',
         'Nature',
         'Hols',
+        'Jour',
       ]);
     });
 
     test('too tight for even the short names scrolls, hiding nothing', () {
-      final destinations = almanacOf(8);
+      final destinations = almanacOf(9);
       final layout = layoutFor(
         destinations,
-        available: neededPerItem(destinations, short: true) * 9 - 1,
+        available: neededPerItem(destinations, short: true) * 10 - 1,
       );
 
       expect(layout.scrollable, isTrue);
@@ -138,7 +139,7 @@ void main() {
 
   group('touch targets never shrink', () {
     test('every layout keeps items at least 48 wide', () {
-      for (final count in [0, 1, 3, 5, 7]) {
+      for (final count in [0, 1, 3, 5, 7, 9]) {
         for (final width in [200.0, 320.0, 400.0, 600.0]) {
           for (final scale in [1.0, 1.5, 2.0]) {
             final layout = layoutFor(
@@ -181,7 +182,7 @@ void main() {
     }
 
     test('no label ever needs more room than its item has', () {
-      for (final count in [1, 3, 5, 7]) {
+      for (final count in [1, 3, 5, 7, 9]) {
         for (final width in [200.0, 320.0, 360.0, 400.0, 720.0]) {
           for (final scale in [1.0, 1.3, 2.0]) {
             final destinations = almanacOf(count);

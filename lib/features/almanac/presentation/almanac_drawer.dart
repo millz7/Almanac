@@ -7,6 +7,7 @@ import '../../../core/widgets/widgets.dart';
 import 'widgets/feature_setting.dart';
 import 'widgets/hemisphere_setting.dart';
 import 'widgets/location_setting.dart';
+import 'widgets/maramataka_setting.dart';
 import 'widgets/name_setting.dart';
 
 /// The user's own Almanac: their name, their part of the world, and what
@@ -87,6 +88,11 @@ class AlmanacDrawer extends ConsumerWidget {
 
                   const AlmanacRule(spacing: AppSpacing.lg),
                   const FeatureSetting(),
+
+                  const AlmanacRule(spacing: AppSpacing.lg),
+                  const AlmanacSectionLabel(label: 'Preferences'),
+                  const SizedBox(height: AppSpacing.md),
+                  const MaramatakaSetting(),
                 ],
               ),
             );

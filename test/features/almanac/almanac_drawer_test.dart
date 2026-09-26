@@ -11,6 +11,8 @@ import 'package:almanac/core/settings/settings_providers.dart';
 import 'package:almanac/core/settings/settings_store.dart';
 import 'package:almanac/core/settings/user_settings.dart';
 import 'package:almanac/core/widgets/widgets.dart';
+import 'package:almanac/features/almanac/presentation/widgets/feature_setting.dart';
+import 'package:almanac/features/almanac/presentation/widgets/maramataka_setting.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -279,8 +281,14 @@ void main() {
         );
       }
 
-      // Eight switches, not nine: the Environment has no decision to make.
-      expect(find.byType(SwitchListTile), findsNWidgets(8));
+      // Nine switches, not ten: the Environment has no decision to make.
+      expect(
+        find.descendant(
+          of: find.byType(FeatureSetting),
+          matching: find.byType(SwitchListTile),
+        ),
+        findsNWidgets(9),
+      );
       expect(find.text('Always here'), findsOneWidget);
     });
 
@@ -490,6 +498,83 @@ void main() {
       expect(
         contrastRatio(color!, AlmanacPaper.ground),
         greaterThanOrEqualTo(3),
+      );
+    });
+  });
+
+  group('the Journal and the Maramataka', () {
+    testWidgets('the Journal has its own switch, with its description', (
+      tester,
+    ) async {
+      final container = await openAlmanac(tester);
+      final journal = find.widgetWithText(SwitchListTile, 'Journal');
+      expect(journal, findsOneWidget);
+      expect(
+        find.text('A private page for each day you choose to write'),
+        findsOneWidget,
+      );
+      await tapControl(tester, journal);
+      expect(container.read(userSettingsProvider).features, {
+        FeatureId.journal,
+      });
+      await tapControl(tester, journal);
+      expect(container.read(userSettingsProvider).features, isEmpty);
+    });
+
+    testWidgets('the Maramataka is a preference, not a category: off by '
+        'default, and its switch saves', (tester) async {
+      final container = await openAlmanac(tester);
+      expect(find.text('Preferences'), findsOneWidget);
+      final toggle = find.widgetWithText(
+        SwitchListTile,
+        MaramatakaSetting.title,
+      );
+      expect(toggle, findsOneWidget);
+      expect(find.text('Include Māori lunar calendar'), findsOneWidget);
+      expect(
+        find.text('Show Maramataka alongside the astronomical Moon cycle.'),
+        findsOneWidget,
+      );
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      // Not among the parts of the Almanac.
+      expect(
+        find.descendant(
+          of: find.byType(FeatureSetting),
+          matching: find.textContaining('Maramataka'),
+        ),
+        findsNothing,
+      );
+
+      await tapControl(tester, toggle);
+      expect(container.read(userSettingsProvider).includeMaramataka, isTrue);
+      expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+      // Adds nothing to the navigation bar.
+      expect(
+        tester
+            .widget<AlmanacNavigationBar>(find.byType(AlmanacNavigationBar))
+            .destinations,
+        hasLength(1),
+      );
+
+      await tapControl(tester, toggle);
+      expect(container.read(userSettingsProvider).includeMaramataka, isFalse);
+    });
+
+    testWidgets('a save that fails leaves it off and says so', (tester) async {
+      final container = await openAlmanac(
+        tester,
+        overrides: environmentOverrides(
+          settingsStore: const _FailingSettingsStore(),
+        ),
+      );
+      await tapControl(
+        tester,
+        find.widgetWithText(SwitchListTile, MaramatakaSetting.title),
+      );
+      expect(container.read(userSettingsProvider).includeMaramataka, isFalse);
+      expect(
+        find.text('That could not be saved on this device. Please try again.'),
+        findsOneWidget,
       );
     });
   });

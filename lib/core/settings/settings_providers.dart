@@ -98,6 +98,12 @@ class UserSettingsController extends Notifier<UserSettings> {
     return setFeatures(next);
   }
 
+  /// Turns the Māori lunar calendar on the Moon page on or off. Changes
+  /// nothing already written: Journal pages keep the context they were
+  /// saved with.
+  Future<void> setIncludeMaramataka(bool include) =>
+      _persist(state.copyWith(includeMaramataka: include));
+
   /// Marks first-launch setup as finished. The last step of onboarding.
   Future<void> completeOnboarding() =>
       _persist(state.copyWith(onboardingCompleted: true));

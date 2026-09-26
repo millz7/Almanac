@@ -105,6 +105,7 @@ void main() {
         FeatureId.wheel:
             'Seasonal festivals, traditions and ways to '
             'celebrate',
+        FeatureId.journal: 'A private page for each day you choose to write',
       };
 
       for (final feature in FeatureRegistry.optional) {
@@ -137,6 +138,12 @@ void main() {
       }
       // The Environment is not a choice.
       expect(find.widgetWithText(ChoiceCard, 'Environment'), findsNothing);
+      // The Journal is one; the Maramataka is not — it is a preference
+      // inside the Moon, offered in the Almanac drawer instead.
+      expect(find.widgetWithText(ChoiceCard, 'Journal'), findsOneWidget);
+      expect(find.textContaining('Maramataka'), findsNothing);
+      expect(find.textContaining('Māori lunar calendar'), findsNothing);
+      expect(find.byType(ChoiceCard), findsNWidgets(9));
       expect(
         find.textContaining('The Environment — the season, sky, sun and moon'),
         findsOneWidget,
@@ -216,7 +223,7 @@ void main() {
       ]);
     });
 
-    testWidgets('all eight are stored', (tester) async {
+    testWidgets('all nine are stored', (tester) async {
       final store = InMemorySettingsStore(atFeatureQuestion());
       await pumpApp(tester, store: store);
 
@@ -233,7 +240,7 @@ void main() {
       final bar = tester.widget<AlmanacNavigationBar>(
         find.byType(AlmanacNavigationBar),
       );
-      expect(bar.destinations.length, 9);
+      expect(bar.destinations.length, 10);
     });
 
     testWidgets('a choice can be un-chosen before continuing', (tester) async {

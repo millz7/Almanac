@@ -7,6 +7,7 @@ import '../../features/cookbook/presentation/cookbook_screen.dart';
 import '../../features/cycle/presentation/cycle_screen.dart';
 import '../../features/environment/presentation/environment_screen.dart';
 import '../../features/garden/presentation/garden_screen.dart';
+import '../../features/journal/presentation/journal_screen.dart';
 import '../../features/nature_log/presentation/nature_log_screen.dart';
 import '../../features/meditation/presentation/meditation_screen.dart';
 import '../../features/wheel/presentation/wheel_screen.dart';
@@ -51,4 +52,5 @@ Widget screenForFeature(FeatureDefinition feature) => switch (feature.id) {
   FeatureId.garden => const AlmanacPaperSurface(child: GardenScreen()),
   FeatureId.natureLog => const AlmanacPaperSurface(child: NatureLogScreen()),
   FeatureId.wheel => const AlmanacPaperSurface(child: WheelScreen()),
+  FeatureId.journal => const AlmanacPaperSurface(child: JournalScreen()),
 };

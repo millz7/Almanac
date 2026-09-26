@@ -9,6 +9,7 @@ import '../../../core/context/almanac_context.dart';
 import '../../../core/environment/geo_location.dart';
 import '../../../core/widgets/widgets.dart';
 import '../domain/moon_reflection.dart';
+import 'maramataka_section.dart';
 import 'moon_text.dart';
 import 'widgets/moon_disc.dart';
 
@@ -50,6 +51,8 @@ class MoonScreen extends ConsumerWidget {
       trailing: const AlmanacButton(),
       children: [
         _Facts(moon: moon, hemisphere: hemisphere),
+        // Nothing at all unless the user has chosen to include it.
+        const MaramatakaSection(),
         const AlmanacSectionDivider(spacing: AppSpacing.lg),
         _Reflection(reflection: reflection),
       ],

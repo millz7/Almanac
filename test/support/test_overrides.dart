@@ -16,6 +16,7 @@ import 'package:almanac/core/settings/user_settings.dart';
 import 'package:almanac/features/cycle/application/cycle_providers.dart';
 import 'package:almanac/features/cookbook/application/own_recipes_providers.dart';
 import 'package:almanac/features/garden/application/garden_providers.dart';
+import 'package:almanac/features/journal/application/journal_providers.dart';
 import 'package:almanac/features/nature_log/application/nature_log_providers.dart';
 import 'package:flutter_riverpod/misc.dart';
 
@@ -53,6 +54,7 @@ List<Override> environmentOverrides({
   GardenStore? gardenStore,
   NatureLogStore? natureLogStore,
   OwnRecipeStore? ownRecipeStore,
+  JournalStore? journalStore,
   Hemisphere? hemisphere = Hemisphere.northern,
   bool locationIntroSeen = true,
   bool refreshEnabled = false,
@@ -60,6 +62,7 @@ List<Override> environmentOverrides({
   bool? nameAsked,
   Set<FeatureId> features = const {},
   bool onboardingCompleted = true,
+  bool includeMaramataka = false,
 }) {
   useTimeZoneDatabase();
 
@@ -76,6 +79,7 @@ List<Override> environmentOverrides({
           locationIntroSeen: locationIntroSeen,
           features: features,
           onboardingCompleted: onboardingCompleted,
+          includeMaramataka: includeMaramataka,
         ),
       );
 
@@ -102,6 +106,10 @@ List<Override> environmentOverrides({
     // And the Cookbook's own recipes, likewise.
     ownRecipeStoreProvider.overrideWithValue(
       ownRecipeStore ?? InMemoryOwnRecipeStore(),
+    ),
+    // And the Journal, likewise: its own store, empty by default.
+    journalStoreProvider.overrideWithValue(
+      journalStore ?? InMemoryJournalStore(),
     ),
     // `clock` is for the rare test that needs time to *move*: pass a
     // closure over a variable the test reassigns. Everything else pins a

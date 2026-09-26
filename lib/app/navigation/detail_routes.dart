@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/features/feature_registry.dart';
+import '../../features/environment/presentation/maramataka_screen.dart';
 import '../../features/environment/presentation/moon_screen.dart';
 import '../../features/environment/presentation/tide_screen.dart';
 
@@ -52,6 +53,15 @@ List<RouteBase> detailRoutesFor(FeatureDefinition feature) =>
               );
             },
           ),
+          routes: [
+            // `/environment/moon/maramataka`: the lunar month, reached
+            // only from the Moon page and only with the Maramataka on
+            // (the router redirects to the Moon otherwise).
+            GoRoute(
+              path: 'maramataka',
+              builder: (_, _) => const MaramatakaScreen(),
+            ),
+          ],
         ),
         GoRoute(
           // Relative to the parent, which makes the full path

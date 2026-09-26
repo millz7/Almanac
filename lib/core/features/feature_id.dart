@@ -16,7 +16,8 @@ enum FeatureId {
   cookbook,
   garden,
   natureLog,
-  wheel;
+  wheel,
+  journal;
 
   /// Reads an id back from storage, returning null for anything
   /// unrecognised.

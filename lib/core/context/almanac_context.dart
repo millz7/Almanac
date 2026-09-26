@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../environment/day_night.dart';
 import '../environment/daypart.dart';
 import '../environment/environment_providers.dart';
+import '../environment/maramataka.dart';
 import '../environment/moon_phase.dart';
 import '../environment/tide.dart';
 import '../environment/tide_providers.dart';
 import '../environment/weather.dart';
 import '../environment/weather_providers.dart';
+import '../settings/settings_providers.dart';
 import '../time/clock_providers.dart';
 import 'almanac_moment.dart';
 
@@ -27,6 +29,7 @@ export '../environment/tide.dart'
         TideUnavailableForLocation;
 export '../environment/weather.dart' show WeatherCondition, WeatherSnapshot;
 export '../time/clock_providers.dart' show todayProvider;
+export '../environment/maramataka.dart';
 export 'almanac_moment.dart';
 export 'almanac_intent.dart';
 export 'feature_availability.dart';
@@ -44,6 +47,17 @@ final currentMoonProvider = Provider<MoonPhaseState>((ref) {
   if (environment != null) return environment.moon;
 
   return ref.watch(moonServiceProvider).phaseAt(ref.watch(clockProvider)());
+});
+
+/// Tonight's estimated Maramataka night — or null whenever the user has
+/// not chosen to include the Māori lunar calendar.
+///
+/// Derived from [currentMoonProvider], the one Moon the whole app reads:
+/// no second Moon calculation. Off by default, and while it is off
+/// nothing anywhere in the app can see a Maramataka night.
+final currentMaramatakaProvider = Provider<MaramatakaNight?>((ref) {
+  if (!ref.watch(userSettingsProvider).includeMaramataka) return null;
+  return Maramataka.nightForAge(ref.watch(currentMoonProvider).ageInDays);
 });
 
 /// Where the day has got to, once sunrise and sunset have resolved.

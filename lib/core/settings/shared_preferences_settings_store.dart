@@ -23,6 +23,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
   static const _locationIntroSeenKey = 'settings.locationIntroSeen';
   static const _featuresKey = 'settings.features';
   static const _onboardingCompletedKey = 'settings.onboardingCompleted';
+  static const _includeMaramatakaKey = 'settings.includeMaramataka';
 
   /// Everything this app is allowed to read or write. Keeping the list
   /// explicit stops unrelated keys being pulled into the cache.
@@ -33,6 +34,7 @@ class SharedPreferencesSettingsStore implements SettingsStore {
     _locationIntroSeenKey,
     _featuresKey,
     _onboardingCompletedKey,
+    _includeMaramatakaKey,
   };
 
   final SharedPreferencesWithCache _preferences;
@@ -66,6 +68,9 @@ class SharedPreferencesSettingsStore implements SettingsStore {
         hemisphere: hemisphere,
         locationIntroSeen: locationIntroSeen,
       ),
+      // Off unless it was deliberately turned on; anything damaged or
+      // unexpected reads as off.
+      includeMaramataka: _bool(_includeMaramatakaKey) ?? false,
     );
   }
 
@@ -100,6 +105,10 @@ class SharedPreferencesSettingsStore implements SettingsStore {
     await _preferences.setBool(
       _onboardingCompletedKey,
       settings.onboardingCompleted,
+    );
+    await _preferences.setBool(
+      _includeMaramatakaKey,
+      settings.includeMaramataka,
     );
   }
 

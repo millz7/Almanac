@@ -44,6 +44,11 @@ const kMoonRoute = '/environment/moon';
 /// the Environment page's own fact strip.
 const kTidesRoute = '/environment/tides';
 
+/// The lunar-month browser: a page inside the Moon's page, there only
+/// while the user has chosen to include the Maramataka. With the setting
+/// off it redirects back to the Moon.
+const kMaramatakaRoute = '/environment/moon/maramataka';
+
 /// The app's router.
 ///
 /// **Every feature has a route, always.** The user's choices decide what
@@ -70,6 +75,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       (settings) =>
           settings.chosenFeatures.map((feature) => feature.id.name).join(','),
     ),
+    (_, _) => refresh.value++,
+  );
+  // Switching the Maramataka off must also move someone off its page.
+  ref.listen(
+    userSettingsProvider.select((settings) => settings.includeMaramataka),
     (_, _) => refresh.value++,
   );
   ref.onDispose(refresh.dispose);
@@ -157,6 +167,12 @@ String? _afterSetup(Ref ref, String location) {
   final feature = FeatureRegistry.forRoute(location);
   if (feature != null && !ref.read(userSettingsProvider).includes(feature.id)) {
     return kEnvironmentRoute;
+  }
+  // The lunar-month browser belongs to an optional preference inside the
+  // Moon, not to a feature: with it off, the Moon itself is where to be.
+  if (location.startsWith(kMaramatakaRoute) &&
+      !ref.read(userSettingsProvider).includeMaramataka) {
+    return kMoonRoute;
   }
   return null;
 }

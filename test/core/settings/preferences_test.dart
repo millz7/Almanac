@@ -154,7 +154,7 @@ void main() {
       });
     });
 
-    test('all eight are stored', () async {
+    test('all nine are stored', () async {
       final store = InMemorySettingsStore();
       final everything = FeatureRegistry.optional
           .map((feature) => feature.id)
@@ -162,7 +162,7 @@ void main() {
       await controllerFor(store).setFeatures(everything);
 
       expect(store.read().features, everything);
-      expect(store.read().chosenFeatures.length, 8);
+      expect(store.read().chosenFeatures.length, 9);
     });
 
     test('one can be added and removed again', () async {

@@ -27,6 +27,7 @@ class UserSettings {
     this.locationIntroSeen = false,
     this.features = const {},
     this.onboardingCompleted = false,
+    this.includeMaramataka = false,
   });
 
   /// What the user would like to be called, or null if they have not said.
@@ -69,6 +70,11 @@ class UserSettings {
   /// no location, no features.
   final bool onboardingCompleted;
 
+  /// Whether the Moon page also shows the Māori lunar calendar. An
+  /// optional cultural layer, off until the user turns it on — not a
+  /// feature, and not part of onboarding.
+  final bool includeMaramataka;
+
   /// The chosen features in registry order, so the navigation bar and the
   /// drawer agree on the order regardless of the order they were picked.
   List<FeatureDefinition> get chosenFeatures => [
@@ -88,6 +94,7 @@ class UserSettings {
     bool? locationIntroSeen,
     Set<FeatureId>? features,
     bool? onboardingCompleted,
+    bool? includeMaramataka,
   }) => UserSettings(
     name: name == _keep ? this.name : name as String?,
     nameAsked: nameAsked ?? this.nameAsked,
@@ -95,6 +102,7 @@ class UserSettings {
     locationIntroSeen: locationIntroSeen ?? this.locationIntroSeen,
     features: features ?? this.features,
     onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+    includeMaramataka: includeMaramataka ?? this.includeMaramataka,
   );
 
   @override
@@ -105,7 +113,8 @@ class UserSettings {
       other.hemisphere == hemisphere &&
       other.locationIntroSeen == locationIntroSeen &&
       setEquals(other.features, features) &&
-      other.onboardingCompleted == onboardingCompleted;
+      other.onboardingCompleted == onboardingCompleted &&
+      other.includeMaramataka == includeMaramataka;
 
   @override
   int get hashCode => Object.hash(
@@ -115,6 +124,7 @@ class UserSettings {
     locationIntroSeen,
     Object.hashAllUnordered(features),
     onboardingCompleted,
+    includeMaramataka,
   );
 
   @override
@@ -123,5 +133,6 @@ class UserSettings {
       'hemisphere: ${hemisphere?.name ?? 'unset'}, '
       'locationIntroSeen: $locationIntroSeen, '
       'features: {${features.map((f) => f.name).join(', ')}}, '
-      'onboardingCompleted: $onboardingCompleted)';
+      'onboardingCompleted: $onboardingCompleted, '
+      'includeMaramataka: $includeMaramataka)';
 }

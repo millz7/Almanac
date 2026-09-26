@@ -559,13 +559,11 @@ void main() {
     });
   });
 
-  group('navigation holds nine categories', () {
+  group('navigation holds ten categories', () {
     for (final size in [_phone, _tablet]) {
       for (final scale in [1.0, 1.5, 2.0]) {
         testWidgets('${size.width.toInt()}×${size.height.toInt()} at '
-            '${scale}x: nine, named, tappable, never truncated', (
-          tester,
-        ) async {
+            '${scale}x: ten, named, tappable, never truncated', (tester) async {
           final handle = tester.ensureSemantics();
           await open(tester, surface: size, textScale: scale);
 
@@ -604,6 +602,24 @@ void main() {
               matching: find.byWidgetPredicate(
                 (w) => w is Text && (w.data == 'Hols' || w.data == 'Holidays'),
               ),
+            ),
+            findsOneWidget,
+          );
+          // And the Journal's reads as "Journal", or its agreed "Jour",
+          // announced in full either way.
+          expect(
+            find.descendant(
+              of: find.byType(AlmanacNavigationBar),
+              matching: find.byWidgetPredicate(
+                (w) => w is Text && (w.data == 'Jour' || w.data == 'Journal'),
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: find.byType(AlmanacNavigationBar),
+              matching: find.bySemanticsLabel('Journal'),
             ),
             findsOneWidget,
           );

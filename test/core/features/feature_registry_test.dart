@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('the catalogue', () {
-    test('holds the Environment and the eight choosable features', () {
-      expect(FeatureRegistry.all.length, 9);
-      expect(FeatureRegistry.optional.length, 8);
+    test('holds the Environment and the nine choosable features', () {
+      expect(FeatureRegistry.all.length, 10);
+      expect(FeatureRegistry.optional.length, 9);
       expect(FeatureRegistry.all.first, same(FeatureRegistry.environment));
     });
 
@@ -19,6 +19,7 @@ void main() {
         'Garden',
         'Nature Log',
         'Wheel of the Year',
+        'Journal',
       ]);
     });
 
@@ -38,6 +39,7 @@ void main() {
           'Garden': 'Garden',
           'Nature Log': 'Nature',
           'Wheel of the Year': 'Hols',
+          'Journal': 'Jour',
         },
       );
     });
@@ -47,6 +49,19 @@ void main() {
       expect(wheel.name, 'Wheel of the Year');
       expect(wheel.navLabel, 'Holidays');
       expect(wheel.shortName, 'Hols');
+    });
+
+    test('the Journal is named for what it is', () {
+      final journal = FeatureRegistry.byId(FeatureId.journal);
+      expect(journal.name, 'Journal');
+      expect(journal.navLabel, isNull);
+      expect(journal.shortName, 'Jour');
+      expect(journal.route, '/journal');
+      expect(
+        journal.description,
+        'A private page for each day you choose to write',
+      );
+      expect(journal.isCore, isFalse);
     });
 
     test('every short name is a word, never a truncation', () {

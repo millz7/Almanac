@@ -128,6 +128,18 @@ abstract final class FeatureRegistry {
           'The eight festivals of the Wheel of the Year will live here, '
           'turning with your own hemisphere.',
     ),
+    FeatureDefinition(
+      id: FeatureId.journal,
+      name: 'Journal',
+      shortName: 'Jour',
+      icon: Icons.menu_book_outlined,
+      selectedIcon: Icons.menu_book,
+      route: '/journal',
+      description: 'A private page for each day you choose to write',
+      placeholderMessage:
+          'A page for each day you choose to write will live here, kept '
+          'on this device.',
+    ),
   ];
 
   /// Every feature, core first.
